@@ -1,0 +1,279 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+
+  /* Light theme (default) */
+  --surface-0: #ffffff;
+  --surface-1: #fafafa;
+  --surface-2: #f5f5f5;
+  --surface-3: #ebebeb;
+  --text-primary: #171717;
+  --text-secondary: #737373;
+  --text-tertiary: #a3a3a3;
+  --accent: #2563eb;
+  --accent-hover: #1d4ed8;
+  --terminal-bg: #fafafa;
+
+  /* Diff colors - light */
+  --diff-add-bg: #dafbe1;
+  --diff-add-text: #1a7f37;
+  --diff-remove-bg: #ffebe9;
+  --diff-remove-text: #cf222e;
+
+  color-scheme: light;
+  color: var(--text-primary);
+  background-color: var(--surface-0);
+}
+
+.dark {
+  --surface-0: #0a0a0a;
+  --surface-1: #141414;
+  --surface-2: #1c1c1c;
+  --surface-3: #262626;
+  --text-primary: #fafafa;
+  --text-secondary: #a3a3a3;
+  --text-tertiary: #737373;
+  --accent: #3b82f6;
+  --accent-hover: #60a5fa;
+  --terminal-bg: #0c0c0c;
+
+  /* Diff colors - dark */
+  --diff-add-bg: rgba(46, 160, 67, 0.15);
+  --diff-add-text: #7ee787;
+  --diff-remove-bg: rgba(248, 81, 73, 0.15);
+  --diff-remove-text: #ff7b72;
+
+  color-scheme: dark;
+  color: var(--text-primary);
+  background-color: var(--surface-0);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body, #root {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+/* Scrollbar styles */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--surface-0);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--surface-3);
+  border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-tertiary);
+}
+
+/* Terminal specific styles */
+.xterm {
+  padding: 8px;
+  height: 100%;
+}
+
+.xterm-screen {
+  height: 100%;
+}
+
+.xterm-viewport::-webkit-scrollbar {
+  width: 10px;
+}
+
+.xterm-viewport::-webkit-scrollbar-track {
+  background: var(--terminal-bg);
+}
+
+.xterm-viewport::-webkit-scrollbar-thumb {
+  background: var(--surface-3);
+}
+
+/* CodeMirror overrides */
+.cm-editor {
+  height: 100%;
+}
+
+.cm-scroller {
+  font-family: 'Menlo', 'Monaco', 'Consolas', 'Liberation Mono', 'Courier New', monospace;
+  font-size: 13px;
+  overflow: auto !important;
+}
+
+/* Allow tooltips to overflow editor containers */
+.cm-tooltip {
+  z-index: 1000 !important;
+}
+
+.cm-tooltip-above, .cm-tooltip-below {
+  z-index: 1000 !important;
+}
+
+/* Go-to-definition cursor */
+.cm-editor.cm-go-to-definition-active {
+  cursor: pointer;
+}
+
+/* Hover tooltip styles (rendered in body) */
+.cm-tooltip-signature {
+  background-color: var(--surface-2);
+  border: 1px solid var(--surface-3);
+  border-radius: 6px;
+  padding: 8px 12px;
+  max-width: 400px;
+  font-size: 12px;
+  line-height: 1.4;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  z-index: 1000;
+}
+
+.cm-tooltip-signature-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.cm-tooltip-signature-kind {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background-color: var(--surface-3);
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  font-weight: 500;
+}
+
+.cm-tooltip-kind-function {
+  background-color: rgba(59, 130, 246, 0.2);
+  color: #3b82f6;
+}
+
+.cm-tooltip-kind-class {
+  background-color: rgba(6, 182, 212, 0.2);
+  color: #06b6d4;
+}
+
+.cm-tooltip-kind-type,
+.cm-tooltip-kind-interface {
+  background-color: rgba(6, 182, 212, 0.2);
+  color: #06b6d4;
+}
+
+.cm-tooltip-kind-variable {
+  background-color: rgba(34, 197, 94, 0.2);
+  color: #22c55e;
+}
+
+.cm-tooltip-kind-import {
+  background-color: rgba(192, 132, 252, 0.2);
+  color: #c084fc;
+}
+
+.cm-tooltip-kind-enum {
+  background-color: rgba(249, 115, 22, 0.2);
+  color: #f97316;
+}
+
+.cm-tooltip-signature-name {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.cm-tooltip-signature-code {
+  font-family: 'Menlo', 'Monaco', 'Consolas', monospace;
+  font-size: 11px;
+  color: var(--text-secondary);
+  background-color: var(--surface-1);
+  padding: 4px 8px;
+  border-radius: 4px;
+  margin-top: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cm-tooltip-signature-location {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  margin-top: 4px;
+}
+
+.cm-tooltip-signature-separator {
+  border: none;
+  border-top: 1px solid var(--surface-3);
+  margin: 8px 0;
+}
+
+.cm-tooltip-signature-ext-header {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  margin-bottom: 4px;
+}
+
+.cm-tooltip-signature-ext-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 0;
+}
+
+.cm-tooltip-signature-file {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.cm-tooltip-signature-more {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  font-style: italic;
+  margin-top: 4px;
+}
+
+.cm-tooltip-signature-hint {
+  font-size: 10px;
+  color: var(--text-tertiary);
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--surface-3);
+}
+
+/* Resizable panel handle styles */
+[data-panel-group-direction="horizontal"] > [data-panel-resize-handle-id] {
+  width: 4px;
+  background-color: var(--surface-3);
+}
+
+[data-panel-group-direction="horizontal"] > [data-panel-resize-handle-id]:hover {
+  background-color: var(--accent);
+}
+
+[data-panel-group-direction="vertical"] > [data-panel-resize-handle-id] {
+  height: 4px;
+  background-color: var(--surface-3);
+}
+
+[data-panel-group-direction="vertical"] > [data-panel-resize-handle-id]:hover {
+  background-color: var(--accent);
+}

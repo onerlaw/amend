@@ -1,0 +1,132 @@
+/* Custom theme for highlight.js that works with light and dark modes */
+.hljs {
+  color: var(--text-primary);
+  background: transparent;
+}
+
+.hljs-comment,
+.hljs-quote {
+  color: #6b7280;
+  font-style: italic;
+}
+
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-built_in,
+.hljs-name {
+  color: #a855f7; /* Purple - works on both */
+}
+
+.hljs-string,
+.hljs-title.class_,
+.hljs-title.function_.inherited__,
+.hljs-attr,
+.hljs-template-variable,
+.hljs-variable.language_ {
+  color: #22c55e; /* Green - works on both */
+}
+
+.hljs-number,
+.hljs-literal,
+.hljs-variable,
+.hljs-template-tag,
+.hljs-tag .hljs-attr {
+  color: #f97316; /* Orange - works on both */
+}
+
+.hljs-type,
+.hljs-class .hljs-title,
+.hljs-title.class_ {
+  color: #06b6d4; /* Cyan - works on both */
+}
+
+.hljs-function,
+.hljs-title.function_ {
+  color: #3b82f6; /* Blue - works on both */
+}
+
+.hljs-regexp,
+.hljs-selector-attr,
+.hljs-selector-pseudo {
+  color: #ec4899; /* Pink - works on both */
+}
+
+.hljs-symbol,
+.hljs-bullet,
+.hljs-link {
+  color: #f97316; /* Orange */
+}
+
+.hljs-meta,
+.hljs-selector-id,
+.hljs-title {
+  color: #3b82f6; /* Blue */
+}
+
+.hljs-emphasis {
+  font-style: italic;
+}
+
+.hljs-strong {
+  font-weight: bold;
+}
+
+.hljs-section {
+  color: #3b82f6;
+  font-weight: bold;
+}
+
+.hljs-tag {
+  color: #ec4899;
+}
+
+.hljs-tag .hljs-name {
+  color: #ec4899;
+}
+
+.hljs-attribute {
+  color: #06b6d4;
+}
+
+.hljs-punctuation {
+  color: var(--text-secondary);
+}
+
+.hljs-operator {
+  color: var(--text-primary);
+}
+
+.hljs-property {
+  color: #06b6d4;
+}
+
+.hljs-params {
+  color: var(--text-primary);
+}
+
+/* Language-specific adjustments */
+.hljs-doctag {
+  color: #6b7280;
+}
+
+.hljs-code {
+  color: #22c55e;
+}
+
+.hljs-formula {
+  color: #f97316;
+}
+
+.hljs-selector-class {
+  color: #06b6d4;
+}
+
+.hljs-addition {
+  color: #22c55e;
+  background-color: rgba(34, 197, 94, 0.15);
+}
+
+.hljs-deletion {
+  color: #ef4444;
+  background-color: rgba(239, 68, 68, 0.15);
+}
