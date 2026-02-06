@@ -5,14 +5,16 @@ import { useTerminalStore } from '@/stores/terminalStore';
 import { useFileStore } from '@/stores/fileStore';
 import { useProjectStore } from '@/stores/projectStore';
 import { useCloseTerminal } from '@/hooks/useTerminal';
-import { useDiffStats } from '@/hooks/useGit';
+import { useGitPolling } from '@/hooks/useGit';
 import { useTheme } from '@/hooks/useTheme';
 import { TerminalTabs, TerminalTabsHandle } from '@/components/Terminal/TerminalTabs';
 import { DiffContentPanel } from '@/components/DiffViewer/DiffContentPanel';
 import { DiffFileListPanel } from '@/components/DiffViewer/DiffFileListPanel';
+import { DiffViewerProvider } from '@/components/DiffViewer/DiffViewerContext';
 import { BrowseEditorTabs } from '@/components/FileBrowser/BrowseEditorTabs';
 import { BrowseFileListPanel } from '@/components/FileBrowser/BrowseFileListPanel';
 import { GlobalSearch } from '@/components/GlobalSearch/GlobalSearch';
+import { ModalOverlay } from '@/components/ModalOverlay';
 import { indexProject } from '@/lib/tauri';
 import { PlusIcon, CloseIcon, InfoIcon, SunIcon, MoonIcon, MonitorIcon } from '@/components/Icons';
 
@@ -41,7 +43,8 @@ export function MainLayout() {
   const [showShortcuts, setShowShortcuts] = useState(false);
   const terminalTabsRef = useRef<TerminalTabsHandle>(null);
   const migrationDone = useRef(false);
-  const diffStats = useDiffStats(contextPath);
+  const gitPolling = useGitPolling(contextPath);
+  const diffStats = gitPolling.diffStats;
 
   // Migration: if currentDirectory exists but no projects, auto-create one
   useEffect(() => {
@@ -191,41 +194,57 @@ export function MainLayout() {
         {/* No panel mode - terminal only */}
         {panelMode === null ? (
           <TerminalTabs ref={terminalTabsRef} />
-        ) : /* Browse mode without file selected - 2 panel layout */
-        panelMode === 'browse' && browseOpenFiles.length === 0 ? (
+        ) : panelMode === 'diff' ? (
+          /* Diff mode - 3 panel layout with shared context */
+          <DiffViewerProvider gitPolling={gitPolling}>
+            <PanelGroup direction="horizontal" autoSaveId="main-layout">
+              <Panel defaultSize={40} minSize={20}>
+                <TerminalTabs ref={terminalTabsRef} />
+              </Panel>
+
+              <PanelResizeHandle />
+
+              <Panel defaultSize={40} minSize={20}>
+                <DiffContentPanel />
+              </Panel>
+
+              <PanelResizeHandle />
+
+              <Panel defaultSize={20} minSize={10} maxSize={40}>
+                <DiffFileListPanel />
+              </Panel>
+            </PanelGroup>
+          </DiffViewerProvider>
+        ) : browseOpenFiles.length === 0 ? (
+          /* Browse mode without file selected - 2 panel layout */
           <PanelGroup direction="horizontal" autoSaveId="browse-no-file-layout">
-            {/* Terminal - Left */}
             <Panel defaultSize={60} minSize={20}>
               <TerminalTabs ref={terminalTabsRef} />
             </Panel>
 
             <PanelResizeHandle />
 
-            {/* File List - Right */}
             <Panel defaultSize={40} minSize={15}>
               <BrowseFileListPanel />
             </Panel>
           </PanelGroup>
         ) : (
-          /* Diff mode or Browse mode with file selected - 3 panel layout */
+          /* Browse mode with file selected - 3 panel layout */
           <PanelGroup direction="horizontal" autoSaveId="main-layout">
-            {/* Terminal - Left */}
             <Panel defaultSize={40} minSize={20}>
               <TerminalTabs ref={terminalTabsRef} />
             </Panel>
 
             <PanelResizeHandle />
 
-            {/* Content Area - Middle */}
             <Panel defaultSize={40} minSize={20}>
-              {panelMode === 'diff' ? <DiffContentPanel /> : <BrowseEditorTabs />}
+              <BrowseEditorTabs />
             </Panel>
 
             <PanelResizeHandle />
 
-            {/* File List - Right */}
             <Panel defaultSize={20} minSize={10} maxSize={40}>
-              {panelMode === 'diff' ? <DiffFileListPanel /> : <BrowseFileListPanel />}
+              <BrowseFileListPanel />
             </Panel>
           </PanelGroup>
         )}
@@ -233,14 +252,8 @@ export function MainLayout() {
 
       {/* Keyboard Shortcuts Modal */}
       {showShortcuts && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
-          onClick={() => setShowShortcuts(false)}
-        >
-          <div
-            className="w-80 rounded-xl bg-surface-2 p-4 shadow-xl"
-            onClick={(e) => e.stopPropagation()}
-          >
+        <ModalOverlay onClose={() => setShowShortcuts(false)}>
+          <div className="w-80 rounded-xl bg-surface-2 p-4 shadow-xl">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-sm font-semibold text-primary">Keyboard Shortcuts</h2>
               <button
@@ -277,7 +290,7 @@ export function MainLayout() {
               </div>
             </div>
           </div>
-        </div>
+        </ModalOverlay>
       )}
     </div>
   );

@@ -1,12 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen, UnlistenFn } from '@tauri-apps/api/event';
 
-// Terminal types
-export interface TerminalSession {
-  id: string;
-  title: string;
-}
-
 // Terminal commands
 export async function createTerminal(cwd?: string): Promise<string> {
   return invoke('create_terminal', { cwd });
@@ -203,6 +197,3 @@ export async function findDefinition(
   return invoke('find_definition', { symbol, currentFile });
 }
 
-export async function reindexFile(path: string, content: string): Promise<void> {
-  return invoke('reindex_file', { path, content });
-}

@@ -1,8 +1,8 @@
 import { useState, useMemo, useCallback } from 'react';
-import { createPortal } from 'react-dom';
 import { GitStatus, FileEntry, restoreFile, unstageFile } from '@/lib/tauri';
 import { sortDirectoriesFirst, getFileName } from '@/lib/fileUtils';
 import { ContextMenu } from '@/components/ContextMenu/ContextMenu';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { ChevronIcon, FolderIcon, DiscardIcon } from '@/components/Icons';
 
 interface DiffFileListProps {
@@ -62,19 +62,16 @@ function buildTree<T>(items: T[], options: BuildTreeOptions<T>): FileTreeNode {
   return root;
 }
 
+const STATUS_DISPLAY: Record<string, { color: string; letter: string }> = {
+  added: { color: 'text-diff-add-text', letter: 'A' },
+  modified: { color: 'text-amber-500 dark:text-yellow-400', letter: 'M' },
+  deleted: { color: 'text-diff-remove-text', letter: 'D' },
+  renamed: { color: 'text-blue-600 dark:text-blue-400', letter: 'R' },
+};
+
 function getStatusIcon(statusType: string) {
-  switch (statusType) {
-    case 'added':
-      return <span className="text-diff-add-text font-mono text-xs w-4 text-center">A</span>;
-    case 'modified':
-      return <span className="text-amber-500 dark:text-yellow-400 font-mono text-xs w-4 text-center">M</span>;
-    case 'deleted':
-      return <span className="text-diff-remove-text font-mono text-xs w-4 text-center">D</span>;
-    case 'renamed':
-      return <span className="text-blue-600 dark:text-blue-400 font-mono text-xs w-4 text-center">R</span>;
-    default:
-      return <span className="text-tertiary font-mono text-xs w-4 text-center">U</span>;
-  }
+  const display = STATUS_DISPLAY[statusType] ?? { color: 'text-tertiary', letter: 'U' };
+  return <span className={`${display.color} font-mono text-xs w-4 text-center`}>{display.letter}</span>;
 }
 
 interface FileTreeItemProps {
@@ -164,70 +161,6 @@ function FileTreeItem({
   );
 }
 
-interface ConfirmRestoreDialogProps {
-  target: { path: string; action: 'restore' | 'unstage' } | null;
-  onConfirm: () => void;
-  onCancel: () => void;
-}
-
-function ConfirmRestoreDialog({ target, onConfirm, onCancel }: ConfirmRestoreDialogProps) {
-  if (!target) return null;
-
-  const isRestore = target.action === 'restore';
-  const fileName = getFileName(target.path);
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      onConfirm();
-    } else if (e.key === 'Escape') {
-      onCancel();
-    }
-  };
-
-  return createPortal(
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
-      onClick={onCancel}
-      onKeyDown={handleKeyDown}
-    >
-      <div
-        className="w-80 rounded-lg border border-surface-3 bg-surface-2 p-4 shadow-xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="mb-2 text-sm font-medium text-primary">
-          {isRestore ? 'Discard Changes' : 'Unstage File'}
-        </div>
-        <p className="mb-4 text-sm text-secondary">
-          {isRestore
-            ? <>Are you sure you want to discard changes to &ldquo;{fileName}&rdquo;? This cannot be undone.</>
-            : <>Are you sure you want to unstage &ldquo;{fileName}&rdquo;?</>
-          }
-        </p>
-        <div className="flex justify-end gap-2">
-          <button
-            onClick={onCancel}
-            className="rounded-md px-3 py-1 text-xs text-secondary hover:bg-surface-3"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={onConfirm}
-            className={`rounded-md px-3 py-1 text-xs text-white ${
-              isRestore
-                ? 'bg-red-600 hover:bg-red-700'
-                : 'bg-accent hover:bg-accent-hover'
-            }`}
-          >
-            {isRestore ? 'Discard' : 'Unstage'}
-          </button>
-        </div>
-      </div>
-    </div>,
-    document.body
-  );
-}
-
 export function DiffFileList({ status, onScrollToFile, isLoading, onRefresh, repoPath }: DiffFileListProps) {
   const [restoreTarget, setRestoreTarget] = useState<{ path: string; action: 'restore' | 'unstage' } | null>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; path: string; action: 'restore' | 'unstage' } | null>(null);
@@ -300,6 +233,8 @@ export function DiffFileList({ status, onScrollToFile, isLoading, onRefresh, rep
     );
   }
 
+  const isRestore = restoreTarget?.action === 'restore';
+
   return (
     <div className="h-full overflow-y-auto">
       {/* Staged changes */}
@@ -360,11 +295,20 @@ export function DiffFileList({ status, onScrollToFile, isLoading, onRefresh, rep
         }] : []}
       />
 
-      <ConfirmRestoreDialog
-        target={restoreTarget}
-        onConfirm={handleRestoreConfirm}
-        onCancel={() => setRestoreTarget(null)}
-      />
+      {restoreTarget && (
+        <ConfirmDialog
+          title={isRestore ? 'Discard Changes' : 'Unstage File'}
+          message={
+            isRestore
+              ? <>Are you sure you want to discard changes to &ldquo;{getFileName(restoreTarget.path)}&rdquo;? This cannot be undone.</>
+              : <>Are you sure you want to unstage &ldquo;{getFileName(restoreTarget.path)}&rdquo;?</>
+          }
+          confirmLabel={isRestore ? 'Discard' : 'Unstage'}
+          confirmClassName={isRestore ? 'bg-red-600 hover:bg-red-700' : 'bg-accent hover:bg-accent-hover'}
+          onConfirm={handleRestoreConfirm}
+          onCancel={() => setRestoreTarget(null)}
+        />
+      )}
     </div>
   );
 }

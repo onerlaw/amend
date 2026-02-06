@@ -1,5 +1,5 @@
 import { Virtuoso } from 'react-virtuoso';
-import { useDiffViewerState } from '@/hooks/useDiffViewerState';
+import { useDiffViewer } from './DiffViewerContext';
 import { useUIStore } from '@/stores/uiStore';
 import { DiffFileSection } from './DiffFileSection';
 import { DocumentIcon, CheckCircleIcon } from '@/components/Icons';
@@ -14,7 +14,7 @@ export function DiffContentPanel() {
     virtuosoRef,
     toggleDiffFileCollapse,
     handleEditFile,
-  } = useDiffViewerState();
+  } = useDiffViewer();
   const { setFocusedPanel } = useUIStore();
 
   // No directory open state

@@ -1,10 +1,10 @@
-import { useDiffViewerState } from '@/hooks/useDiffViewerState';
+import { useDiffViewer } from './DiffViewerContext';
 import { DiffFileList } from './DiffFileList';
 import { RefreshIcon } from '@/components/Icons';
 
 export function DiffFileListPanel() {
   const { status, statusLoading, allFiles, contextPath, handleRefresh, handleScrollToFile } =
-    useDiffViewerState();
+    useDiffViewer();
 
   const changedFilesCount = allFiles.length;
 

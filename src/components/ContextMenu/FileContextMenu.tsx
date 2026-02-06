@@ -1,8 +1,9 @@
 import { useCallback, useMemo, useState, useEffect, useRef } from 'react';
-import { createPortal } from 'react-dom';
 import { ContextMenu, ContextMenuItem } from './ContextMenu';
 import { useContextMenuStore, dispatchFileTreeRefresh } from '@/stores/contextMenuStore';
 import { useFileStore } from '@/stores/fileStore';
+import { ModalOverlay } from '@/components/ModalOverlay';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import {
   renameEntry,
   deleteFile,
@@ -63,15 +64,9 @@ function RenameDialog() {
     }
   };
 
-  return createPortal(
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
-      onClick={closeRenameDialog}
-    >
-      <div
-        className="w-72 rounded-lg border border-surface-3 bg-surface-2 p-4 shadow-xl"
-        onClick={(e) => e.stopPropagation()}
-      >
+  return (
+    <ModalOverlay onClose={closeRenameDialog}>
+      <div className="w-72 rounded-lg border border-surface-3 bg-surface-2 p-4 shadow-xl">
         <div className="mb-3 text-sm font-medium text-primary">Rename</div>
         <input
           ref={inputRef}
@@ -97,8 +92,7 @@ function RenameDialog() {
           </button>
         </div>
       </div>
-    </div>,
-    document.body
+    </ModalOverlay>
   );
 }
 
@@ -121,46 +115,15 @@ function ConfirmDeleteDialog() {
     closeDeleteDialog();
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      handleConfirm();
-    } else if (e.key === 'Escape') {
-      closeDeleteDialog();
-    }
-  };
-
-  return createPortal(
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
-      onClick={closeDeleteDialog}
-      onKeyDown={handleKeyDown}
-    >
-      <div
-        className="w-72 rounded-lg border border-surface-3 bg-surface-2 p-4 shadow-xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="mb-2 text-sm font-medium text-primary">Delete</div>
-        <p className="mb-4 text-sm text-secondary">
-          Are you sure you want to delete &ldquo;{deleteTarget.name}&rdquo;?
-        </p>
-        <div className="flex justify-end gap-2">
-          <button
-            onClick={closeDeleteDialog}
-            className="rounded-md px-3 py-1 text-xs text-secondary hover:bg-surface-3"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleConfirm}
-            className="rounded-md bg-red-600 px-3 py-1 text-xs text-white hover:bg-red-700"
-          >
-            Delete
-          </button>
-        </div>
-      </div>
-    </div>,
-    document.body
+  return (
+    <ConfirmDialog
+      title="Delete"
+      message={<>Are you sure you want to delete &ldquo;{deleteTarget.name}&rdquo;?</>}
+      confirmLabel="Delete"
+      confirmClassName="bg-red-600 hover:bg-red-700"
+      onConfirm={handleConfirm}
+      onCancel={closeDeleteDialog}
+    />
   );
 }
 

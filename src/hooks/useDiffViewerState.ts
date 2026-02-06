@@ -2,16 +2,16 @@ import { useEffect, useMemo, useCallback, useRef } from 'react';
 import { VirtuosoHandle } from 'react-virtuoso';
 import { useFileStore } from '@/stores/fileStore';
 import { useUIStore } from '@/stores/uiStore';
-import { useGitStatus } from '@/hooks/useGit';
 import { useMultiFileDiff } from '@/hooks/useMultiFileDiff';
 import { openFileInBrowseMode, getFileName } from '@/lib/fileUtils';
+import { GitPollingResult } from '@/hooks/useGit';
 
 export interface FileWithCategory {
   path: string;
   category: 'staged' | 'unstaged' | 'untracked';
 }
 
-export function useDiffViewerState() {
+export function useDiffViewerState(gitPolling: GitPollingResult) {
   const { currentDirectory, contextPath } = useFileStore();
   const {
     collapsedDiffFiles,
@@ -20,7 +20,7 @@ export function useDiffViewerState() {
     setScrollTargetFile,
     setPanelMode,
   } = useUIStore();
-  const { status, isLoading: statusLoading, refresh } = useGitStatus(contextPath);
+  const { status, isLoading: statusLoading, refresh } = gitPolling;
   const { diffs, loadDiff, clearDiffs } = useMultiFileDiff(contextPath);
 
   const virtuosoRef = useRef<VirtuosoHandle>(null);

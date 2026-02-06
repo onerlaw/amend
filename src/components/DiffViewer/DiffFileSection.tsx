@@ -94,27 +94,19 @@ const CollapsedSeparator = memo(function CollapsedSeparator({
   );
 });
 
+const BADGE_CONFIG: Record<string, { bg: string; text: string; label: string }> = {
+  staged: { bg: 'bg-diff-add-bg', text: 'text-diff-add-text', label: 'Staged' },
+  unstaged: { bg: 'bg-amber-100 dark:bg-yellow-600/30', text: 'text-amber-600 dark:text-yellow-400', label: 'Changed' },
+  untracked: { bg: 'bg-gray-200 dark:bg-gray-600/30', text: 'text-tertiary', label: 'Untracked' },
+};
+
 function getStatusBadge(category: 'staged' | 'unstaged' | 'untracked') {
-  switch (category) {
-    case 'staged':
-      return (
-        <span className="rounded-md bg-diff-add-bg px-1.5 py-0.5 text-xs font-medium text-diff-add-text">
-          Staged
-        </span>
-      );
-    case 'unstaged':
-      return (
-        <span className="rounded-md bg-amber-100 dark:bg-yellow-600/30 px-1.5 py-0.5 text-xs font-medium text-amber-600 dark:text-yellow-400">
-          Changed
-        </span>
-      );
-    case 'untracked':
-      return (
-        <span className="rounded-md bg-gray-200 dark:bg-gray-600/30 px-1.5 py-0.5 text-xs font-medium text-tertiary">
-          Untracked
-        </span>
-      );
-  }
+  const config = BADGE_CONFIG[category];
+  return (
+    <span className={`rounded-md ${config.bg} px-1.5 py-0.5 text-xs font-medium ${config.text}`}>
+      {config.label}
+    </span>
+  );
 }
 
 // Diff content component - renders sections with collapsible hunks

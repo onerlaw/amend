@@ -7,13 +7,16 @@ import {
   DiffStats,
 } from '@/lib/tauri';
 
-const POLL_INTERVAL = 2000; // Poll every 2 seconds
+const POLL_INTERVAL = 2000;
 
-export function useGitStatus(repoPath: string | null) {
+/** Combined polling hook for git status and diff stats. Single interval, single source of truth. */
+export function useGitPolling(repoPath: string | null) {
   const [status, setStatus] = useState<GitStatus | null>(null);
+  const [diffStats, setDiffStats] = useState<DiffStats | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const lastStatusRef = useRef<string>('');
+  const lastStatsRef = useRef<string>('');
 
   const refresh = useCallback(async (silent = false) => {
     if (!repoPath) return;
@@ -27,14 +30,17 @@ export function useGitStatus(repoPath: string | null) {
       const isRepo = await isGitRepository(repoPath);
       if (!isRepo) {
         setStatus(null);
+        setDiffStats(null);
         setError('Not a git repository');
         return;
       }
 
-      const gitStatus = await getGitStatus(repoPath);
+      const [gitStatus, stats] = await Promise.all([
+        getGitStatus(repoPath),
+        getDiffStats(repoPath).catch(() => null),
+      ]);
 
-      // Only update state if status actually changed (to avoid unnecessary re-renders)
-      // Use a lightweight key instead of JSON.stringify for large status objects
+      // Only update status if actually changed (avoid unnecessary re-renders)
       const statusKey =
         gitStatus.staged.map((f) => `${f.path}:${f.status}`).join('|') +
         '||' +
@@ -45,6 +51,12 @@ export function useGitStatus(repoPath: string | null) {
         lastStatusRef.current = statusKey;
         setStatus(gitStatus);
       }
+
+      const statsKey = JSON.stringify(stats);
+      if (statsKey !== lastStatsRef.current) {
+        lastStatsRef.current = statsKey;
+        setDiffStats(stats);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to get git status');
     } finally {
@@ -54,57 +66,23 @@ export function useGitStatus(repoPath: string | null) {
     }
   }, [repoPath]);
 
-  // Poll for changes
-  useEffect(() => {
-    if (!repoPath) return;
-
-    // Initial fetch
-    refresh();
-
-    // Set up polling
-    const intervalId = setInterval(() => {
-      refresh(true); // Silent refresh (no loading state)
-    }, POLL_INTERVAL);
-
-    return () => clearInterval(intervalId);
-  }, [repoPath, refresh]);
-
-  const manualRefresh = useCallback(() => refresh(false), [refresh]);
-
-  return { status, isLoading, error, refresh: manualRefresh };
-}
-
-export function useDiffStats(repoPath: string | null) {
-  const [stats, setStats] = useState<DiffStats | null>(null);
-  const lastStatsRef = useRef<string>('');
-
-  const refresh = useCallback(async () => {
-    if (!repoPath) return;
-
-    try {
-      const result = await getDiffStats(repoPath);
-      const key = JSON.stringify(result);
-      if (key !== lastStatsRef.current) {
-        lastStatsRef.current = key;
-        setStats(result);
-      }
-    } catch {
-      // Silently ignore — stats are best-effort
-    }
-  }, [repoPath]);
-
   useEffect(() => {
     if (!repoPath) {
-      setStats(null);
+      setStatus(null);
+      setDiffStats(null);
+      lastStatusRef.current = '';
       lastStatsRef.current = '';
       return;
     }
 
     refresh();
-
-    const intervalId = setInterval(refresh, POLL_INTERVAL);
+    const intervalId = setInterval(() => refresh(true), POLL_INTERVAL);
     return () => clearInterval(intervalId);
   }, [repoPath, refresh]);
 
-  return stats;
+  const manualRefresh = useCallback(() => refresh(false), [refresh]);
+
+  return { status, diffStats, isLoading, error, refresh: manualRefresh };
 }
+
+export type GitPollingResult = ReturnType<typeof useGitPolling>;

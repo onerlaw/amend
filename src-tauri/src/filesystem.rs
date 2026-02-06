@@ -67,13 +67,13 @@ impl FileSystemManager {
     }
 
     pub fn read_directory(&self, path: &str) -> Result<Vec<FileEntry>, FileSystemError> {
-        let path = Path::new(path);
+        let path = validate_path(path)?;
         if !path.exists() {
             return Err(FileSystemError::NotFound(path.display().to_string()));
         }
 
         let mut entries = Vec::new();
-        let walker = WalkBuilder::new(path)
+        let walker = WalkBuilder::new(&path)
             .max_depth(Some(1))
             .hidden(false)
             .git_ignore(true)
@@ -111,11 +111,11 @@ impl FileSystemManager {
     }
 
     pub fn read_file(&self, path: &str) -> Result<String, FileSystemError> {
-        let path = Path::new(path);
+        let path = validate_path(path)?;
         if !path.exists() {
             return Err(FileSystemError::NotFound(path.display().to_string()));
         }
-        Ok(fs::read_to_string(path)?)
+        Ok(fs::read_to_string(&path)?)
     }
 
     pub fn write_file(&self, path: &str, contents: &str) -> Result<(), FileSystemError> {

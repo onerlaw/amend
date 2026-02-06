@@ -12,7 +12,7 @@ import { markdown } from '@codemirror/lang-markdown';
 import { Extension } from '@codemirror/state';
 
 // Custom syntax highlighting theme - colors stay consistent across light/dark
-export const customHighlightStyle = HighlightStyle.define([
+const customHighlightStyle = HighlightStyle.define([
   { tag: tags.keyword, color: '#c084fc' }, // Purple
   { tag: tags.controlKeyword, color: '#c084fc' },
   { tag: tags.operatorKeyword, color: '#c084fc' },
@@ -62,7 +62,7 @@ export const customHighlightStyle = HighlightStyle.define([
 ]);
 
 // Theme that uses CSS variables for colors
-export const darkTheme = EditorView.theme(
+const darkTheme = EditorView.theme(
   {
     '&': {
       backgroundColor: 'var(--surface-0)',
@@ -223,7 +223,7 @@ export function createBaseExtensions(language: string | undefined): Extension[] 
 
 // Map language names to CodeMirror language extensions
 // Supports languages from getLanguageFromPath() in highlight.ts
-export function getLanguageExtension(language: string | undefined): Extension {
+function getLanguageExtension(language: string | undefined): Extension {
   if (!language) return [];
 
   switch (language) {

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useFileBrowserState } from '@/hooks/useFileBrowserState';
 import { readDirectory, FileEntry } from '@/lib/tauri';
 import { useContextMenuStore } from '@/stores/contextMenuStore';
@@ -102,7 +102,7 @@ export function BrowseFileListPanel() {
   const { entries, isLoading, browseActiveFilePath, browseOpenFiles, handleSelectFile, handleRefresh } =
     useFileBrowserState();
 
-  const openFilePaths = new Set(browseOpenFiles.map((f) => f.path));
+  const openFilePaths = useMemo(() => new Set(browseOpenFiles.map((f) => f.path)), [browseOpenFiles]);
 
   return (
     <div className="h-full bg-surface-2 flex flex-col">

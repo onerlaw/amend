@@ -1,41 +1,18 @@
 import { useFileBrowserState, SaveStatus } from '@/hooks/useFileBrowserState';
 import { useUIStore } from '@/stores/uiStore';
 import { FileContentPanel } from './FileContentPanel';
-import { CloseIcon } from '@/components/Icons';
+import { CloseIcon, DocumentIcon } from '@/components/Icons';
+
+const STATUS_CONFIG: Record<string, { color: string; title: string }> = {
+  saving: { color: 'bg-blue-500 animate-pulse', title: 'Saving...' },
+  pending: { color: 'bg-yellow-500', title: 'Unsaved changes (saving soon)' },
+  error: { color: 'bg-red-500', title: 'Save failed' },
+};
 
 function StatusIndicator({ status }: { status: SaveStatus }) {
-  if (status === 'idle') {
-    return null;
-  }
-
-  if (status === 'saving') {
-    return (
-      <span
-        className="h-2 w-2 rounded-full bg-blue-500 animate-pulse"
-        title="Saving..."
-      />
-    );
-  }
-
-  if (status === 'pending') {
-    return (
-      <span
-        className="h-2 w-2 rounded-full bg-yellow-500"
-        title="Unsaved changes (saving soon)"
-      />
-    );
-  }
-
-  if (status === 'error') {
-    return (
-      <span
-        className="h-2 w-2 rounded-full bg-red-500"
-        title="Save failed"
-      />
-    );
-  }
-
-  return null;
+  const config = STATUS_CONFIG[status];
+  if (!config) return null;
+  return <span className={`h-2 w-2 rounded-full ${config.color}`} title={config.title} />;
 }
 
 export function BrowseEditorTabs() {
@@ -59,16 +36,7 @@ export function BrowseEditorTabs() {
     return (
       <div className="flex h-full items-center justify-center bg-surface-0 text-tertiary">
         <div className="text-center">
-          <svg
-            className="mx-auto mb-4 h-16 w-16 text-tertiary"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1"
-          >
-            <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
-            <polyline points="14,2 14,8 20,8" />
-          </svg>
+          <DocumentIcon className="mx-auto mb-4 h-16 w-16 text-tertiary" />
           <p>No file open</p>
           <p className="mt-2 text-sm">Select a file from the browser</p>
         </div>

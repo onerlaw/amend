@@ -121,4 +121,3 @@ function escapeHtml(text: string): string {
     .replace(/'/g, '&#039;');
 }
 
-export { hljs };
