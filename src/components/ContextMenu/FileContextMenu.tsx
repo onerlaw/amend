@@ -241,7 +241,7 @@ export function FileContextMenu() {
       {
         label: revealLabel,
         onClick: handleRevealInFinder,
-      },
+      }
     );
 
     return menuItems;
@@ -260,12 +260,7 @@ export function FileContextMenu() {
 
   return (
     <>
-      <ContextMenu
-        isOpen={isOpen}
-        position={position}
-        items={items}
-        onClose={closeMenu}
-      />
+      <ContextMenu isOpen={isOpen} position={position} items={items} onClose={closeMenu} />
       <RenameDialog />
       <ConfirmDeleteDialog />
     </>

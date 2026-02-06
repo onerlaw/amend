@@ -29,9 +29,9 @@ export function useDiffViewerState(gitPolling: GitPollingResult) {
   const allFiles = useMemo((): FileWithCategory[] => {
     if (!status) return [];
     return [
-      ...status.staged.map(f => ({ path: f.path, category: 'staged' as const })),
-      ...status.unstaged.map(f => ({ path: f.path, category: 'unstaged' as const })),
-      ...status.untracked.map(path => ({ path, category: 'untracked' as const })),
+      ...status.staged.map((f) => ({ path: f.path, category: 'staged' as const })),
+      ...status.unstaged.map((f) => ({ path: f.path, category: 'unstaged' as const })),
+      ...status.untracked.map((path) => ({ path, category: 'untracked' as const })),
     ];
   }, [status]);
 

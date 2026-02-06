@@ -63,7 +63,9 @@
   padding: 0;
 }
 
-html, body, #root {
+html,
+body,
+#root {
   height: 100%;
   width: 100%;
   overflow: hidden;
@@ -126,7 +128,8 @@ html, body, #root {
   z-index: 1000 !important;
 }
 
-.cm-tooltip-above, .cm-tooltip-below {
+.cm-tooltip-above,
+.cm-tooltip-below {
   z-index: 1000 !important;
 }
 
@@ -260,20 +263,20 @@ html, body, #root {
 }
 
 /* Resizable panel handle styles */
-[data-panel-group-direction="horizontal"] > [data-panel-resize-handle-id] {
+[data-panel-group-direction='horizontal'] > [data-panel-resize-handle-id] {
   width: 4px;
   background-color: var(--surface-3);
 }
 
-[data-panel-group-direction="horizontal"] > [data-panel-resize-handle-id]:hover {
+[data-panel-group-direction='horizontal'] > [data-panel-resize-handle-id]:hover {
   background-color: var(--accent);
 }
 
-[data-panel-group-direction="vertical"] > [data-panel-resize-handle-id] {
+[data-panel-group-direction='vertical'] > [data-panel-resize-handle-id] {
   height: 4px;
   background-color: var(--surface-3);
 }
 
-[data-panel-group-direction="vertical"] > [data-panel-resize-handle-id]:hover {
+[data-panel-group-direction='vertical'] > [data-panel-resize-handle-id]:hover {
   background-color: var(--accent);
 }

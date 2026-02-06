@@ -50,9 +50,7 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
 
   setTabTitle: (id: string, title: string) => {
     set({
-      tabs: get().tabs.map((tab) =>
-        tab.id === id ? { ...tab, title } : tab
-      ),
+      tabs: get().tabs.map((tab) => (tab.id === id ? { ...tab, title } : tab)),
     });
   },
 }));

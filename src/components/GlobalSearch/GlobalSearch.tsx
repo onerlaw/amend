@@ -144,87 +144,89 @@ export function GlobalSearch() {
             className="fixed inset-0 z-50 flex items-start justify-center pt-[15vh] bg-black/50"
             onClick={closeSearch}
           >
-          <div
-            className="w-[500px] max-w-[90vw] rounded-xl bg-surface-2 shadow-xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Input */}
-            <div className="flex items-center gap-2 px-3 py-3">
-              <SearchIcon className="h-4 w-4 text-tertiary" />
-              <input
-                ref={inputRef}
-                type="text"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                onKeyDown={handleInputKeyDown}
-                placeholder="Search files..."
-                className="flex-1 bg-transparent text-sm text-primary outline-none placeholder:text-tertiary"
-              />
-              {isSearching && (
-                <SpinnerIcon className="h-4 w-4 animate-spin text-tertiary" />
-              )}
-            </div>
-
-            {/* Results */}
-            <div ref={resultsRef} className="max-h-[50vh] overflow-y-auto">
-              {!searchRoot && (
-                <div className="px-3 py-8 text-center text-sm text-tertiary">
-                  Open a repository first to search files
-                </div>
-              )}
-              {searchRoot && query && results.length === 0 && !isSearching && (
-                <div className="px-3 py-8 text-center text-sm text-tertiary">No results found</div>
-              )}
-              {results.map((result, index) => (
-                <button
-                  key={`${result.path}-${result.lineNumber ?? 0}`}
-                  onClick={() => handleSelectResult(result)}
-                  className={`flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-surface-3/50 ${
-                    index === selectedIndex ? 'bg-surface-3' : ''
-                  }`}
-                >
-                  <FileIcon className={`h-4 w-4 flex-shrink-0 ${getFileIconColor(result.name)}`} />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="truncate text-sm text-primary">{result.name}</span>
-                      {result.matchType === 'content' && result.lineNumber && (
-                        <span className="flex-shrink-0 text-xs text-tertiary">
-                          :{result.lineNumber}
-                        </span>
-                      )}
-                    </div>
-                    <div className="truncate text-xs text-tertiary">
-                      {result.matchType === 'content' && result.lineContent ? (
-                        <span className="font-mono">{result.lineContent}</span>
-                      ) : (
-                        getRelativePath(result.path)
-                      )}
-                    </div>
-                  </div>
-                  <span className="flex-shrink-0 rounded-md bg-surface-1 px-1.5 py-0.5 text-[10px] text-tertiary">
-                    {result.matchType === 'filename' ? 'name' : 'content'}
-                  </span>
-                </button>
-              ))}
-            </div>
-
-            {/* Footer */}
-            <div className="flex items-center justify-between px-3 py-2 text-[10px] text-tertiary">
-              <div className="flex items-center gap-3">
-                <span>
-                  <kbd className="rounded-md bg-surface-1 px-1 py-0.5">↑↓</kbd> navigate
-                </span>
-                <span>
-                  <kbd className="rounded-md bg-surface-1 px-1 py-0.5">↵</kbd> open
-                </span>
-                <span>
-                  <kbd className="rounded-md bg-surface-1 px-1 py-0.5">esc</kbd> close
-                </span>
+            <div
+              className="w-[500px] max-w-[90vw] rounded-xl bg-surface-2 shadow-xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Input */}
+              <div className="flex items-center gap-2 px-3 py-3">
+                <SearchIcon className="h-4 w-4 text-tertiary" />
+                <input
+                  ref={inputRef}
+                  type="text"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  onKeyDown={handleInputKeyDown}
+                  placeholder="Search files..."
+                  className="flex-1 bg-transparent text-sm text-primary outline-none placeholder:text-tertiary"
+                />
+                {isSearching && <SpinnerIcon className="h-4 w-4 animate-spin text-tertiary" />}
               </div>
-              <div>{results.length > 0 && `${results.length} results`}</div>
+
+              {/* Results */}
+              <div ref={resultsRef} className="max-h-[50vh] overflow-y-auto">
+                {!searchRoot && (
+                  <div className="px-3 py-8 text-center text-sm text-tertiary">
+                    Open a repository first to search files
+                  </div>
+                )}
+                {searchRoot && query && results.length === 0 && !isSearching && (
+                  <div className="px-3 py-8 text-center text-sm text-tertiary">
+                    No results found
+                  </div>
+                )}
+                {results.map((result, index) => (
+                  <button
+                    key={`${result.path}-${result.lineNumber ?? 0}`}
+                    onClick={() => handleSelectResult(result)}
+                    className={`flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-surface-3/50 ${
+                      index === selectedIndex ? 'bg-surface-3' : ''
+                    }`}
+                  >
+                    <FileIcon
+                      className={`h-4 w-4 flex-shrink-0 ${getFileIconColor(result.name)}`}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="truncate text-sm text-primary">{result.name}</span>
+                        {result.matchType === 'content' && result.lineNumber && (
+                          <span className="flex-shrink-0 text-xs text-tertiary">
+                            :{result.lineNumber}
+                          </span>
+                        )}
+                      </div>
+                      <div className="truncate text-xs text-tertiary">
+                        {result.matchType === 'content' && result.lineContent ? (
+                          <span className="font-mono">{result.lineContent}</span>
+                        ) : (
+                          getRelativePath(result.path)
+                        )}
+                      </div>
+                    </div>
+                    <span className="flex-shrink-0 rounded-md bg-surface-1 px-1.5 py-0.5 text-[10px] text-tertiary">
+                      {result.matchType === 'filename' ? 'name' : 'content'}
+                    </span>
+                  </button>
+                ))}
+              </div>
+
+              {/* Footer */}
+              <div className="flex items-center justify-between px-3 py-2 text-[10px] text-tertiary">
+                <div className="flex items-center gap-3">
+                  <span>
+                    <kbd className="rounded-md bg-surface-1 px-1 py-0.5">↑↓</kbd> navigate
+                  </span>
+                  <span>
+                    <kbd className="rounded-md bg-surface-1 px-1 py-0.5">↵</kbd> open
+                  </span>
+                  <span>
+                    <kbd className="rounded-md bg-surface-1 px-1 py-0.5">esc</kbd> close
+                  </span>
+                </div>
+                <div>{results.length > 0 && `${results.length} results`}</div>
+              </div>
             </div>
-          </div>
-        </div>,
+          </div>,
           document.body
         )}
     </>

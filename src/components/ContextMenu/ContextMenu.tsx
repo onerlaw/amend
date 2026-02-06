@@ -83,12 +83,7 @@ export function ContextMenu({ isOpen, position, items, onClose }: ContextMenuPro
     >
       {items.map((item, index) => {
         if (item.separator) {
-          return (
-            <div
-              key={`separator-${index}`}
-              className="my-1 h-px bg-surface-3"
-            />
-          );
+          return <div key={`separator-${index}`} className="my-1 h-px bg-surface-3" />;
         }
 
         return (

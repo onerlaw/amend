@@ -15,7 +15,14 @@ interface WorktreeSelectorProps {
 
 type Mode = 'select' | 'create';
 
-export function WorktreeSelector({ worktrees, onSelect, onCreate, onDelete, onCancel, repoPath }: WorktreeSelectorProps) {
+export function WorktreeSelector({
+  worktrees,
+  onSelect,
+  onCreate,
+  onDelete,
+  onCancel,
+  repoPath,
+}: WorktreeSelectorProps) {
   const [mode, setMode] = useState<Mode>('select');
   const [selectedIndex, setSelectedIndex] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -47,14 +54,16 @@ export function WorktreeSelector({ worktrees, onSelect, onCreate, onDelete, onCa
   const filteredBranches = useMemo(() => {
     const query = branchName.trim().toLowerCase();
     if (!query) return [];
-    const usedBranches = new Set(worktrees.map(w => w.branch));
+    const usedBranches = new Set(worktrees.map((w) => w.branch));
     return branches
-      .filter(b => !usedBranches.has(b.name) && b.name.toLowerCase().includes(query))
+      .filter((b) => !usedBranches.has(b.name) && b.name.toLowerCase().includes(query))
       .slice(0, 5); // Limit to 5 suggestions
   }, [branches, branchName, worktrees]);
 
   const isNewBranch = branchName.trim() !== '' && filteredBranches.length === 0;
-  const exactMatch = filteredBranches.find(b => b.name.toLowerCase() === branchName.trim().toLowerCase());
+  const exactMatch = filteredBranches.find(
+    (b) => b.name.toLowerCase() === branchName.trim().toLowerCase()
+  );
 
   // Reset selection when filtered results change
   useEffect(() => {
@@ -117,7 +126,7 @@ export function WorktreeSelector({ worktrees, onSelect, onCreate, onDelete, onCa
     const finalPath = `${homePath}/.amend/${projectName}/${finalBranch}`;
 
     // Check if this is an existing branch
-    const existingBranch = branches.find(b => b.name === finalBranch);
+    const existingBranch = branches.find((b) => b.name === finalBranch);
     setError(null);
     onCreate(finalPath, finalBranch, !existingBranch);
   };
@@ -135,10 +144,7 @@ export function WorktreeSelector({ worktrees, onSelect, onCreate, onDelete, onCa
       onKeyDown={handleKeyDown}
       onClick={onCancel}
     >
-      <div
-        className="w-80 rounded-xl bg-surface-2 shadow-xl"
-        onClick={(e) => e.stopPropagation()}
-      >
+      <div className="w-80 rounded-xl bg-surface-2 shadow-xl" onClick={(e) => e.stopPropagation()}>
         {mode === 'select' ? (
           <>
             <div className="px-3 py-2">
@@ -150,7 +156,9 @@ export function WorktreeSelector({ worktrees, onSelect, onCreate, onDelete, onCa
                   key={worktree.path}
                   onMouseEnter={() => setSelectedIndex(index)}
                   className={`group flex w-full items-center gap-2 px-3 py-2 text-left text-sm ${
-                    index === selectedIndex ? 'bg-accent text-white' : 'text-primary hover:bg-surface-1'
+                    index === selectedIndex
+                      ? 'bg-accent text-white'
+                      : 'text-primary hover:bg-surface-1'
                   }`}
                 >
                   <button
@@ -172,9 +180,7 @@ export function WorktreeSelector({ worktrees, onSelect, onCreate, onDelete, onCa
                         onDelete(worktree);
                       }}
                       className={`rounded-md p-1 opacity-0 group-hover:opacity-100 ${
-                        index === selectedIndex
-                          ? 'hover:bg-white/20'
-                          : 'hover:bg-surface-3'
+                        index === selectedIndex ? 'hover:bg-white/20' : 'hover:bg-surface-3'
                       }`}
                       title="Delete worktree"
                     >
@@ -225,10 +231,10 @@ export function WorktreeSelector({ worktrees, onSelect, onCreate, onDelete, onCa
                   onKeyDown={(e) => {
                     if (e.key === 'ArrowDown' && filteredBranches.length > 0) {
                       e.preventDefault();
-                      setBranchSelectedIndex(i => Math.min(i + 1, filteredBranches.length - 1));
+                      setBranchSelectedIndex((i) => Math.min(i + 1, filteredBranches.length - 1));
                     } else if (e.key === 'ArrowUp' && filteredBranches.length > 0) {
                       e.preventDefault();
-                      setBranchSelectedIndex(i => Math.max(i - 1, 0));
+                      setBranchSelectedIndex((i) => Math.max(i - 1, 0));
                     } else if (e.key === 'Enter') {
                       e.preventDefault();
                       if (filteredBranches.length > 0 && !exactMatch) {
@@ -248,7 +254,9 @@ export function WorktreeSelector({ worktrees, onSelect, onCreate, onDelete, onCa
                         onClick={() => handleBranchSelect(branch)}
                         onMouseEnter={() => setBranchSelectedIndex(index)}
                         className={`flex w-full items-center gap-2 px-2 py-1.5 text-left text-sm ${
-                          index === branchSelectedIndex ? 'bg-accent text-white' : 'text-primary hover:bg-surface-3'
+                          index === branchSelectedIndex
+                            ? 'bg-accent text-white'
+                            : 'text-primary hover:bg-surface-3'
                         }`}
                       >
                         <BranchIcon className="h-3.5 w-3.5 flex-shrink-0 opacity-60" />
@@ -263,7 +271,9 @@ export function WorktreeSelector({ worktrees, onSelect, onCreate, onDelete, onCa
               </div>
               {/* Status indicator */}
               {branchName.trim() && (
-                <div className={`rounded-md px-2 py-1.5 text-xs ${isNewBranch ? 'bg-green-500/10 text-green-400' : 'bg-surface-1 text-secondary'}`}>
+                <div
+                  className={`rounded-md px-2 py-1.5 text-xs ${isNewBranch ? 'bg-green-500/10 text-green-400' : 'bg-surface-1 text-secondary'}`}
+                >
                   {isNewBranch ? (
                     <span className="flex items-center gap-1.5">
                       <PlusIcon className="h-3.5 w-3.5" />

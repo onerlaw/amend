@@ -19,7 +19,11 @@ function tabOpen(files: OpenFile[], file: OpenFile): { files: OpenFile[]; active
   return { files, activePath: file.path };
 }
 
-function tabClose(files: OpenFile[], activePath: string | null, path: string): { files: OpenFile[]; activePath: string | null } {
+function tabClose(
+  files: OpenFile[],
+  activePath: string | null,
+  path: string
+): { files: OpenFile[]; activePath: string | null } {
   const filtered = files.filter((f) => f.path !== path);
   const newActivePath =
     activePath === path
@@ -42,7 +46,12 @@ function tabOpenAtLine(
   files: OpenFile[],
   file: OpenFile,
   line: number
-): { files: OpenFile[]; activePath: string; pendingScrollToLine: number; pendingScrollToFile: string } {
+): {
+  files: OpenFile[];
+  activePath: string;
+  pendingScrollToLine: number;
+  pendingScrollToFile: string;
+} {
   const { files: newFiles, activePath } = tabOpen(files, file);
   return {
     files: newFiles,
@@ -86,7 +95,8 @@ export const useFileStore = create<FileState>()(
           browseActiveFilePath: null,
         }),
       activeWorktreePath: null,
-      setActiveWorktreePath: (path: string | null) => set({ activeWorktreePath: path, contextPath: path ?? get().currentDirectory }),
+      setActiveWorktreePath: (path: string | null) =>
+        set({ activeWorktreePath: path, contextPath: path ?? get().currentDirectory }),
       contextPath: null,
       // Browse mode state
       browseOpenFiles: [],
@@ -99,7 +109,11 @@ export const useFileStore = create<FileState>()(
         set({ browseActiveFilePath: path });
       },
       closeBrowseFile: (path: string) => {
-        const { files, activePath } = tabClose(get().browseOpenFiles, get().browseActiveFilePath, path);
+        const { files, activePath } = tabClose(
+          get().browseOpenFiles,
+          get().browseActiveFilePath,
+          path
+        );
         set({ browseOpenFiles: files, browseActiveFilePath: activePath });
       },
       updateBrowseFileContent: (path: string, content: string) => {

@@ -1,5 +1,5 @@
-use base64::{engine::general_purpose::STANDARD, Engine as _};
 use crate::error::impl_serialize_as_string;
+use base64::{engine::general_purpose::STANDARD, Engine as _};
 use parking_lot::Mutex;
 use portable_pty::{native_pty_system, CommandBuilder, MasterPty, PtySize};
 use std::collections::HashMap;

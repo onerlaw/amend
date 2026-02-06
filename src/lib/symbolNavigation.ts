@@ -144,7 +144,11 @@ function getSymbolKind(node: SyntaxNode): string | undefined {
   if (parentName.includes('Type') || parentName.includes('Interface')) {
     return 'type';
   }
-  if (parentName.includes('Variable') || parentName.includes('Const') || parentName.includes('Let')) {
+  if (
+    parentName.includes('Variable') ||
+    parentName.includes('Const') ||
+    parentName.includes('Let')
+  ) {
     return 'variable';
   }
   if (parentName.includes('Property')) {
@@ -223,7 +227,10 @@ export function findDefinitionInFile(view: EditorView, symbolName: string): Loca
 /**
  * Extract a signature string from a definition node
  */
-function extractSignature(doc: { sliceString: (from: number, to: number) => string }, node: SyntaxNode): string | undefined {
+function extractSignature(
+  doc: { sliceString: (from: number, to: number) => string },
+  node: SyntaxNode
+): string | undefined {
   // Get the first line of the definition
   const text = doc.sliceString(node.from, Math.min(node.to, node.from + 200));
   const firstLine = text.split('\n')[0];

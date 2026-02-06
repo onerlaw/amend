@@ -45,10 +45,7 @@ export function symbolHoverTooltip(config: HoverTooltipConfig): Extension {
 /**
  * Create the DOM content for the tooltip
  */
-function createTooltipContent(
-  symbolName: string,
-  localDefs: LocalDefinition[]
-): HTMLElement {
+function createTooltipContent(symbolName: string, localDefs: LocalDefinition[]): HTMLElement {
   const container = document.createElement('div');
   container.className = 'cm-tooltip-signature';
 

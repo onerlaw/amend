@@ -36,7 +36,15 @@ function ThemeToggle() {
 
 export function MainLayout() {
   const { panelMode, setPanelMode } = useUIStore();
-  const { currentDirectory, setCurrentDirectory, browseOpenFiles, browseActiveFilePath, closeBrowseFile, setActiveWorktreePath, contextPath } = useFileStore();
+  const {
+    currentDirectory,
+    setCurrentDirectory,
+    browseOpenFiles,
+    browseActiveFilePath,
+    closeBrowseFile,
+    setActiveWorktreePath,
+    contextPath,
+  } = useFileStore();
   const { projects, addProject, setActiveProject } = useProjectStore();
   const { tabs, activeTabId, setActiveTab } = useTerminalStore();
   const closeTerminal = useCloseTerminal();
@@ -58,10 +66,9 @@ export function MainLayout() {
   // Index project for symbol navigation when directory changes
   useEffect(() => {
     if (currentDirectory) {
-      indexProject(currentDirectory)
-        .catch((err) => {
-          console.error('[MainLayout] Failed to index project for symbol navigation:', err);
-        });
+      indexProject(currentDirectory).catch((err) => {
+        console.error('[MainLayout] Failed to index project for symbol navigation:', err);
+      });
     }
   }, [currentDirectory]);
 
@@ -125,7 +132,15 @@ export function MainLayout() {
         }
       }
     },
-    [tabs, activeTabId, setActiveTab, closeTerminal, panelMode, browseActiveFilePath, closeBrowseFile]
+    [
+      tabs,
+      activeTabId,
+      setActiveTab,
+      closeTerminal,
+      panelMode,
+      browseActiveFilePath,
+      closeBrowseFile,
+    ]
   );
 
   useEffect(() => {
@@ -163,20 +178,24 @@ export function MainLayout() {
             <button
               onClick={() => setPanelMode(panelMode === 'diff' ? null : 'diff')}
               className={`rounded-md px-2 py-1 text-xs ${
-                panelMode === 'diff'
-                  ? 'bg-accent text-white'
-                  : 'text-secondary hover:bg-surface-3'
+                panelMode === 'diff' ? 'bg-accent text-white' : 'text-secondary hover:bg-surface-3'
               }`}
             >
               Diff
               {diffStats && (diffStats.additions > 0 || diffStats.deletions > 0) && (
                 <span className="ml-1.5">
                   {diffStats.additions > 0 && (
-                    <span className={panelMode === 'diff' ? 'text-white/80' : 'text-diff-add-text'}>+{diffStats.additions}</span>
+                    <span className={panelMode === 'diff' ? 'text-white/80' : 'text-diff-add-text'}>
+                      +{diffStats.additions}
+                    </span>
                   )}
                   {diffStats.additions > 0 && diffStats.deletions > 0 && ' '}
                   {diffStats.deletions > 0 && (
-                    <span className={panelMode === 'diff' ? 'text-white/80' : 'text-diff-remove-text'}>-{diffStats.deletions}</span>
+                    <span
+                      className={panelMode === 'diff' ? 'text-white/80' : 'text-diff-remove-text'}
+                    >
+                      -{diffStats.deletions}
+                    </span>
                   )}
                 </span>
               )}

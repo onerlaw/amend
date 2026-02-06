@@ -65,16 +65,13 @@ export function useFileBrowserState() {
     [saveStatuses]
   );
 
-  const handleSelectFile = useCallback(
-    async (path: string) => {
-      try {
-        await openFileInBrowseMode(path);
-      } catch (err) {
-        console.error('Failed to read file:', err);
-      }
-    },
-    []
-  );
+  const handleSelectFile = useCallback(async (path: string) => {
+    try {
+      await openFileInBrowseMode(path);
+    } catch (err) {
+      console.error('Failed to read file:', err);
+    }
+  }, []);
 
   const handleCloseFile = useCallback(
     (path: string) => {

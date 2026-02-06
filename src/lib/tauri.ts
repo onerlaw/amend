@@ -27,10 +27,7 @@ export async function onTerminalOutput(
   });
 }
 
-export async function onTerminalExit(
-  id: string,
-  callback: () => void
-): Promise<UnlistenFn> {
+export async function onTerminalExit(id: string, callback: () => void): Promise<UnlistenFn> {
   return listen(`terminal-exit-${id}`, () => {
     callback();
   });
@@ -211,4 +208,3 @@ export async function findDefinition(
 ): Promise<SymbolDefinition[]> {
   return invoke('find_definition', { symbol, currentFile });
 }
-

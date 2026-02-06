@@ -10,7 +10,7 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "lint": "eslint src --ext .ts,.tsx",
-    "format": "prettier --write \"src/**/*.{ts,tsx,css}\""
+    "format": "prettier --write \"src/**/*.{ts,tsx,css}\" && cargo fmt --manifest-path src-tauri/Cargo.toml"
   },
   "dependencies": {
     "@codemirror/commands": "^6.10.1",

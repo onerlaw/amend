@@ -12,9 +12,7 @@ export function ModalOverlay({ onClose, children }: ModalOverlayProps) {
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
       onClick={onClose}
     >
-      <div onClick={(e) => e.stopPropagation()}>
-        {children}
-      </div>
+      <div onClick={(e) => e.stopPropagation()}>{children}</div>
     </div>,
     document.body
   );

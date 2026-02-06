@@ -1,6 +1,10 @@
 import { EditorView } from '@codemirror/view';
 import { Extension } from '@codemirror/state';
-import { getSymbolAtPosition, findDefinitionInFile, hasGoToDefinitionModifier } from '@/lib/symbolNavigation';
+import {
+  getSymbolAtPosition,
+  findDefinitionInFile,
+  hasGoToDefinitionModifier,
+} from '@/lib/symbolNavigation';
 import { findDefinition, SymbolDefinition, readFile } from '@/lib/tauri';
 import { OpenFile } from '@/stores/fileStore';
 import { getLanguageFromPath } from '@/lib/highlight';

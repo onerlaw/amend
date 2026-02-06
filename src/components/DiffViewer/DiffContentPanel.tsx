@@ -33,7 +33,10 @@ export function DiffContentPanel() {
   const changedFilesCount = allFiles.length;
 
   return (
-    <div className="h-full overflow-hidden bg-surface-0 flex flex-col" onClick={() => setFocusedPanel('editor')}>
+    <div
+      className="h-full overflow-hidden bg-surface-0 flex flex-col"
+      onClick={() => setFocusedPanel('editor')}
+    >
       {changedFilesCount === 0 && (
         <div className="flex h-full flex-col items-center justify-center px-6 text-center">
           <CheckCircleIcon className="h-12 w-12 text-green-500 mb-3" />

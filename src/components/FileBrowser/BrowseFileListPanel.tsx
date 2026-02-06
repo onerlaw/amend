@@ -13,7 +13,13 @@ interface BrowseFileListProps {
   isLoading: boolean;
 }
 
-function BrowseFileList({ entries, activeFilePath, openFilePaths, onSelectFile, isLoading }: BrowseFileListProps) {
+function BrowseFileList({
+  entries,
+  activeFilePath,
+  openFilePaths,
+  onSelectFile,
+  isLoading,
+}: BrowseFileListProps) {
   const { openMenu, isOpen: contextMenuOpen, targetEntry } = useContextMenuStore();
   const contextTargetPath = targetEntry?.path ?? null;
   const [expandedDirs, setExpandedDirs] = useState<Set<string>>(new Set());
@@ -63,7 +69,9 @@ function BrowseFileList({ entries, activeFilePath, openFilePaths, onSelectFile, 
           style={{ paddingLeft: `${depth * 12 + 8}px` }}
         >
           {entry.isDirectory && (
-            <ChevronIcon className={`h-3 w-3 text-tertiary transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
+            <ChevronIcon
+              className={`h-3 w-3 text-tertiary transition-transform ${isExpanded ? 'rotate-90' : ''}`}
+            />
           )}
           {!entry.isDirectory && <span className="w-3" />}
           {getFileIcon()}
@@ -71,18 +79,14 @@ function BrowseFileList({ entries, activeFilePath, openFilePaths, onSelectFile, 
         </button>
 
         {entry.isDirectory && isExpanded && (
-          <div>
-            {sortDirectoriesFirst(children).map((child) => renderEntry(child, depth + 1))}
-          </div>
+          <div>{sortDirectoriesFirst(children).map((child) => renderEntry(child, depth + 1))}</div>
         )}
       </div>
     );
   };
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-full text-tertiary">Loading...</div>
-    );
+    return <div className="flex items-center justify-center h-full text-tertiary">Loading...</div>;
   }
 
   if (entries.length === 0) {
@@ -101,18 +105,25 @@ function BrowseFileList({ entries, activeFilePath, openFilePaths, onSelectFile, 
 }
 
 export function BrowseFileListPanel() {
-  const { entries, isLoading, browseActiveFilePath, browseOpenFiles, handleSelectFile, handleRefresh } =
-    useFileBrowserState();
+  const {
+    entries,
+    isLoading,
+    browseActiveFilePath,
+    browseOpenFiles,
+    handleSelectFile,
+    handleRefresh,
+  } = useFileBrowserState();
 
-  const openFilePaths = useMemo(() => new Set(browseOpenFiles.map((f) => f.path)), [browseOpenFiles]);
+  const openFilePaths = useMemo(
+    () => new Set(browseOpenFiles.map((f) => f.path)),
+    [browseOpenFiles]
+  );
 
   return (
     <div className="h-full bg-surface-2 flex flex-col">
       <div className="flex items-center justify-between px-3 py-2">
         <div className="flex items-center gap-2">
-          <span className="text-xs font-semibold uppercase tracking-wide text-primary">
-            Files
-          </span>
+          <span className="text-xs font-semibold uppercase tracking-wide text-primary">Files</span>
         </div>
         <button
           onClick={handleRefresh}

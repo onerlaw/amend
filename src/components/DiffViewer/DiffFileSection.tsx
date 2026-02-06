@@ -38,11 +38,7 @@ const DiffLine = memo(function DiffLine({
   language,
 }: DiffLineProps) {
   const bgClass =
-    type === 'added'
-      ? 'bg-diff-add-bg'
-      : type === 'removed'
-        ? 'bg-diff-remove-bg'
-        : '';
+    type === 'added' ? 'bg-diff-add-bg' : type === 'removed' ? 'bg-diff-remove-bg' : '';
 
   const prefixClass =
     type === 'added'
@@ -52,10 +48,7 @@ const DiffLine = memo(function DiffLine({
         : 'text-tertiary';
 
   const prefix = type === 'added' ? '+' : type === 'removed' ? '-' : ' ';
-  const highlightedContent = useMemo(
-    () => highlightCode(content, language),
-    [content, language]
-  );
+  const highlightedContent = useMemo(() => highlightCode(content, language), [content, language]);
 
   return (
     <div className={`flex font-mono text-sm ${bgClass} whitespace-nowrap`}>
@@ -97,7 +90,11 @@ const CollapsedSeparator = memo(function CollapsedSeparator({
 
 const BADGE_CONFIG: Record<string, { bg: string; text: string; label: string }> = {
   staged: { bg: 'bg-diff-add-bg', text: 'text-diff-add-text', label: 'Staged' },
-  unstaged: { bg: 'bg-amber-100 dark:bg-yellow-600/30', text: 'text-amber-600 dark:text-yellow-400', label: 'Changed' },
+  unstaged: {
+    bg: 'bg-amber-100 dark:bg-yellow-600/30',
+    text: 'text-amber-600 dark:text-yellow-400',
+    label: 'Changed',
+  },
   untracked: { bg: 'bg-gray-200 dark:bg-gray-600/30', text: 'text-tertiary', label: 'Untracked' },
 };
 
@@ -235,7 +232,7 @@ export const DiffFileSection = memo(function DiffFileSection({
   }, [oldContent, newContent]);
 
   const toggleSection = useCallback((index: number) => {
-    setExpandedSections(prev => toggleSetItem(prev, index));
+    setExpandedSections((prev) => toggleSetItem(prev, index));
   }, []);
 
   // Compute diff once — extract stats and sections from the same computation
@@ -296,7 +293,11 @@ export const DiffFileSection = memo(function DiffFileSection({
 
     // If no changes or all lines are changes, return a single hunk
     if (changedIndices.length === 0 || changedIndices.length === result.length) {
-      return { additions: adds, deletions: dels, sections: [{ kind: 'hunk' as const, lines: result }] };
+      return {
+        additions: adds,
+        deletions: dels,
+        sections: [{ kind: 'hunk' as const, lines: result }],
+      };
     }
 
     // Compute context ranges around each changed line, then merge overlapping
@@ -322,7 +323,11 @@ export const DiffFileSection = memo(function DiffFileSection({
       // Collapsed section before this range
       if (cursor < range.start) {
         const collapsedLines = result.slice(cursor, range.start);
-        sects.push({ kind: 'collapsed', lines: collapsedLines, hiddenCount: collapsedLines.length });
+        sects.push({
+          kind: 'collapsed',
+          lines: collapsedLines,
+          hiddenCount: collapsedLines.length,
+        });
       }
       // Hunk section
       sects.push({ kind: 'hunk', lines: result.slice(range.start, range.end + 1) });
@@ -344,14 +349,18 @@ export const DiffFileSection = memo(function DiffFileSection({
   return (
     <div className="m-2">
       {/* Header */}
-      <div className={`flex items-center justify-between bg-surface-2 px-3 py-2 rounded-t-md ${isCollapsed ? 'rounded-b-md' : ''}`}>
+      <div
+        className={`flex items-center justify-between bg-surface-2 px-3 py-2 rounded-t-md ${isCollapsed ? 'rounded-b-md' : ''}`}
+      >
         <div className="flex items-center gap-2 min-w-0">
           <button
             onClick={onToggleCollapse}
             className="rounded-md p-0.5 hover:bg-surface-3"
             title={isCollapsed ? 'Expand' : 'Collapse'}
           >
-            <ChevronIcon className={`h-4 w-4 text-tertiary transition-transform ${isCollapsed ? '' : 'rotate-90'}`} />
+            <ChevronIcon
+              className={`h-4 w-4 text-tertiary transition-transform ${isCollapsed ? '' : 'rotate-90'}`}
+            />
           </button>
 
           <span className="text-sm text-primary truncate" title={filePath}>
@@ -405,11 +414,7 @@ export const DiffFileSection = memo(function DiffFileSection({
           )}
 
           {hasContent && isBinary && (
-            <ImageDiffContent
-              filePath={filePath}
-              oldContent={oldContent}
-              newContent={newContent}
-            />
+            <ImageDiffContent filePath={filePath} oldContent={oldContent} newContent={newContent} />
           )}
 
           {hasContent && !isBinary && (

@@ -6,7 +6,13 @@ type DiffViewerContextValue = ReturnType<typeof useDiffViewerState>;
 
 const DiffViewerContext = createContext<DiffViewerContextValue | null>(null);
 
-export function DiffViewerProvider({ gitPolling, children }: { gitPolling: GitPollingResult; children: ReactNode }) {
+export function DiffViewerProvider({
+  gitPolling,
+  children,
+}: {
+  gitPolling: GitPollingResult;
+  children: ReactNode;
+}) {
   const state = useDiffViewerState(gitPolling);
   return <DiffViewerContext.Provider value={state}>{children}</DiffViewerContext.Provider>;
 }

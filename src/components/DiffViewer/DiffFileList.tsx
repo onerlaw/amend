@@ -73,7 +73,9 @@ const STATUS_DISPLAY: Record<string, { color: string; letter: string }> = {
 
 function getStatusIcon(statusType: string) {
   const display = STATUS_DISPLAY[statusType] ?? { color: 'text-tertiary', letter: 'U' };
-  return <span className={`${display.color} font-mono text-xs w-4 text-center`}>{display.letter}</span>;
+  return (
+    <span className={`${display.color} font-mono text-xs w-4 text-center`}>{display.letter}</span>
+  );
 }
 
 interface FileTreeItemProps {
@@ -108,7 +110,9 @@ function FileTreeItem({
             className="flex w-full select-none items-center gap-1 px-2 py-0.5 text-sm hover:bg-surface-3/50"
             style={{ paddingLeft: `${depth * 12 + 8}px` }}
           >
-            <ChevronIcon className={`h-3 w-3 text-tertiary transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
+            <ChevronIcon
+              className={`h-3 w-3 text-tertiary transition-transform ${isExpanded ? 'rotate-90' : ''}`}
+            />
             <FolderIcon className="h-4 w-4 text-yellow-500" />
             <span className="text-primary">{node.name}</span>
           </button>
@@ -138,16 +142,20 @@ function FileTreeItem({
   return (
     <button
       onClick={() => onScrollToFile(node.path)}
-      onContextMenu={onContextMenuEntry ? (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        onContextMenuEntry(e, {
-          name: node.name,
-          path: node.path,
-          isDirectory: false,
-          isSymlink: false,
-        });
-      } : undefined}
+      onContextMenu={
+        onContextMenuEntry
+          ? (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onContextMenuEntry(e, {
+                name: node.name,
+                path: node.path,
+                isDirectory: false,
+                isSymlink: false,
+              });
+            }
+          : undefined
+      }
       className={`group flex w-full select-none items-center gap-1 py-0.5 text-sm hover:bg-surface-3/50 ${
         isSelected ? 'bg-surface-3' : ''
       }`}
@@ -170,22 +178,43 @@ function FileTreeItem({
   );
 }
 
-export function DiffFileList({ status, onScrollToFile, isLoading, onRefresh, repoPath, selectedFile, onSelectFile }: DiffFileListProps) {
-  const [restoreTarget, setRestoreTarget] = useState<{ path: string; action: 'restore' | 'unstage' } | null>(null);
-  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; path: string; action: 'restore' | 'unstage' } | null>(null);
+export function DiffFileList({
+  status,
+  onScrollToFile,
+  isLoading,
+  onRefresh,
+  repoPath,
+  selectedFile,
+  onSelectFile,
+}: DiffFileListProps) {
+  const [restoreTarget, setRestoreTarget] = useState<{
+    path: string;
+    action: 'restore' | 'unstage';
+  } | null>(null);
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+    path: string;
+    action: 'restore' | 'unstage';
+  } | null>(null);
 
-  const handleScrollToFile = useCallback((path: string) => {
-    onSelectFile?.(path);
-    onScrollToFile(path);
-  }, [onSelectFile, onScrollToFile]);
+  const handleScrollToFile = useCallback(
+    (path: string) => {
+      onSelectFile?.(path);
+      onScrollToFile(path);
+    },
+    [onSelectFile, onScrollToFile]
+  );
 
-  const makeContextMenuHandler = useCallback((action: 'unstage' | 'restore') =>
-    (e: React.MouseEvent, entry: FileEntry) => {
+  const makeContextMenuHandler = useCallback(
+    (action: 'unstage' | 'restore') => (e: React.MouseEvent, entry: FileEntry) => {
       e.preventDefault();
       e.stopPropagation();
       onSelectFile?.(entry.path);
       setContextMenu({ x: e.clientX, y: e.clientY, path: entry.path, action });
-    }, [onSelectFile]);
+    },
+    [onSelectFile]
+  );
 
   const handleRestoreConfirm = async () => {
     if (!restoreTarget || !repoPath) return;
@@ -205,12 +234,18 @@ export function DiffFileList({ status, onScrollToFile, isLoading, onRefresh, rep
 
   const stagedTree = useMemo(() => {
     if (!status || status.staged.length === 0) return null;
-    return buildTree(status.staged, { getPath: (f) => f.path, getLeafData: (f) => ({ status: f.status }) });
+    return buildTree(status.staged, {
+      getPath: (f) => f.path,
+      getLeafData: (f) => ({ status: f.status }),
+    });
   }, [status]);
 
   const unstagedTree = useMemo(() => {
     if (!status || status.unstaged.length === 0) return null;
-    return buildTree(status.unstaged, { getPath: (f) => f.path, getLeafData: (f) => ({ status: f.status }) });
+    return buildTree(status.unstaged, {
+      getPath: (f) => f.path,
+      getLeafData: (f) => ({ status: f.status }),
+    });
   }, [status]);
 
   const untrackedTree = useMemo(() => {
@@ -219,9 +254,7 @@ export function DiffFileList({ status, onScrollToFile, isLoading, onRefresh, rep
   }, [status]);
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-full text-tertiary">Loading...</div>
-    );
+    return <div className="flex items-center justify-center h-full text-tertiary">Loading...</div>;
   }
 
   if (!status) {
@@ -258,10 +291,14 @@ export function DiffFileList({ status, onScrollToFile, isLoading, onRefresh, rep
             depth={0}
             onScrollToFile={handleScrollToFile}
             onContextMenuEntry={makeContextMenuHandler('unstage')}
-            onDiscardClick={repoPath ? (e, path) => {
-              e.stopPropagation();
-              setRestoreTarget({ path, action: 'unstage' });
-            } : undefined}
+            onDiscardClick={
+              repoPath
+                ? (e, path) => {
+                    e.stopPropagation();
+                    setRestoreTarget({ path, action: 'unstage' });
+                  }
+                : undefined
+            }
             selectedFile={selectedFile}
           />
         </div>
@@ -278,10 +315,14 @@ export function DiffFileList({ status, onScrollToFile, isLoading, onRefresh, rep
             depth={0}
             onScrollToFile={handleScrollToFile}
             onContextMenuEntry={makeContextMenuHandler('restore')}
-            onDiscardClick={repoPath ? (e, path) => {
-              e.stopPropagation();
-              setRestoreTarget({ path, action: 'restore' });
-            } : undefined}
+            onDiscardClick={
+              repoPath
+                ? (e, path) => {
+                    e.stopPropagation();
+                    setRestoreTarget({ path, action: 'restore' });
+                  }
+                : undefined
+            }
             selectedFile={selectedFile}
           />
         </div>
@@ -293,7 +334,12 @@ export function DiffFileList({ status, onScrollToFile, isLoading, onRefresh, rep
           <div className="px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-tertiary">
             Untracked ({status.untracked.length})
           </div>
-          <FileTreeItem node={untrackedTree} depth={0} onScrollToFile={handleScrollToFile} selectedFile={selectedFile} />
+          <FileTreeItem
+            node={untrackedTree}
+            depth={0}
+            onScrollToFile={handleScrollToFile}
+            selectedFile={selectedFile}
+          />
         </div>
       )}
 
@@ -301,22 +347,36 @@ export function DiffFileList({ status, onScrollToFile, isLoading, onRefresh, rep
         isOpen={contextMenu !== null}
         position={contextMenu ?? { x: 0, y: 0 }}
         onClose={() => setContextMenu(null)}
-        items={contextMenu ? [{
-          label: contextMenu.action === 'unstage' ? 'Unstage File' : 'Discard Changes',
-          onClick: () => setRestoreTarget({ path: contextMenu.path, action: contextMenu.action }),
-        }] : []}
+        items={
+          contextMenu
+            ? [
+                {
+                  label: contextMenu.action === 'unstage' ? 'Unstage File' : 'Discard Changes',
+                  onClick: () =>
+                    setRestoreTarget({ path: contextMenu.path, action: contextMenu.action }),
+                },
+              ]
+            : []
+        }
       />
 
       {restoreTarget && (
         <ConfirmDialog
           title={isRestore ? 'Discard Changes' : 'Unstage File'}
           message={
-            isRestore
-              ? <>Are you sure you want to discard changes to &ldquo;{getFileName(restoreTarget.path)}&rdquo;? This cannot be undone.</>
-              : <>Are you sure you want to unstage &ldquo;{getFileName(restoreTarget.path)}&rdquo;?</>
+            isRestore ? (
+              <>
+                Are you sure you want to discard changes to &ldquo;{getFileName(restoreTarget.path)}
+                &rdquo;? This cannot be undone.
+              </>
+            ) : (
+              <>Are you sure you want to unstage &ldquo;{getFileName(restoreTarget.path)}&rdquo;?</>
+            )
           }
           confirmLabel={isRestore ? 'Discard' : 'Unstage'}
-          confirmClassName={isRestore ? 'bg-red-600 hover:bg-red-700' : 'bg-accent hover:bg-accent-hover'}
+          confirmClassName={
+            isRestore ? 'bg-red-600 hover:bg-red-700' : 'bg-accent hover:bg-accent-hover'
+          }
           onConfirm={handleRestoreConfirm}
           onCancel={() => setRestoreTarget(null)}
         />

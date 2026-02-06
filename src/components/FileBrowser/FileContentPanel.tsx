@@ -38,10 +38,7 @@ export function FileContentPanel({ file, onContentChange }: FileContentPanelProp
 
     const state = EditorState.create({
       doc: file.content,
-      extensions: [
-        ...createBaseExtensions(file.language),
-        updateListener,
-      ],
+      extensions: [...createBaseExtensions(file.language), updateListener],
     });
 
     const view = new EditorView({
@@ -85,7 +82,5 @@ export function FileContentPanel({ file, onContentChange }: FileContentPanelProp
     );
   }
 
-  return (
-    <div ref={containerRef} className="h-full" />
-  );
+  return <div ref={containerRef} className="h-full" />;
 }

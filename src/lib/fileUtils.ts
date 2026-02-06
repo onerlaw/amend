@@ -34,13 +34,16 @@ export function buildImageDataUrl(base64: string, path: string): string {
  * Get the CSS color class for a file icon based on file extension.
  */
 const FILE_ICON_COLORS: Record<string, string> = {
-  ts: 'text-blue-400', tsx: 'text-blue-400',
-  js: 'text-yellow-400', jsx: 'text-yellow-400',
+  ts: 'text-blue-400',
+  tsx: 'text-blue-400',
+  js: 'text-yellow-400',
+  jsx: 'text-yellow-400',
   rs: 'text-orange-400',
   py: 'text-green-400',
   json: 'text-yellow-300',
   md: 'text-blue-300',
-  css: 'text-pink-400', scss: 'text-pink-400',
+  css: 'text-pink-400',
+  scss: 'text-pink-400',
   html: 'text-orange-300',
 };
 
@@ -110,7 +113,9 @@ export function toggleSetItem<T>(set: Set<T>, item: T): Set<T> {
 /**
  * Sort entries with directories first, then alphabetically by name.
  */
-export function sortDirectoriesFirst<T extends { isDirectory: boolean; name: string }>(entries: T[]): T[] {
+export function sortDirectoriesFirst<T extends { isDirectory: boolean; name: string }>(
+  entries: T[]
+): T[] {
   return [...entries].sort((a, b) => {
     if (a.isDirectory && !b.isDirectory) return -1;
     if (!a.isDirectory && b.isDirectory) return 1;

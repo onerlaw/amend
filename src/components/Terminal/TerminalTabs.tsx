@@ -30,7 +30,9 @@ export const TerminalTabs = forwardRef<TerminalTabsHandle>(function TerminalTabs
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
 
   // Use selected project's path for worktree listing, or fall back to currentDirectory
-  const selectedProject = selectedProjectId ? projects.find(p => p.id === selectedProjectId) : null;
+  const selectedProject = selectedProjectId
+    ? projects.find((p) => p.id === selectedProjectId)
+    : null;
   const worktreeBasePath = selectedProject?.path ?? currentDirectory;
   const { worktrees, add: addWorktree, remove: removeWorktree } = useWorktrees(worktreeBasePath);
 
@@ -39,7 +41,7 @@ export const TerminalTabs = forwardRef<TerminalTabsHandle>(function TerminalTabs
     if (tabs.length === 0 && !initializedRef.current && currentDirectory) {
       initializedRef.current = true;
       // Find the project matching currentDirectory to associate with the terminal
-      const project = projects.find(p => p.path === currentDirectory);
+      const project = projects.find((p) => p.path === currentDirectory);
       createTerminal(currentDirectory, project?.id ?? null).catch((err) => {
         console.error('Failed to create terminal:', err);
         initializedRef.current = false;
@@ -48,7 +50,7 @@ export const TerminalTabs = forwardRef<TerminalTabsHandle>(function TerminalTabs
   }, [tabs.length, createTerminal, currentDirectory, projects]);
 
   const handleDuplicateTerminal = useCallback(() => {
-    const activeTab = tabs.find(t => t.id === activeTabId);
+    const activeTab = tabs.find((t) => t.id === activeTabId);
     if (!activeTab) return;
     createTerminal(activeTab.worktreePath, activeTab.projectId);
   }, [tabs, activeTabId, createTerminal]);
@@ -88,10 +90,14 @@ export const TerminalTabs = forwardRef<TerminalTabsHandle>(function TerminalTabs
   }, [projects, addProject, setCurrentDirectory]);
 
   // Expose methods to parent via ref
-  useImperativeHandle(ref, () => ({
-    openNewTerminal: handleNewTerminal,
-    duplicateTerminal: handleDuplicateTerminal,
-  }), [handleNewTerminal, handleDuplicateTerminal]);
+  useImperativeHandle(
+    ref,
+    () => ({
+      openNewTerminal: handleNewTerminal,
+      duplicateTerminal: handleDuplicateTerminal,
+    }),
+    [handleNewTerminal, handleDuplicateTerminal]
+  );
 
   const handleProjectSelect = (project: Project) => {
     setSelectedProjectId(project.id);
@@ -112,7 +118,11 @@ export const TerminalTabs = forwardRef<TerminalTabsHandle>(function TerminalTabs
 
   const handleWorktreeCreate = async (path: string, branch: string, isNewBranch: boolean) => {
     try {
-      const newWorktree = await addWorktree(path, isNewBranch ? undefined : branch, isNewBranch ? branch : undefined);
+      const newWorktree = await addWorktree(
+        path,
+        isNewBranch ? undefined : branch,
+        isNewBranch ? branch : undefined
+      );
       setShowWorktreeSelector(false);
       createTerminal(newWorktree.path, selectedProjectId);
       setSelectedProjectId(null);
@@ -122,7 +132,9 @@ export const TerminalTabs = forwardRef<TerminalTabsHandle>(function TerminalTabs
   };
 
   const handleWorktreeDelete = async (worktree: GitWorktree) => {
-    if (!confirm(`Delete worktree "${worktree.path}"?\n\nThis will remove the worktree directory.`)) {
+    if (
+      !confirm(`Delete worktree "${worktree.path}"?\n\nThis will remove the worktree directory.`)
+    ) {
       return;
     }
     try {
@@ -144,7 +156,10 @@ export const TerminalTabs = forwardRef<TerminalTabsHandle>(function TerminalTabs
   };
 
   return (
-    <div className="flex h-full flex-col bg-terminal-bg" onClick={() => setFocusedPanel('terminal')}>
+    <div
+      className="flex h-full flex-col bg-terminal-bg"
+      onClick={() => setFocusedPanel('terminal')}
+    >
       {/* Tab bar */}
       <div className="flex items-center bg-surface-2 px-1 pt-1 gap-0.5">
         <div className="flex flex-1 overflow-x-auto gap-0.5">
@@ -159,7 +174,9 @@ export const TerminalTabs = forwardRef<TerminalTabsHandle>(function TerminalTabs
               }`}
               title={tab.worktreePath}
             >
-              <span className="truncate max-w-[120px]">{tab.title || getFileName(tab.worktreePath)}</span>
+              <span className="truncate max-w-[120px]">
+                {tab.title || getFileName(tab.worktreePath)}
+              </span>
               <span
                 onClick={(e) => handleCloseTerminal(e, tab.id)}
                 className="ml-1 rounded-full p-0.5 opacity-0 hover:bg-surface-3 group-hover:opacity-100"
@@ -211,7 +228,9 @@ export const TerminalTabs = forwardRef<TerminalTabsHandle>(function TerminalTabs
                     className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs text-primary hover:bg-surface-3"
                   >
                     <FolderIcon className="h-4 w-4 flex-shrink-0" />
-                    <span className="truncate" title={project.path}>{project.name}</span>
+                    <span className="truncate" title={project.path}>
+                      {project.name}
+                    </span>
                   </button>
                 ))}
                 {/* Open Folder option */}
