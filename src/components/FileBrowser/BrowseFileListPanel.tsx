@@ -14,7 +14,8 @@ interface BrowseFileListProps {
 }
 
 function BrowseFileList({ entries, activeFilePath, openFilePaths, onSelectFile, isLoading }: BrowseFileListProps) {
-  const { openMenu } = useContextMenuStore();
+  const { openMenu, isOpen: contextMenuOpen, targetEntry } = useContextMenuStore();
+  const contextTargetPath = targetEntry?.path ?? null;
   const [expandedDirs, setExpandedDirs] = useState<Set<string>>(new Set());
   const [dirContents, setDirContents] = useState<Map<string, FileEntry[]>>(new Map());
 
@@ -45,6 +46,7 @@ function BrowseFileList({ entries, activeFilePath, openFilePaths, onSelectFile, 
 
     const isOpen = openFilePaths.has(entry.path);
     const isActive = activeFilePath === entry.path;
+    const isContextTarget = contextMenuOpen && contextTargetPath === entry.path;
 
     return (
       <div key={entry.path}>
@@ -56,7 +58,7 @@ function BrowseFileList({ entries, activeFilePath, openFilePaths, onSelectFile, 
             openMenu(entry, e.clientX, e.clientY);
           }}
           className={`flex w-full select-none items-center gap-1 py-0.5 pr-2 text-left text-sm hover:bg-surface-3/50 ${
-            isActive ? 'bg-surface-3' : isOpen ? 'bg-surface-3/30' : ''
+            isActive || isContextTarget ? 'bg-surface-3' : isOpen ? 'bg-surface-3/30' : ''
           }`}
           style={{ paddingLeft: `${depth * 12 + 8}px` }}
         >

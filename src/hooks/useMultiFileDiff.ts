@@ -4,6 +4,7 @@ import { getFileDiff, GitDiff } from '@/lib/tauri';
 export interface FileDiffData {
   oldContent: string;
   newContent: string;
+  isBinary: boolean;
   isLoading: boolean;
   error: string | null;
 }
@@ -35,6 +36,7 @@ export function useMultiFileDiff(repoPath: string | null) {
         newDiffs.set(filePath, {
           oldContent: '',
           newContent: '',
+          isBinary: false,
           isLoading: true,
           error: null,
         });
@@ -49,6 +51,7 @@ export function useMultiFileDiff(repoPath: string | null) {
           newDiffs.set(filePath, {
             oldContent: diff.oldContent,
             newContent: diff.newContent,
+            isBinary: diff.isBinary,
             isLoading: false,
             error: null,
           });
@@ -60,6 +63,7 @@ export function useMultiFileDiff(repoPath: string | null) {
           newDiffs.set(filePath, {
             oldContent: '',
             newContent: '',
+            isBinary: false,
             isLoading: false,
             error: err instanceof Error ? err.message : 'Failed to load diff',
           });

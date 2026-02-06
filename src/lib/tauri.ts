@@ -52,6 +52,10 @@ export async function readFile(path: string): Promise<string> {
   return invoke('read_file', { path });
 }
 
+export async function readFileBase64(path: string): Promise<string> {
+  return invoke('read_file_base64', { path });
+}
+
 export async function writeFile(path: string, contents: string): Promise<void> {
   return invoke('write_file', { path, contents });
 }
@@ -105,6 +109,7 @@ export interface GitDiff {
   newPath: string;
   oldContent: string;
   newContent: string;
+  isBinary: boolean;
 }
 
 export interface GitWorktree {

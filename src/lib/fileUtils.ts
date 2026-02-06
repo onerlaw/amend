@@ -1,6 +1,34 @@
-import { readFile } from '@/lib/tauri';
+import { readFile, readFileBase64 } from '@/lib/tauri';
 import { getLanguageFromPath } from '@/lib/highlight';
 import { useFileStore, OpenFile } from '@/stores/fileStore';
+
+const IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'bmp', 'ico']);
+
+const MIME_TYPES: Record<string, string> = {
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  gif: 'image/gif',
+  svg: 'image/svg+xml',
+  webp: 'image/webp',
+  bmp: 'image/bmp',
+  ico: 'image/x-icon',
+};
+
+export function isImageFile(path: string): boolean {
+  const ext = path.split('.').pop()?.toLowerCase() ?? '';
+  return IMAGE_EXTENSIONS.has(ext);
+}
+
+export function getImageMimeType(path: string): string {
+  const ext = path.split('.').pop()?.toLowerCase() ?? '';
+  return MIME_TYPES[ext] ?? 'application/octet-stream';
+}
+
+export function buildImageDataUrl(base64: string, path: string): string {
+  const mime = getImageMimeType(path);
+  return `data:${mime};base64,${base64}`;
+}
 
 /**
  * Get the CSS color class for a file icon based on file extension.
@@ -34,17 +62,32 @@ export async function openFileInBrowseMode(fullPath: string, displayName?: strin
     return;
   }
 
-  const content = await readFile(fullPath);
   const name = displayName || getFileName(fullPath);
-  const language = getLanguageFromPath(fullPath) || '';
-  const newFile: OpenFile = {
-    path: fullPath,
-    name,
-    content,
-    isDirty: false,
-    language,
-  };
-  openBrowseFile(newFile);
+  const isImage = isImageFile(fullPath);
+
+  if (isImage) {
+    const base64 = await readFileBase64(fullPath);
+    const newFile: OpenFile = {
+      path: fullPath,
+      name,
+      content: base64,
+      isDirty: false,
+      language: '',
+      isImage: true,
+    };
+    openBrowseFile(newFile);
+  } else {
+    const content = await readFile(fullPath);
+    const language = getLanguageFromPath(fullPath) || '';
+    const newFile: OpenFile = {
+      path: fullPath,
+      name,
+      content,
+      isDirty: false,
+      language,
+    };
+    openBrowseFile(newFile);
+  }
 }
 
 /**

@@ -65,6 +65,7 @@ export function DiffContentPanel() {
                   category={file.category}
                   oldContent={diffData?.oldContent ?? ''}
                   newContent={diffData?.newContent ?? ''}
+                  isBinary={diffData?.isBinary ?? false}
                   isCollapsed={collapsedDiffFiles.has(file.path)}
                   isLoading={diffData?.isLoading ?? true}
                   error={diffData?.error ?? null}

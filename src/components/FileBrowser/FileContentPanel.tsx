@@ -3,6 +3,7 @@ import { EditorState } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
 import { OpenFile } from '@/stores/fileStore';
 import { createBaseExtensions } from '@/lib/codemirror';
+import { buildImageDataUrl } from '@/lib/fileUtils';
 
 interface FileContentPanelProps {
   file: OpenFile;
@@ -20,7 +21,7 @@ export function FileContentPanel({ file, onContentChange }: FileContentPanelProp
   }, [onContentChange]);
 
   useEffect(() => {
-    if (!containerRef.current) return;
+    if (!containerRef.current || file.isImage) return;
 
     // Clear any existing editor
     if (viewRef.current) {
@@ -53,11 +54,11 @@ export function FileContentPanel({ file, onContentChange }: FileContentPanelProp
     return () => {
       view.destroy();
     };
-  }, [file.path]); // Only recreate when file path changes
+  }, [file.path, file.isImage]); // Only recreate when file path changes
 
   // Update content when file content changes externally (not from typing)
   useEffect(() => {
-    if (!viewRef.current) return;
+    if (!viewRef.current || file.isImage) return;
 
     const currentContent = viewRef.current.state.doc.toString();
     // Only update if content differs and file is not dirty (external change)
@@ -70,7 +71,19 @@ export function FileContentPanel({ file, onContentChange }: FileContentPanelProp
         },
       });
     }
-  }, [file.content, file.isDirty]);
+  }, [file.content, file.isDirty, file.isImage]);
+
+  if (file.isImage) {
+    return (
+      <div className="flex h-full items-center justify-center bg-surface-0 p-8">
+        <img
+          src={buildImageDataUrl(file.content, file.path)}
+          alt={file.name}
+          className="max-w-full max-h-full object-contain rounded-md"
+        />
+      </div>
+    );
+  }
 
   return (
     <div ref={containerRef} className="h-full" />

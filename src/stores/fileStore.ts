@@ -7,6 +7,7 @@ export interface OpenFile {
   content: string;
   isDirty: boolean;
   language: string;
+  isImage?: boolean;
 }
 
 // Internal tab helpers

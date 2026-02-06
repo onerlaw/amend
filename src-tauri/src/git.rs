@@ -1,4 +1,5 @@
 use crate::error::impl_serialize_as_string;
+use base64::{engine::general_purpose::STANDARD, Engine as _};
 use git2::{DiffOptions, Repository, StatusOptions};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
@@ -49,6 +50,7 @@ pub struct GitDiff {
     pub new_path: String,
     pub old_content: String,
     pub new_content: String,
+    pub is_binary: bool,
 }
 
 /// Run a git command in the given repo directory and return stdout on success.
@@ -76,6 +78,14 @@ fn validate_no_flag(arg: &str, label: &str) -> Result<(), GitError> {
         )));
     }
     Ok(())
+}
+
+fn is_image_extension(path: &str) -> bool {
+    let lower = path.to_lowercase();
+    matches!(
+        lower.rsplit('.').next(),
+        Some("png" | "jpg" | "jpeg" | "gif" | "svg" | "webp" | "bmp" | "ico")
+    )
 }
 
 fn index_status_to_string(status: git2::Status) -> &'static str {
@@ -170,6 +180,39 @@ pub fn get_file_diff(repo_path: String, file_path: String) -> Result<GitDiff, Gi
     let full_path = workdir.join(&file_path);
     let relative_path = Path::new(&file_path);
 
+    if is_image_extension(&file_path) {
+        // Read current file as base64
+        let new_content = if full_path.exists() {
+            let bytes = std::fs::read(&full_path).unwrap_or_default();
+            STANDARD.encode(&bytes)
+        } else {
+            String::new()
+        };
+
+        // Read HEAD blob as base64
+        let old_content = match repo.head() {
+            Ok(head) => {
+                let tree = head.peel_to_tree()?;
+                match tree.get_path(relative_path) {
+                    Ok(entry) => {
+                        let blob = repo.find_blob(entry.id())?;
+                        STANDARD.encode(blob.content())
+                    }
+                    Err(_) => String::new(),
+                }
+            }
+            Err(_) => String::new(),
+        };
+
+        return Ok(GitDiff {
+            old_path: file_path.clone(),
+            new_path: file_path,
+            old_content,
+            new_content,
+            is_binary: true,
+        });
+    }
+
     // Get current file content
     let new_content = if full_path.exists() {
         std::fs::read_to_string(&full_path).unwrap_or_default()
@@ -197,6 +240,7 @@ pub fn get_file_diff(repo_path: String, file_path: String) -> Result<GitDiff, Gi
         new_path: file_path,
         old_content,
         new_content,
+        is_binary: false,
     })
 }
 

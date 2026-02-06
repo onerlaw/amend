@@ -26,6 +26,7 @@ pub fn run() {
             // File system commands
             filesystem::read_directory,
             filesystem::read_file,
+            filesystem::read_file_base64,
             filesystem::write_file,
             filesystem::search_files,
             filesystem::rename_entry,

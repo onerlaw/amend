@@ -11,6 +11,8 @@ interface DiffFileListProps {
   isLoading: boolean;
   onRefresh?: () => void;
   repoPath?: string | null;
+  selectedFile?: string | null;
+  onSelectFile?: (path: string) => void;
 }
 
 interface FileTreeNode {
@@ -81,6 +83,7 @@ interface FileTreeItemProps {
   onContextMenuEntry?: (e: React.MouseEvent, entry: FileEntry) => void;
   defaultExpanded?: boolean;
   onDiscardClick?: (e: React.MouseEvent, filePath: string) => void;
+  selectedFile?: string | null;
 }
 
 function FileTreeItem({
@@ -90,6 +93,7 @@ function FileTreeItem({
   onContextMenuEntry,
   defaultExpanded = true,
   onDiscardClick,
+  selectedFile,
 }: FileTreeItemProps) {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
 
@@ -120,6 +124,7 @@ function FileTreeItem({
                 onContextMenuEntry={onContextMenuEntry}
                 defaultExpanded={defaultExpanded}
                 onDiscardClick={onDiscardClick}
+                selectedFile={selectedFile}
               />
             ))}
           </div>
@@ -127,6 +132,8 @@ function FileTreeItem({
       </div>
     );
   }
+
+  const isSelected = selectedFile === node.path;
 
   return (
     <button
@@ -141,7 +148,9 @@ function FileTreeItem({
           isSymlink: false,
         });
       } : undefined}
-      className="group flex w-full select-none items-center gap-1 py-0.5 text-sm hover:bg-surface-3/50"
+      className={`group flex w-full select-none items-center gap-1 py-0.5 text-sm hover:bg-surface-3/50 ${
+        isSelected ? 'bg-surface-3' : ''
+      }`}
       style={{ paddingLeft: `${depth * 12 + 8}px` }}
     >
       {getStatusIcon(node.status || '')}
@@ -161,16 +170,22 @@ function FileTreeItem({
   );
 }
 
-export function DiffFileList({ status, onScrollToFile, isLoading, onRefresh, repoPath }: DiffFileListProps) {
+export function DiffFileList({ status, onScrollToFile, isLoading, onRefresh, repoPath, selectedFile, onSelectFile }: DiffFileListProps) {
   const [restoreTarget, setRestoreTarget] = useState<{ path: string; action: 'restore' | 'unstage' } | null>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; path: string; action: 'restore' | 'unstage' } | null>(null);
+
+  const handleScrollToFile = useCallback((path: string) => {
+    onSelectFile?.(path);
+    onScrollToFile(path);
+  }, [onSelectFile, onScrollToFile]);
 
   const makeContextMenuHandler = useCallback((action: 'unstage' | 'restore') =>
     (e: React.MouseEvent, entry: FileEntry) => {
       e.preventDefault();
       e.stopPropagation();
+      onSelectFile?.(entry.path);
       setContextMenu({ x: e.clientX, y: e.clientY, path: entry.path, action });
-    }, []);
+    }, [onSelectFile]);
 
   const handleRestoreConfirm = async () => {
     if (!restoreTarget || !repoPath) return;
@@ -241,12 +256,13 @@ export function DiffFileList({ status, onScrollToFile, isLoading, onRefresh, rep
           <FileTreeItem
             node={stagedTree}
             depth={0}
-            onScrollToFile={onScrollToFile}
+            onScrollToFile={handleScrollToFile}
             onContextMenuEntry={makeContextMenuHandler('unstage')}
             onDiscardClick={repoPath ? (e, path) => {
               e.stopPropagation();
               setRestoreTarget({ path, action: 'unstage' });
             } : undefined}
+            selectedFile={selectedFile}
           />
         </div>
       )}
@@ -260,12 +276,13 @@ export function DiffFileList({ status, onScrollToFile, isLoading, onRefresh, rep
           <FileTreeItem
             node={unstagedTree}
             depth={0}
-            onScrollToFile={onScrollToFile}
+            onScrollToFile={handleScrollToFile}
             onContextMenuEntry={makeContextMenuHandler('restore')}
             onDiscardClick={repoPath ? (e, path) => {
               e.stopPropagation();
               setRestoreTarget({ path, action: 'restore' });
             } : undefined}
+            selectedFile={selectedFile}
           />
         </div>
       )}
@@ -276,7 +293,7 @@ export function DiffFileList({ status, onScrollToFile, isLoading, onRefresh, rep
           <div className="px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-tertiary">
             Untracked ({status.untracked.length})
           </div>
-          <FileTreeItem node={untrackedTree} depth={0} onScrollToFile={onScrollToFile} />
+          <FileTreeItem node={untrackedTree} depth={0} onScrollToFile={handleScrollToFile} selectedFile={selectedFile} />
         </div>
       )}
 

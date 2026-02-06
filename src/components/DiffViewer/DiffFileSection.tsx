@@ -1,7 +1,7 @@
 import { useMemo, useState, useEffect, useCallback, memo } from 'react';
 import * as Diff from 'diff';
 import { highlightCode, getLanguageFromPath } from '@/lib/highlight';
-import { getFileName, toggleSetItem } from '@/lib/fileUtils';
+import { getFileName, toggleSetItem, buildImageDataUrl } from '@/lib/fileUtils';
 import { ChevronIcon } from '@/components/Icons';
 
 interface DiffFileSectionProps {
@@ -9,6 +9,7 @@ interface DiffFileSectionProps {
   category: 'staged' | 'unstaged' | 'untracked';
   oldContent: string;
   newContent: string;
+  isBinary: boolean;
   isCollapsed: boolean;
   isLoading: boolean;
   error: string | null;
@@ -165,11 +166,60 @@ const DiffContent = memo(function DiffContent({
   );
 });
 
+// Image diff component - renders old/new images side-by-side
+const ImageDiffContent = memo(function ImageDiffContent({
+  filePath,
+  oldContent,
+  newContent,
+}: {
+  filePath: string;
+  oldContent: string;
+  newContent: string;
+}) {
+  const hasOld = oldContent.length > 0;
+  const hasNew = newContent.length > 0;
+
+  const label = !hasOld ? 'Added' : !hasNew ? 'Removed' : 'Modified';
+
+  return (
+    <div className="p-4">
+      <div className="text-xs text-tertiary mb-3">{label} (binary image file)</div>
+      <div className="flex items-start gap-4">
+        {hasOld && (
+          <div className="flex-1 min-w-0">
+            {hasNew && <div className="text-xs text-diff-remove-text mb-1">Old</div>}
+            <div className="border border-surface-3 rounded-md p-2 bg-surface-0">
+              <img
+                src={buildImageDataUrl(oldContent, filePath)}
+                alt="Old version"
+                className="max-w-full max-h-64 object-contain mx-auto"
+              />
+            </div>
+          </div>
+        )}
+        {hasNew && (
+          <div className="flex-1 min-w-0">
+            {hasOld && <div className="text-xs text-diff-add-text mb-1">New</div>}
+            <div className="border border-surface-3 rounded-md p-2 bg-surface-0">
+              <img
+                src={buildImageDataUrl(newContent, filePath)}
+                alt="New version"
+                className="max-w-full max-h-64 object-contain mx-auto"
+              />
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+});
+
 export const DiffFileSection = memo(function DiffFileSection({
   filePath,
   category,
   oldContent,
   newContent,
+  isBinary,
   isCollapsed,
   isLoading,
   error,
@@ -310,11 +360,17 @@ export const DiffFileSection = memo(function DiffFileSection({
 
           {getStatusBadge(category)}
 
-          {hasContent && (
+          {hasContent && !isBinary && (
             <div className="flex items-center gap-2 text-xs">
               {additions > 0 && <span className="text-diff-add-text">+{additions}</span>}
               {deletions > 0 && <span className="text-diff-remove-text">-{deletions}</span>}
             </div>
+          )}
+
+          {hasContent && isBinary && (
+            <span className="rounded-md bg-surface-3 px-1.5 py-0.5 text-xs text-tertiary">
+              Binary file
+            </span>
           )}
         </div>
 
@@ -348,7 +404,15 @@ export const DiffFileSection = memo(function DiffFileSection({
             </div>
           )}
 
-          {hasContent && (
+          {hasContent && isBinary && (
+            <ImageDiffContent
+              filePath={filePath}
+              oldContent={oldContent}
+              newContent={newContent}
+            />
+          )}
+
+          {hasContent && !isBinary && (
             <DiffContent
               sections={sections}
               expandedSections={expandedSections}

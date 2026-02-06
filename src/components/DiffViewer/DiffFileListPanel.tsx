@@ -1,10 +1,13 @@
 import { useDiffViewer } from './DiffViewerContext';
 import { DiffFileList } from './DiffFileList';
 import { RefreshIcon } from '@/components/Icons';
+import { useUIStore } from '@/stores/uiStore';
 
 export function DiffFileListPanel() {
   const { status, statusLoading, allFiles, contextPath, handleRefresh, handleScrollToFile } =
     useDiffViewer();
+  const selectedDiffFile = useUIStore((s) => s.selectedDiffFile);
+  const setSelectedDiffFile = useUIStore((s) => s.setSelectedDiffFile);
 
   const changedFilesCount = allFiles.length;
 
@@ -36,6 +39,8 @@ export function DiffFileListPanel() {
           isLoading={statusLoading}
           onRefresh={handleRefresh}
           repoPath={contextPath}
+          selectedFile={selectedDiffFile}
+          onSelectFile={setSelectedDiffFile}
         />
       </div>
     </div>

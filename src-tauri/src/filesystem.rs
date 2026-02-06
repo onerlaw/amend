@@ -1,4 +1,5 @@
 use crate::error::impl_serialize_as_string;
+use base64::{engine::general_purpose::STANDARD, Engine as _};
 use ignore::WalkBuilder;
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -116,6 +117,15 @@ impl FileSystemManager {
             return Err(FileSystemError::NotFound(path.display().to_string()));
         }
         Ok(fs::read_to_string(&path)?)
+    }
+
+    pub fn read_file_base64(&self, path: &str) -> Result<String, FileSystemError> {
+        let path = validate_path(path)?;
+        if !path.exists() {
+            return Err(FileSystemError::NotFound(path.display().to_string()));
+        }
+        let bytes = fs::read(&path)?;
+        Ok(STANDARD.encode(&bytes))
     }
 
     pub fn write_file(&self, path: &str, contents: &str) -> Result<(), FileSystemError> {
@@ -300,6 +310,14 @@ pub fn read_file(
     path: String,
 ) -> Result<String, FileSystemError> {
     state.read_file(&path)
+}
+
+#[tauri::command]
+pub fn read_file_base64(
+    state: tauri::State<'_, FileSystemManager>,
+    path: String,
+) -> Result<String, FileSystemError> {
+    state.read_file_base64(&path)
 }
 
 #[tauri::command]
