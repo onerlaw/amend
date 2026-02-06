@@ -271,3 +271,38 @@ function inferDefinitionKind(nodeType: string): string {
 export function hasGoToDefinitionModifier(event: MouseEvent): boolean {
   return isMac ? event.metaKey : event.ctrlKey;
 }
+
+/**
+ * Extract the import source path for a given symbol name from document text.
+ * Handles named imports, default imports, and aliased imports.
+ *
+ * Examples matched:
+ *   import { foo } from './bar'           -> './bar'
+ *   import { foo as baz } from './bar'    -> './bar'  (for symbolName 'baz')
+ *   import foo from './bar'               -> './bar'
+ *   import * as foo from './bar'           -> './bar'
+ */
+export function extractImportSource(docText: string, symbolName: string): string | null {
+  const escaped = symbolName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+  const patterns = [
+    // Named import: import { symbolName } from '...' or import { symbolName, ... } from '...'
+    // Also handles aliased: import { original as symbolName } from '...'
+    new RegExp(
+      `import\\s+\\{[^}]*\\b(?:\\w+\\s+as\\s+)?${escaped}\\b[^}]*\\}\\s+from\\s+['"]([^'"]+)['"]`
+    ),
+    // Default import: import symbolName from '...'
+    new RegExp(`import\\s+${escaped}\\s+from\\s+['"]([^'"]+)['"]`),
+    // Namespace import: import * as symbolName from '...'
+    new RegExp(`import\\s+\\*\\s+as\\s+${escaped}\\s+from\\s+['"]([^'"]+)['"]`),
+  ];
+
+  for (const pattern of patterns) {
+    const match = docText.match(pattern);
+    if (match) {
+      return match[1];
+    }
+  }
+
+  return null;
+}

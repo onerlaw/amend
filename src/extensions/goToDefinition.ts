@@ -1,14 +1,16 @@
-import { EditorView } from '@codemirror/view';
+import { EditorView, ViewPlugin } from '@codemirror/view';
 import { Extension } from '@codemirror/state';
 import {
   getSymbolAtPosition,
   findDefinitionInFile,
+  extractImportSource,
   hasGoToDefinitionModifier,
 } from '@/lib/symbolNavigation';
 import { findDefinition, SymbolDefinition, readFile } from '@/lib/tauri';
 import { OpenFile } from '@/stores/fileStore';
 import { getLanguageFromPath } from '@/lib/highlight';
 import { getFileName } from '@/lib/fileUtils';
+import { isMac } from '@/lib/platform';
 
 export interface GoToDefinitionConfig {
   currentFilePath: string;
@@ -98,14 +100,84 @@ async function handleNavigation(
       return;
     }
 
-    // Fall back to import statement if nothing else found
+    // Fall back: try to resolve import path and navigate to the source file
     const importDefs = localDefs.filter((d) => d.line !== cursorLine && d.kind === 'import');
     if (importDefs.length > 0) {
+      const docText = view.state.doc.toString();
+      const importSource = extractImportSource(docText, symbolName);
+
+      if (importSource && (importSource.startsWith('./') || importSource.startsWith('../'))) {
+        const resolved = await resolveImportPath(currentFilePath, importSource);
+        if (resolved) {
+          try {
+            const content = await readFile(resolved);
+            const fileName = getFileName(resolved);
+            const language = getLanguageFromPath(resolved) || 'plaintext';
+            onNavigate({ path: resolved, name: fileName, content, isDirty: false, language }, 1);
+            return;
+          } catch {
+            // File read failed, fall through to local jump
+          }
+        }
+      }
+
+      // Last resort: jump to the import line itself
       onLocalNavigate(importDefs[0].line);
     }
   } catch (err) {
     console.error('Navigation error:', err);
   }
+}
+
+const RESOLVE_EXTENSIONS = ['.ts', '.tsx', '.js', '.jsx'];
+
+/**
+ * Resolve a relative import path to an absolute file path by trying common extensions and /index.* variants.
+ */
+async function resolveImportPath(
+  currentFilePath: string,
+  importSource: string
+): Promise<string | null> {
+  // Get directory of the current file
+  const lastSlash = currentFilePath.lastIndexOf('/');
+  const currentDir = lastSlash >= 0 ? currentFilePath.slice(0, lastSlash) : '';
+
+  // Resolve the relative path
+  const segments = (`${currentDir}/${importSource}`).split('/');
+  const resolved: string[] = [];
+  for (const seg of segments) {
+    if (seg === '' || seg === '.') continue;
+    if (seg === '..') {
+      resolved.pop();
+    } else {
+      resolved.push(seg);
+    }
+  }
+  const basePath = '/' + resolved.join('/');
+
+  // Try the exact path first (in case the import already has an extension)
+  const candidates = [basePath];
+
+  // Try with extensions
+  for (const ext of RESOLVE_EXTENSIONS) {
+    candidates.push(basePath + ext);
+  }
+
+  // Try index variants
+  for (const ext of RESOLVE_EXTENSIONS) {
+    candidates.push(basePath + '/index' + ext);
+  }
+
+  for (const candidate of candidates) {
+    try {
+      await readFile(candidate);
+      return candidate;
+    } catch {
+      // File doesn't exist, try next
+    }
+  }
+
+  return null;
 }
 
 /**
@@ -120,4 +192,52 @@ export function scrollToLine(view: EditorView, line: number): void {
     selection: { anchor: lineInfo.from },
     scrollIntoView: true,
   });
+}
+
+/**
+ * Extension that toggles a pointer cursor on the editor when Cmd (Mac) / Ctrl (other) is held.
+ * Uses the existing `.cm-go-to-definition-active` CSS class defined in codemirror.ts.
+ */
+export function cmdHeldCursorExtension(): Extension {
+  const modKey = isMac ? 'Meta' : 'Control';
+
+  return ViewPlugin.fromClass(
+    class {
+      private editorDom: HTMLElement;
+      private handleKeyDown: (e: KeyboardEvent) => void;
+      private handleKeyUp: (e: KeyboardEvent) => void;
+      private handleBlur: () => void;
+
+      constructor(view: EditorView) {
+        this.editorDom = view.dom;
+
+        this.handleKeyDown = (e: KeyboardEvent) => {
+          if (e.key === modKey) {
+            this.editorDom.classList.add('cm-go-to-definition-active');
+          }
+        };
+
+        this.handleKeyUp = (e: KeyboardEvent) => {
+          if (e.key === modKey) {
+            this.editorDom.classList.remove('cm-go-to-definition-active');
+          }
+        };
+
+        this.handleBlur = () => {
+          this.editorDom.classList.remove('cm-go-to-definition-active');
+        };
+
+        document.addEventListener('keydown', this.handleKeyDown);
+        document.addEventListener('keyup', this.handleKeyUp);
+        window.addEventListener('blur', this.handleBlur);
+      }
+
+      destroy() {
+        document.removeEventListener('keydown', this.handleKeyDown);
+        document.removeEventListener('keyup', this.handleKeyUp);
+        window.removeEventListener('blur', this.handleBlur);
+        this.editorDom.classList.remove('cm-go-to-definition-active');
+      }
+    }
+  );
 }
