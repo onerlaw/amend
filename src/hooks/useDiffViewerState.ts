@@ -11,7 +11,7 @@ export interface FileWithCategory {
   category: 'staged' | 'unstaged' | 'untracked';
 }
 
-export function useDiffViewerState(gitPolling: GitPollingResult) {
+export function useDiffViewerState(gitPolling: GitPollingResult, enabled: boolean = true) {
   const { currentDirectory, contextPath } = useFileStore();
   const {
     collapsedDiffFiles,
@@ -37,23 +37,26 @@ export function useDiffViewerState(gitPolling: GitPollingResult) {
 
   // Load all diffs when files change (expanded by default)
   useEffect(() => {
+    if (!enabled) return;
     if (allFiles.length > 0) {
       allFiles.forEach((file) => {
         loadDiff(file.path);
       });
     }
-  }, [allFiles, loadDiff]);
+  }, [allFiles, loadDiff, enabled]);
 
   // Reset when context path changes
   useEffect(() => {
+    if (!enabled) return;
     clearDiffs();
-  }, [contextPath, clearDiffs]);
+  }, [contextPath, clearDiffs, enabled]);
 
   useEffect(() => {
+    if (!enabled) return;
     if (contextPath) {
       refresh();
     }
-  }, [contextPath, refresh]);
+  }, [contextPath, refresh, enabled]);
 
   // Handle scroll-to-file using Virtuoso
   useEffect(() => {

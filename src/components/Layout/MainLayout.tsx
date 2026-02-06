@@ -228,63 +228,48 @@ export function MainLayout() {
 
       {/* Main content */}
       <div className="flex-1 overflow-hidden">
-        {/* No panel mode - terminal only */}
-        {panelMode === null ? (
-          <TerminalTabs ref={terminalTabsRef} />
-        ) : panelMode === 'diff' ? (
-          /* Diff mode - 3 panel layout with shared context */
-          <DiffViewerProvider gitPolling={gitPolling}>
-            <PanelGroup direction="horizontal" autoSaveId="main-layout">
-              <Panel defaultSize={40} minSize={20}>
-                <TerminalTabs ref={terminalTabsRef} />
-              </Panel>
+        <DiffViewerProvider gitPolling={gitPolling} enabled={panelMode === 'diff'}>
+          <PanelGroup direction="horizontal" autoSaveId="main-layout">
+            {/* Terminal: ALWAYS mounted, never unmounts */}
+            <Panel id="terminal" order={1} minSize={20}>
+              <TerminalTabs ref={terminalTabsRef} />
+            </Panel>
 
-              <PanelResizeHandle />
-
-              <Panel defaultSize={40} minSize={20}>
+            {/* Diff mode: content + file list */}
+            {panelMode === 'diff' && <PanelResizeHandle />}
+            {panelMode === 'diff' && (
+              <Panel id="diff-content" order={2} defaultSize={40} minSize={20}>
                 <DiffContentPanel />
               </Panel>
-
-              <PanelResizeHandle />
-
-              <Panel defaultSize={20} minSize={10} maxSize={40}>
+            )}
+            {panelMode === 'diff' && <PanelResizeHandle />}
+            {panelMode === 'diff' && (
+              <Panel id="diff-file-list" order={3} defaultSize={20} minSize={10} maxSize={40}>
                 <DiffFileListPanel />
               </Panel>
-            </PanelGroup>
-          </DiffViewerProvider>
-        ) : browseOpenFiles.length === 0 ? (
-          /* Browse mode without file selected - 2 panel layout */
-          <PanelGroup direction="horizontal" autoSaveId="browse-no-file-layout">
-            <Panel defaultSize={60} minSize={20}>
-              <TerminalTabs ref={terminalTabsRef} />
-            </Panel>
+            )}
 
-            <PanelResizeHandle />
-
-            <Panel defaultSize={40} minSize={15}>
-              <BrowseFileListPanel />
-            </Panel>
+            {/* Browse mode: editor (if files open) + file list */}
+            {panelMode === 'browse' && <PanelResizeHandle />}
+            {panelMode === 'browse' && browseOpenFiles.length > 0 && (
+              <Panel id="browse-editor" order={2} defaultSize={40} minSize={20}>
+                <BrowseEditorTabs ref={browseEditorTabsRef} />
+              </Panel>
+            )}
+            {panelMode === 'browse' && browseOpenFiles.length > 0 && <PanelResizeHandle />}
+            {panelMode === 'browse' && (
+              <Panel
+                id="browse-file-list"
+                order={3}
+                defaultSize={browseOpenFiles.length > 0 ? 20 : 40}
+                minSize={browseOpenFiles.length > 0 ? 10 : 15}
+                maxSize={browseOpenFiles.length > 0 ? 40 : undefined}
+              >
+                <BrowseFileListPanel />
+              </Panel>
+            )}
           </PanelGroup>
-        ) : (
-          /* Browse mode with file selected - 3 panel layout */
-          <PanelGroup direction="horizontal" autoSaveId="main-layout">
-            <Panel defaultSize={40} minSize={20}>
-              <TerminalTabs ref={terminalTabsRef} />
-            </Panel>
-
-            <PanelResizeHandle />
-
-            <Panel defaultSize={40} minSize={20}>
-              <BrowseEditorTabs ref={browseEditorTabsRef} />
-            </Panel>
-
-            <PanelResizeHandle />
-
-            <Panel defaultSize={20} minSize={10} maxSize={40}>
-              <BrowseFileListPanel />
-            </Panel>
-          </PanelGroup>
-        )}
+        </DiffViewerProvider>
       </div>
 
       {/* Keyboard Shortcuts Modal */}

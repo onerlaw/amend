@@ -8,12 +8,14 @@ const DiffViewerContext = createContext<DiffViewerContextValue | null>(null);
 
 export function DiffViewerProvider({
   gitPolling,
+  enabled = true,
   children,
 }: {
   gitPolling: GitPollingResult;
+  enabled?: boolean;
   children: ReactNode;
 }) {
-  const state = useDiffViewerState(gitPolling);
+  const state = useDiffViewerState(gitPolling, enabled);
   return <DiffViewerContext.Provider value={state}>{children}</DiffViewerContext.Provider>;
 }
 
