@@ -1,9 +1,8 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { GitStatus, FileEntry, restoreFile, unstageFile } from '@/lib/tauri';
-import { useContextMenuStore } from '@/stores/contextMenuStore';
-import { useFileStore } from '@/stores/fileStore';
 import { sortDirectoriesFirst } from '@/lib/fileUtils';
+import { ContextMenu } from '@/components/ContextMenu/ContextMenu';
 
 interface DiffFileListProps {
   status: GitStatus | null;
@@ -239,18 +238,20 @@ function ConfirmRestoreDialog({ target, onConfirm, onCancel }: ConfirmRestoreDia
 }
 
 export function DiffFileList({ status, onScrollToFile, isLoading, onRefresh, repoPath }: DiffFileListProps) {
-  const { openMenu } = useContextMenuStore();
-  const { currentDirectory } = useFileStore();
   const [restoreTarget, setRestoreTarget] = useState<{ path: string; action: 'restore' | 'unstage' } | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; path: string; action: 'restore' | 'unstage' } | null>(null);
 
-  const handleContextMenu = (e: React.MouseEvent, entry: FileEntry) => {
+  const handleStagedContextMenu = useCallback((e: React.MouseEvent, entry: FileEntry) => {
     e.preventDefault();
     e.stopPropagation();
-    const absolutePath = entry.path.startsWith('/')
-      ? entry.path
-      : `${currentDirectory}/${entry.path}`;
-    openMenu({ ...entry, path: absolutePath }, e.clientX, e.clientY);
-  };
+    setContextMenu({ x: e.clientX, y: e.clientY, path: entry.path, action: 'unstage' });
+  }, []);
+
+  const handleUnstagedContextMenu = useCallback((e: React.MouseEvent, entry: FileEntry) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setContextMenu({ x: e.clientX, y: e.clientY, path: entry.path, action: 'restore' });
+  }, []);
 
   const handleRestoreConfirm = async () => {
     if (!restoreTarget || !repoPath) return;
@@ -320,7 +321,7 @@ export function DiffFileList({ status, onScrollToFile, isLoading, onRefresh, rep
             node={stagedTree}
             depth={0}
             onScrollToFile={onScrollToFile}
-            onContextMenuEntry={handleContextMenu}
+            onContextMenuEntry={handleStagedContextMenu}
             onDiscardClick={repoPath ? (e, path) => {
               e.stopPropagation();
               setRestoreTarget({ path, action: 'unstage' });
@@ -339,7 +340,7 @@ export function DiffFileList({ status, onScrollToFile, isLoading, onRefresh, rep
             node={unstagedTree}
             depth={0}
             onScrollToFile={onScrollToFile}
-            onContextMenuEntry={handleContextMenu}
+            onContextMenuEntry={handleUnstagedContextMenu}
             onDiscardClick={repoPath ? (e, path) => {
               e.stopPropagation();
               setRestoreTarget({ path, action: 'restore' });
@@ -354,9 +355,19 @@ export function DiffFileList({ status, onScrollToFile, isLoading, onRefresh, rep
           <div className="px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-tertiary">
             Untracked ({status.untracked.length})
           </div>
-          <FileTreeItem node={untrackedTree} depth={0} onScrollToFile={onScrollToFile} onContextMenuEntry={handleContextMenu} />
+          <FileTreeItem node={untrackedTree} depth={0} onScrollToFile={onScrollToFile} />
         </div>
       )}
+
+      <ContextMenu
+        isOpen={contextMenu !== null}
+        position={contextMenu ?? { x: 0, y: 0 }}
+        onClose={() => setContextMenu(null)}
+        items={contextMenu ? [{
+          label: contextMenu.action === 'unstage' ? 'Unstage File' : 'Discard Changes',
+          onClick: () => setRestoreTarget({ path: contextMenu.path, action: contextMenu.action }),
+        }] : []}
+      />
 
       <ConfirmRestoreDialog
         target={restoreTarget}
