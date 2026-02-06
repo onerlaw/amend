@@ -344,9 +344,7 @@ pub fn add_worktree(
     run_git_command(&repo_path, &args)?;
 
     // Determine the branch name for the result
-    let result_branch = new_branch
-        .or(branch)
-        .unwrap_or_else(|| "HEAD".to_string());
+    let result_branch = new_branch.or(branch).unwrap_or_else(|| "HEAD".to_string());
 
     // Convert to absolute path if relative
     let absolute_path = if Path::new(&worktree_path).is_absolute() {
@@ -451,10 +449,7 @@ pub struct GitBranch {
 #[tauri::command]
 pub fn list_branches(repo_path: String) -> Result<Vec<GitBranch>, GitError> {
     // Get local branches
-    let stdout = run_git_command(
-        &repo_path,
-        &["branch", "--format=%(refname:short)|%(HEAD)"],
-    )?;
+    let stdout = run_git_command(&repo_path, &["branch", "--format=%(refname:short)|%(HEAD)"])?;
 
     let mut branches: Vec<GitBranch> = stdout
         .lines()

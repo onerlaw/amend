@@ -57,7 +57,7 @@ impl SymbolIndex {
             eprintln!(
                 "[symbols] Indexed {} symbols from {}",
                 definitions.len(),
-                path.split('/').last().unwrap_or(path)
+                path.split('/').next_back().unwrap_or(path)
             );
         }
 
@@ -99,14 +99,18 @@ impl SymbolIndex {
     pub fn find_definition(&self, name: &str) -> Vec<SymbolDefinition> {
         let symbols = self.symbols.read();
         let result = symbols.get(name).cloned().unwrap_or_default();
-        eprintln!("[symbols] find_definition('{}') -> {} results", name, result.len());
+        eprintln!(
+            "[symbols] find_definition('{}') -> {} results",
+            name,
+            result.len()
+        );
         result
     }
 
     /// Parse JavaScript/TypeScript file and extract symbol definitions
     fn parse_js_ts(&self, path: &str, content: &str, lang: &str) -> Vec<SymbolDefinition> {
         let mut definitions = Vec::new();
-        let filename = path.split('/').last().unwrap_or(path);
+        let filename = path.split('/').next_back().unwrap_or(path);
         let is_typescript = matches!(lang, "typescript" | "typescriptreact");
 
         // Get the appropriate language

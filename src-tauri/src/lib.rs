@@ -6,8 +6,8 @@ mod terminal;
 
 use filesystem::FileSystemManager;
 use symbols::{SymbolDefinition, SymbolManager};
-use terminal::TerminalManager;
 use tauri::State;
+use terminal::TerminalManager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -74,6 +74,10 @@ fn find_definition(
 }
 
 #[tauri::command]
-fn reindex_file(path: String, content: String, manager: State<SymbolManager>) -> Result<(), String> {
+fn reindex_file(
+    path: String,
+    content: String,
+    manager: State<SymbolManager>,
+) -> Result<(), String> {
     manager.reindex_file(&path, &content)
 }

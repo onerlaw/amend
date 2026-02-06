@@ -123,12 +123,10 @@ impl FileSystemManager {
         }
 
         // Sort: directories first, then alphabetically
-        entries.sort_by(|a, b| {
-            match (a.is_directory, b.is_directory) {
-                (true, false) => std::cmp::Ordering::Less,
-                (false, true) => std::cmp::Ordering::Greater,
-                _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
-            }
+        entries.sort_by(|a, b| match (a.is_directory, b.is_directory) {
+            (true, false) => std::cmp::Ordering::Less,
+            (false, true) => std::cmp::Ordering::Greater,
+            _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
         });
 
         Ok(entries)
@@ -443,7 +441,7 @@ pub fn reveal_in_file_manager(path: String) -> Result<(), FileSystemError> {
         std::process::Command::new("open")
             .args(["-R", &path])
             .spawn()
-            .map_err(|e| FileSystemError::Io(e))?;
+            .map_err(FileSystemError::Io)?;
     }
 
     #[cfg(target_os = "windows")]
@@ -451,7 +449,7 @@ pub fn reveal_in_file_manager(path: String) -> Result<(), FileSystemError> {
         std::process::Command::new("explorer")
             .args(["/select,", &path])
             .spawn()
-            .map_err(|e| FileSystemError::Io(e))?;
+            .map_err(FileSystemError::Io)?;
     }
 
     #[cfg(target_os = "linux")]
@@ -460,7 +458,7 @@ pub fn reveal_in_file_manager(path: String) -> Result<(), FileSystemError> {
         std::process::Command::new("xdg-open")
             .arg(parent)
             .spawn()
-            .map_err(|e| FileSystemError::Io(e))?;
+            .map_err(FileSystemError::Io)?;
     }
 
     Ok(())
