@@ -183,8 +183,17 @@ export const TerminalTabs = forwardRef<TerminalTabsHandle>(function TerminalTabs
                 } ${dragFromIndex === index ? 'opacity-50' : ''}`}
                 title={tab.worktreePath}
               >
-                <span className="truncate max-w-[120px]">
-                  {tab.title || getFileName(tab.worktreePath)}
+                <span className="truncate max-w-[200px]">
+                  {(() => {
+                    const project = tab.projectId
+                      ? projects.find((p) => p.id === tab.projectId)
+                      : null;
+                    const worktreeName = getFileName(tab.worktreePath);
+                    if (!project) return worktreeName;
+                    return project.name === worktreeName
+                      ? project.name
+                      : `${project.name} / ${worktreeName}`;
+                  })()}
                 </span>
                 <span
                   onMouseDown={(e) => e.stopPropagation()}
