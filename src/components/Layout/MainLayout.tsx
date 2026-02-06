@@ -100,6 +100,12 @@ export function MainLayout() {
         }
       }
 
+      // Cmd/Ctrl + D: Duplicate current terminal
+      if ((e.metaKey || e.ctrlKey) && e.key === 'd') {
+        e.preventDefault();
+        terminalTabsRef.current?.duplicateTerminal();
+      }
+
       // Cmd/Ctrl + W: Close current tab
       if ((e.metaKey || e.ctrlKey) && e.key === 'w') {
         e.preventDefault();
@@ -268,6 +274,12 @@ export function MainLayout() {
                 <span className="text-primary">New Terminal</span>
                 <kbd className="rounded-md bg-surface-1 px-2 py-0.5 font-mono text-secondary">
                   Cmd+T / Cmd+O
+                </kbd>
+              </div>
+              <div className="flex items-center justify-between py-1">
+                <span className="text-primary">Duplicate Terminal</span>
+                <kbd className="rounded-md bg-surface-1 px-2 py-0.5 font-mono text-secondary">
+                  Cmd+D
                 </kbd>
               </div>
               <div className="flex items-center justify-between py-1">

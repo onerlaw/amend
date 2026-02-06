@@ -14,6 +14,7 @@ import { getFileName } from '@/lib/fileUtils';
 
 export interface TerminalTabsHandle {
   openNewTerminal: () => void;
+  duplicateTerminal: () => void;
 }
 
 export const TerminalTabs = forwardRef<TerminalTabsHandle>(function TerminalTabs(_, ref) {
@@ -86,10 +87,11 @@ export const TerminalTabs = forwardRef<TerminalTabsHandle>(function TerminalTabs
     }
   }, [projects, addProject, setCurrentDirectory]);
 
-  // Expose openNewTerminal method to parent via ref
+  // Expose methods to parent via ref
   useImperativeHandle(ref, () => ({
     openNewTerminal: handleNewTerminal,
-  }), [handleNewTerminal]);
+    duplicateTerminal: handleDuplicateTerminal,
+  }), [handleNewTerminal, handleDuplicateTerminal]);
 
   const handleProjectSelect = (project: Project) => {
     setSelectedProjectId(project.id);
