@@ -11,15 +11,14 @@ export function GlobalSearch() {
   const [results, setResults] = useState<SearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
-  const [searchContent, setSearchContent] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
 
-  const { currentDirectory } = useFileStore();
+  const { currentDirectory, activeWorktreePath } = useFileStore();
   const { setPanelMode } = useUIStore();
+  const searchRoot = activeWorktreePath ?? currentDirectory;
 
-  const openSearch = useCallback((withContent: boolean) => {
-    setSearchContent(withContent);
+  const openSearch = useCallback(() => {
     setIsOpen(true);
     setQuery('');
     setResults([]);
@@ -49,15 +48,13 @@ export function GlobalSearch() {
   // Keyboard shortcuts for opening search
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Cmd+P: Open filename search
-      if ((e.metaKey || e.ctrlKey) && e.key === 'p' && !e.shiftKey) {
+      // Cmd+P or Cmd+Shift+F: Open search
+      if (
+        ((e.metaKey || e.ctrlKey) && e.key === 'p' && !e.shiftKey) ||
+        ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'f')
+      ) {
         e.preventDefault();
-        openSearch(false);
-      }
-      // Cmd+Shift+F: Open content search
-      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'f') {
-        e.preventDefault();
-        openSearch(true);
+        openSearch();
       }
     };
 
@@ -74,7 +71,7 @@ export function GlobalSearch() {
 
   // Debounced search
   useEffect(() => {
-    if (!isOpen || !query.trim() || !currentDirectory) {
+    if (!isOpen || !query.trim() || !searchRoot) {
       setResults([]);
       return;
     }
@@ -82,7 +79,7 @@ export function GlobalSearch() {
     const timeoutId = setTimeout(async () => {
       setIsSearching(true);
       try {
-        const searchResults = await searchFiles(currentDirectory, query.trim(), searchContent);
+        const searchResults = await searchFiles(searchRoot, query.trim(), true);
         setResults(searchResults);
         setSelectedIndex(0);
       } catch (err) {
@@ -94,7 +91,7 @@ export function GlobalSearch() {
     }, 150);
 
     return () => clearTimeout(timeoutId);
-  }, [query, isOpen, currentDirectory, searchContent]);
+  }, [query, isOpen, searchRoot]);
 
   // Scroll selected item into view
   useEffect(() => {
@@ -126,17 +123,17 @@ export function GlobalSearch() {
   const getFileColor = (name: string) => getFileIconColor(name);
 
   const getRelativePath = (fullPath: string) => {
-    if (!currentDirectory) return fullPath;
-    return fullPath.replace(currentDirectory + '/', '');
+    if (!searchRoot) return fullPath;
+    return fullPath.replace(searchRoot + '/', '');
   };
 
   return (
     <>
       {/* Search Button */}
       <button
-        onClick={() => openSearch(false)}
+        onClick={() => openSearch()}
         className="flex items-center gap-2 rounded-lg bg-surface-1 px-4 py-1.5 text-sm text-secondary hover:bg-surface-3 w-72"
-        title="Search Files (Cmd+P)"
+        title="Search (Cmd+P)"
       >
         <svg className="h-4 w-4 text-tertiary" viewBox="0 0 16 16" fill="currentColor">
           <path d="M15.25 13.371l-3.5-3.5c-.063-.063-.131-.11-.2-.152a5.5 5.5 0 1 0-.879.879c.042.069.09.137.152.2l3.5 3.5a.75.75 0 0 0 1.061-1.061l-.134.134zM6.5 10.5a4 4 0 1 1 0-8 4 4 0 0 1 0 8z" />
@@ -169,7 +166,7 @@ export function GlobalSearch() {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={handleInputKeyDown}
-                placeholder={searchContent ? 'Search in file contents...' : 'Search file names...'}
+                placeholder="Search files..."
                 className="flex-1 bg-transparent text-sm text-primary outline-none placeholder:text-tertiary"
               />
               {isSearching && (
@@ -190,27 +187,16 @@ export function GlobalSearch() {
                   />
                 </svg>
               )}
-              <button
-                onClick={() => setSearchContent(!searchContent)}
-                className={`rounded-md px-2 py-0.5 text-xs ${
-                  searchContent
-                    ? 'bg-accent text-white'
-                    : 'text-tertiary hover:bg-surface-3 hover:text-primary'
-                }`}
-                title="Toggle content search (Cmd+Shift+F)"
-              >
-                Content
-              </button>
             </div>
 
             {/* Results */}
             <div ref={resultsRef} className="max-h-[50vh] overflow-y-auto">
-              {!currentDirectory && (
+              {!searchRoot && (
                 <div className="px-3 py-8 text-center text-sm text-tertiary">
                   Open a repository first to search files
                 </div>
               )}
-              {currentDirectory && query && results.length === 0 && !isSearching && (
+              {searchRoot && query && results.length === 0 && !isSearching && (
                 <div className="px-3 py-8 text-center text-sm text-tertiary">No results found</div>
               )}
               {results.map((result, index) => (

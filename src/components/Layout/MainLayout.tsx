@@ -293,15 +293,9 @@ export function MainLayout() {
                 </kbd>
               </div>
               <div className="flex items-center justify-between py-1">
-                <span className="text-primary">Search Files</span>
+                <span className="text-primary">Search</span>
                 <kbd className="rounded-md bg-surface-1 px-2 py-0.5 font-mono text-secondary">
-                  Cmd+P
-                </kbd>
-              </div>
-              <div className="flex items-center justify-between py-1">
-                <span className="text-primary">Search in Files</span>
-                <kbd className="rounded-md bg-surface-1 px-2 py-0.5 font-mono text-secondary">
-                  Cmd+Shift+F
+                  Cmd+P / Cmd+Shift+F
                 </kbd>
               </div>
             </div>
