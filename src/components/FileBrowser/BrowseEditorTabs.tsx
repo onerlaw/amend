@@ -1,6 +1,7 @@
 import { useFileBrowserState, SaveStatus } from '@/hooks/useFileBrowserState';
 import { useUIStore } from '@/stores/uiStore';
 import { FileContentPanel } from './FileContentPanel';
+import { CloseIcon } from '@/components/Icons';
 
 function StatusIndicator({ status }: { status: SaveStatus }) {
   if (status === 'idle') {
@@ -102,9 +103,7 @@ export function BrowseEditorTabs() {
                 onClick={(e) => handleClose(e, file.path)}
                 className="rounded-full p-0.5 opacity-0 hover:bg-surface-3 group-hover:opacity-100"
               >
-                <svg className="h-3 w-3" viewBox="0 0 12 12" fill="currentColor">
-                  <path d="M9.5 3.205L8.795 2.5 6 5.295 3.205 2.5l-.705.705L5.295 6 2.5 8.795l.705.705L6 6.705 8.795 9.5l.705-.705L6.705 6z" />
-                </svg>
+                <CloseIcon />
               </span>
             </button>
           );

@@ -1,8 +1,9 @@
 import { useState, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { GitStatus, FileEntry, restoreFile, unstageFile } from '@/lib/tauri';
-import { sortDirectoriesFirst } from '@/lib/fileUtils';
+import { sortDirectoriesFirst, getFileName } from '@/lib/fileUtils';
 import { ContextMenu } from '@/components/ContextMenu/ContextMenu';
+import { ChevronIcon, FolderIcon } from '@/components/Icons';
 
 interface DiffFileListProps {
   status: GitStatus | null;
@@ -106,16 +107,8 @@ function FileTreeItem({
             className="flex w-full select-none items-center gap-1 px-2 py-0.5 text-sm hover:bg-surface-3/50"
             style={{ paddingLeft: `${depth * 12 + 8}px` }}
           >
-            <svg
-              className={`h-3 w-3 text-tertiary transition-transform ${isExpanded ? 'rotate-90' : ''}`}
-              viewBox="0 0 16 16"
-              fill="currentColor"
-            >
-              <path d="M6 4l4 4-4 4V4z" />
-            </svg>
-            <svg className="h-4 w-4 text-yellow-500" viewBox="0 0 16 16" fill="currentColor">
-              <path d="M14.5 3H7.707l-.853-.854L6.5 2h-5l-.5.5v11l.5.5h13l.5-.5v-10l-.5-.5zM14 13H2V3h4.293l.853.854.354.146H14v9z" />
-            </svg>
+            <ChevronIcon className={`h-3 w-3 text-tertiary transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
+            <FolderIcon className="h-4 w-4 text-yellow-500" />
             <span className="text-primary">{node.name}</span>
           </button>
         )}
@@ -183,7 +176,7 @@ function ConfirmRestoreDialog({ target, onConfirm, onCancel }: ConfirmRestoreDia
   if (!target) return null;
 
   const isRestore = target.action === 'restore';
-  const fileName = target.path.split('/').pop() || target.path;
+  const fileName = getFileName(target.path);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {

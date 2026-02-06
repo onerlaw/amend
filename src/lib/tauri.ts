@@ -62,22 +62,6 @@ export async function writeFile(path: string, contents: string): Promise<void> {
   return invoke('write_file', { path, contents });
 }
 
-export async function watchDirectory(path: string): Promise<void> {
-  return invoke('watch_directory', { path });
-}
-
-export async function unwatchDirectory(path: string): Promise<void> {
-  return invoke('unwatch_directory', { path });
-}
-
-export async function onFileChange(
-  callback: (event: { path: string; kind: string }) => void
-): Promise<UnlistenFn> {
-  return listen('file-change', (event) => {
-    callback(event.payload as { path: string; kind: string });
-  });
-}
-
 export async function searchFiles(
   rootPath: string,
   query: string,
@@ -142,10 +126,6 @@ export async function getGitStatus(repoPath: string): Promise<GitStatus> {
 
 export async function getFileDiff(repoPath: string, filePath: string): Promise<GitDiff> {
   return invoke('get_file_diff', { repoPath, filePath });
-}
-
-export async function getStagedDiff(repoPath: string): Promise<GitDiff[]> {
-  return invoke('get_staged_diff', { repoPath });
 }
 
 export async function isGitRepository(path: string): Promise<boolean> {

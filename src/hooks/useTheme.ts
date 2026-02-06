@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect } from 'react';
 import { useUIStore, ThemeMode } from '@/stores/uiStore';
 
 export function isDarkMode(themeMode: ThemeMode): boolean {
@@ -10,13 +10,6 @@ export function isDarkMode(themeMode: ThemeMode): boolean {
 
 export function useTheme() {
   const { themeMode, setThemeMode } = useUIStore();
-
-  const resolvedTheme = useMemo(() => {
-    if (themeMode === 'system') {
-      return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-    }
-    return themeMode;
-  }, [themeMode]);
 
   // Apply theme class to document
   useEffect(() => {
@@ -51,7 +44,6 @@ export function useTheme() {
 
   return {
     themeMode,
-    resolvedTheme,
     setThemeMode,
     cycleTheme,
   };

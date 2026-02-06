@@ -14,6 +14,7 @@ import { BrowseEditorTabs } from '@/components/FileBrowser/BrowseEditorTabs';
 import { BrowseFileListPanel } from '@/components/FileBrowser/BrowseFileListPanel';
 import { GlobalSearch } from '@/components/GlobalSearch/GlobalSearch';
 import { indexProject } from '@/lib/tauri';
+import { PlusIcon } from '@/components/Icons';
 
 function ThemeToggle() {
   const { themeMode, cycleTheme } = useTheme();
@@ -66,12 +67,7 @@ export function MainLayout() {
   // Index project for symbol navigation when directory changes
   useEffect(() => {
     if (currentDirectory) {
-      console.log('[MainLayout] Starting project indexing for:', currentDirectory);
-      // Run indexing in background - don't block UI
       indexProject(currentDirectory)
-        .then(() => {
-          console.log('[MainLayout] Project indexing completed');
-        })
         .catch((err) => {
           console.error('[MainLayout] Failed to index project for symbol navigation:', err);
         });
@@ -162,9 +158,7 @@ export function MainLayout() {
             className="rounded-md p-1.5 text-secondary hover:bg-surface-3"
             title="New Terminal"
           >
-            <svg className="h-4 w-4" viewBox="0 0 16 16" fill="currentColor">
-              <path d="M8 1v6H2v1h6v6h1V8h6V7H9V1z" />
-            </svg>
+            <PlusIcon />
           </button>
 
           {/* Global Search */}

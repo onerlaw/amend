@@ -4,6 +4,7 @@ import { getSymbolAtPosition, findDefinitionInFile, hasGoToDefinitionModifier } 
 import { findDefinition, SymbolDefinition, readFile } from '@/lib/tauri';
 import { OpenFile } from '@/stores/fileStore';
 import { getLanguageFromPath } from '@/lib/highlight';
+import { getFileName } from '@/lib/fileUtils';
 
 export interface GoToDefinitionConfig {
   currentFilePath: string;
@@ -74,7 +75,7 @@ async function handleNavigation(
       const targetDef = externalDefs[0];
       try {
         const content = await readFile(targetDef.filePath);
-        const fileName = targetDef.filePath.split('/').pop() || targetDef.filePath;
+        const fileName = getFileName(targetDef.filePath);
         const language = getLanguageFromPath(targetDef.filePath) || 'plaintext';
 
         onNavigate(

@@ -1,13 +1,8 @@
 use crate::error::impl_serialize_as_string;
 use ignore::WalkBuilder;
-use notify::{Config, RecommendedWatcher, RecursiveMode, Watcher};
-use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
-use tauri::{AppHandle, Emitter};
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -16,8 +11,6 @@ pub enum FileSystemError {
     Io(#[from] std::io::Error),
     #[error("Path not found: {0}")]
     NotFound(String),
-    #[error("Watch error: {0}")]
-    Watch(String),
     #[error("Invalid path: {0}")]
     InvalidPath(String),
 }
@@ -56,12 +49,6 @@ pub struct FileEntry {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct FileChangeEvent {
-    pub path: String,
-    pub kind: String,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct SearchResult {
     pub path: String,
@@ -71,21 +58,12 @@ pub struct SearchResult {
     pub line_content: Option<String>,
 }
 
-pub struct FileSystemManager {
-    watchers: Arc<Mutex<HashMap<String, RecommendedWatcher>>>,
-}
-
-impl Default for FileSystemManager {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+#[derive(Default)]
+pub struct FileSystemManager;
 
 impl FileSystemManager {
     pub fn new() -> Self {
-        Self {
-            watchers: Arc::new(Mutex::new(HashMap::new())),
-        }
+        Self
     }
 
     pub fn read_directory(&self, path: &str) -> Result<Vec<FileEntry>, FileSystemError> {
@@ -143,50 +121,6 @@ impl FileSystemManager {
     pub fn write_file(&self, path: &str, contents: &str) -> Result<(), FileSystemError> {
         validate_path(path)?;
         fs::write(path, contents)?;
-        Ok(())
-    }
-
-    pub fn watch_directory(
-        &self,
-        app_handle: &AppHandle,
-        path: &str,
-    ) -> Result<(), FileSystemError> {
-        let path_string = path.to_string();
-        let app_handle_clone = app_handle.clone();
-
-        let mut watcher = RecommendedWatcher::new(
-            move |res: Result<notify::Event, notify::Error>| {
-                if let Ok(event) = res {
-                    let kind = match event.kind {
-                        notify::EventKind::Create(_) => "create",
-                        notify::EventKind::Modify(_) => "modify",
-                        notify::EventKind::Remove(_) => "remove",
-                        _ => return,
-                    };
-
-                    for path in event.paths {
-                        let change = FileChangeEvent {
-                            path: path.display().to_string(),
-                            kind: kind.to_string(),
-                        };
-                        let _ = app_handle_clone.emit("file-change", change);
-                    }
-                }
-            },
-            Config::default(),
-        )
-        .map_err(|e| FileSystemError::Watch(e.to_string()))?;
-
-        watcher
-            .watch(Path::new(path), RecursiveMode::Recursive)
-            .map_err(|e| FileSystemError::Watch(e.to_string()))?;
-
-        self.watchers.lock().insert(path_string, watcher);
-        Ok(())
-    }
-
-    pub fn unwatch_directory(&self, path: &str) -> Result<(), FileSystemError> {
-        self.watchers.lock().remove(path);
         Ok(())
     }
 
@@ -375,23 +309,6 @@ pub fn write_file(
     contents: String,
 ) -> Result<(), FileSystemError> {
     state.write_file(&path, &contents)
-}
-
-#[tauri::command]
-pub fn watch_directory(
-    app_handle: AppHandle,
-    state: tauri::State<'_, FileSystemManager>,
-    path: String,
-) -> Result<(), FileSystemError> {
-    state.watch_directory(&app_handle, &path)
-}
-
-#[tauri::command]
-pub fn unwatch_directory(
-    state: tauri::State<'_, FileSystemManager>,
-    path: String,
-) -> Result<(), FileSystemError> {
-    state.unwatch_directory(&path)
 }
 
 #[tauri::command]

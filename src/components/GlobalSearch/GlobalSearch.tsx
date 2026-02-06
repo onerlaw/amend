@@ -4,6 +4,7 @@ import { searchFiles, SearchResult } from '@/lib/tauri';
 import { useFileStore } from '@/stores/fileStore';
 import { useUIStore } from '@/stores/uiStore';
 import { getFileIconColor, openFileInBrowseMode } from '@/lib/fileUtils';
+import { SearchIcon, FileIcon } from '@/components/Icons';
 
 export function GlobalSearch() {
   const [isOpen, setIsOpen] = useState(false);
@@ -135,9 +136,7 @@ export function GlobalSearch() {
         className="flex items-center gap-2 rounded-lg bg-surface-1 px-4 py-1.5 text-sm text-secondary hover:bg-surface-3 w-72"
         title="Search (Cmd+P)"
       >
-        <svg className="h-4 w-4 text-tertiary" viewBox="0 0 16 16" fill="currentColor">
-          <path d="M15.25 13.371l-3.5-3.5c-.063-.063-.131-.11-.2-.152a5.5 5.5 0 1 0-.879.879c.042.069.09.137.152.2l3.5 3.5a.75.75 0 0 0 1.061-1.061l-.134.134zM6.5 10.5a4 4 0 1 1 0-8 4 4 0 0 1 0 8z" />
-        </svg>
+        <SearchIcon className="h-4 w-4 text-tertiary" />
         <span className="flex-1 text-left text-tertiary">Search...</span>
         <kbd className="rounded-md bg-surface-3 px-1.5 py-0.5 font-mono text-[10px] text-tertiary">
           {navigator.platform.includes('Mac') ? '⌘P' : 'Ctrl+P'}
@@ -157,9 +156,7 @@ export function GlobalSearch() {
           >
             {/* Input */}
             <div className="flex items-center gap-2 px-3 py-3">
-              <svg className="h-4 w-4 text-tertiary" viewBox="0 0 16 16" fill="currentColor">
-                <path d="M15.25 13.371l-3.5-3.5c-.063-.063-.131-.11-.2-.152a5.5 5.5 0 1 0-.879.879c.042.069.09.137.152.2l3.5 3.5a.75.75 0 0 0 1.061-1.061l-.134.134zM6.5 10.5a4 4 0 1 1 0-8 4 4 0 0 1 0 8z" />
-              </svg>
+              <SearchIcon className="h-4 w-4 text-tertiary" />
               <input
                 ref={inputRef}
                 type="text"
@@ -207,13 +204,7 @@ export function GlobalSearch() {
                     index === selectedIndex ? 'bg-surface-3' : ''
                   }`}
                 >
-                  <svg
-                    className={`h-4 w-4 flex-shrink-0 ${getFileColor(result.name)}`}
-                    viewBox="0 0 16 16"
-                    fill="currentColor"
-                  >
-                    <path d="M13.85 4.44l-3.28-3.3-.35-.14H3.5l-.5.5v13l.5.5h10l.5-.5V4.8l-.15-.36zM10 1.94L12.06 4H10V1.94zM13 14H4V2h5v2.5l.5.5H13v9z" />
-                  </svg>
+                  <FileIcon className={`h-4 w-4 flex-shrink-0 ${getFileColor(result.name)}`} />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <span className="truncate text-sm text-primary">{result.name}</span>

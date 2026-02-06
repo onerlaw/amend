@@ -201,63 +201,6 @@ pub fn get_file_diff(repo_path: String, file_path: String) -> Result<GitDiff, Gi
 }
 
 #[tauri::command]
-pub fn get_staged_diff(repo_path: String) -> Result<Vec<GitDiff>, GitError> {
-    let repo = Repository::discover(&repo_path)?;
-
-    let mut diffs = Vec::new();
-
-    // Get diff between HEAD and index (staged changes)
-    let head = repo.head()?.peel_to_tree()?;
-    let mut opts = DiffOptions::new();
-    let diff = repo.diff_tree_to_index(Some(&head), None, Some(&mut opts))?;
-
-    for delta in diff.deltas() {
-        let old_path = delta
-            .old_file()
-            .path()
-            .map(|p| p.to_string_lossy().to_string())
-            .unwrap_or_default();
-        let new_path = delta
-            .new_file()
-            .path()
-            .map(|p| p.to_string_lossy().to_string())
-            .unwrap_or_default();
-
-        // Get old content from HEAD
-        let old_content = if let Ok(entry) = head.get_path(Path::new(&old_path)) {
-            if let Ok(blob) = repo.find_blob(entry.id()) {
-                String::from_utf8_lossy(blob.content()).to_string()
-            } else {
-                String::new()
-            }
-        } else {
-            String::new()
-        };
-
-        // Get new content from index
-        let index = repo.index()?;
-        let new_content = if let Some(entry) = index.get_path(Path::new(&new_path), 0) {
-            if let Ok(blob) = repo.find_blob(entry.id) {
-                String::from_utf8_lossy(blob.content()).to_string()
-            } else {
-                String::new()
-            }
-        } else {
-            String::new()
-        };
-
-        diffs.push(GitDiff {
-            old_path,
-            new_path,
-            old_content,
-            new_content,
-        });
-    }
-
-    Ok(diffs)
-}
-
-#[tauri::command]
 pub fn list_worktrees(repo_path: String) -> Result<Vec<GitWorktree>, GitError> {
     let stdout = run_git_command(&repo_path, &["worktree", "list", "--porcelain"])?;
     let mut worktrees = Vec::new();

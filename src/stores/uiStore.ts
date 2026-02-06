@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { toggleSetItem } from '@/lib/fileUtils';
 
 export type PanelMode = 'diff' | 'browse' | null;
 export type ThemeMode = 'light' | 'dark' | 'system';
@@ -32,15 +33,9 @@ export const useUIStore = create<UIState>()(
       setPanelMode: (mode: PanelMode) => set({ panelMode: mode }),
       setFocusedPanel: (panel: FocusedPanel) => set({ focusedPanel: panel }),
       toggleDiffFileCollapse: (path: string) =>
-        set((state) => {
-          const newCollapsed = new Set(state.collapsedDiffFiles);
-          if (newCollapsed.has(path)) {
-            newCollapsed.delete(path);
-          } else {
-            newCollapsed.add(path);
-          }
-          return { collapsedDiffFiles: newCollapsed };
-        }),
+        set((state) => ({
+          collapsedDiffFiles: toggleSetItem(state.collapsedDiffFiles, path),
+        })),
       setScrollTargetFile: (path: string | null) => set({ scrollTargetFile: path }),
       setCollapsedDiffFiles: (files: Set<string>) => set({ collapsedDiffFiles: files }),
       setThemeMode: (mode: ThemeMode) => set({ themeMode: mode }),

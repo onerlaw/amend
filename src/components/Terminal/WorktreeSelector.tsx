@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { homeDir } from '@tauri-apps/api/path';
 import { GitWorktree, GitBranch, listBranches } from '@/lib/tauri';
+import { PlusIcon } from '@/components/Icons';
 
 interface WorktreeSelectorProps {
   worktrees: GitWorktree[];
@@ -213,9 +214,7 @@ export function WorktreeSelector({ worktrees, onSelect, onCreate, onDelete, onCa
                 }`}
               >
                 <span className="flex-shrink-0">
-                  <svg className="h-4 w-4" viewBox="0 0 16 16" fill="currentColor">
-                    <path d="M8 1v6H2v1h6v6h1V8h6V7H9V1z" />
-                  </svg>
+                  <PlusIcon />
                 </span>
                 <span className="font-medium">Create New Worktree</span>
               </button>
@@ -289,9 +288,7 @@ export function WorktreeSelector({ worktrees, onSelect, onCreate, onDelete, onCa
                 <div className={`rounded-md px-2 py-1.5 text-xs ${isNewBranch ? 'bg-green-500/10 text-green-400' : 'bg-surface-1 text-secondary'}`}>
                   {isNewBranch ? (
                     <span className="flex items-center gap-1.5">
-                      <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="currentColor">
-                        <path d="M8 1v6H2v1h6v6h1V8h6V7H9V1z" />
-                      </svg>
+                      <PlusIcon className="h-3.5 w-3.5" />
                       Will create new branch "{branchName.trim()}"
                     </span>
                   ) : (

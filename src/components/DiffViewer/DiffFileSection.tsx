@@ -1,6 +1,8 @@
 import { useMemo, useState, useEffect, useCallback, memo } from 'react';
 import * as Diff from 'diff';
 import { highlightCode, getLanguageFromPath } from '@/lib/highlight';
+import { getFileName, toggleSetItem } from '@/lib/fileUtils';
+import { ChevronIcon } from '@/components/Icons';
 
 interface DiffFileSectionProps {
   filePath: string;
@@ -86,13 +88,7 @@ const CollapsedSeparator = memo(function CollapsedSeparator({
       onClick={onToggle}
       className="flex w-full items-center gap-1.5 px-3 py-1 bg-surface-2 hover:bg-surface-3 border-y border-surface-3 font-mono text-xs text-tertiary cursor-pointer"
     >
-      <svg
-        className={`h-3 w-3 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
-        viewBox="0 0 16 16"
-        fill="currentColor"
-      >
-        <path d="M6 4l4 4-4 4V4z" />
-      </svg>
+      <ChevronIcon className={`h-3 w-3 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
       {hiddenCount} hidden lines
     </button>
   );
@@ -197,15 +193,7 @@ export const DiffFileSection = memo(function DiffFileSection({
   }, [oldContent, newContent]);
 
   const toggleSection = useCallback((index: number) => {
-    setExpandedSections(prev => {
-      const next = new Set(prev);
-      if (next.has(index)) {
-        next.delete(index);
-      } else {
-        next.add(index);
-      }
-      return next;
-    });
+    setExpandedSections(prev => toggleSetItem(prev, index));
   }, []);
 
   // Compute diff once — extract stats and sections from the same computation
@@ -308,7 +296,7 @@ export const DiffFileSection = memo(function DiffFileSection({
     return { additions: adds, deletions: dels, sections: sects };
   }, [oldContent, newContent, isLoading, error]);
 
-  const fileName = filePath.split('/').pop() || filePath;
+  const fileName = getFileName(filePath);
   const hasContent = !isLoading && !error && (oldContent || newContent);
 
   return (
@@ -321,13 +309,7 @@ export const DiffFileSection = memo(function DiffFileSection({
             className="rounded-md p-0.5 hover:bg-surface-3"
             title={isCollapsed ? 'Expand' : 'Collapse'}
           >
-            <svg
-              className={`h-4 w-4 text-tertiary transition-transform ${isCollapsed ? '' : 'rotate-90'}`}
-              viewBox="0 0 16 16"
-              fill="currentColor"
-            >
-              <path d="M6 4l4 4-4 4V4z" />
-            </svg>
+            <ChevronIcon className={`h-4 w-4 text-tertiary transition-transform ${isCollapsed ? '' : 'rotate-90'}`} />
           </button>
 
           <span className="text-sm text-primary truncate" title={filePath}>

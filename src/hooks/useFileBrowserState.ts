@@ -21,7 +21,6 @@ export function useFileBrowserState() {
 
   const [entries, setEntries] = useState<FileEntry[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [isLoadingContent, setIsLoadingContent] = useState(false);
   const [saveStatuses, setSaveStatuses] = useState<Map<string, SaveStatus>>(new Map());
 
   const autoSaveTimers = useRef<Map<string, NodeJS.Timeout>>(new Map());
@@ -70,13 +69,11 @@ export function useFileBrowserState() {
 
   const handleSelectFile = useCallback(
     async (path: string) => {
-      setIsLoadingContent(true);
       try {
         await openFileInBrowseMode(path);
       } catch (err) {
         console.error('Failed to read file:', err);
       }
-      setIsLoadingContent(false);
     },
     []
   );
@@ -143,7 +140,6 @@ export function useFileBrowserState() {
     contextPath,
     entries,
     isLoading,
-    isLoadingContent,
     browseOpenFiles,
     browseActiveFilePath,
     activeFile,

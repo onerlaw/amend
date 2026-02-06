@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { useFileBrowserState } from '@/hooks/useFileBrowserState';
 import { readDirectory, FileEntry } from '@/lib/tauri';
 import { useContextMenuStore } from '@/stores/contextMenuStore';
-import { getFileIconColor, sortDirectoriesFirst } from '@/lib/fileUtils';
+import { getFileIconColor, sortDirectoriesFirst, toggleSetItem } from '@/lib/fileUtils';
+import { ChevronIcon, FolderIcon, FileIcon, RefreshIcon } from '@/components/Icons';
 
 interface BrowseFileListProps {
   entries: FileEntry[];
@@ -18,21 +19,15 @@ function BrowseFileList({ entries, activeFilePath, openFilePaths, onSelectFile, 
   const [dirContents, setDirContents] = useState<Map<string, FileEntry[]>>(new Map());
 
   const toggleDir = async (path: string) => {
-    const newExpanded = new Set(expandedDirs);
-    if (newExpanded.has(path)) {
-      newExpanded.delete(path);
-    } else {
-      newExpanded.add(path);
-      if (!dirContents.has(path)) {
-        try {
-          const contents = await readDirectory(path);
-          setDirContents(new Map(dirContents).set(path, contents));
-        } catch (err) {
-          console.error('Failed to read directory:', err);
-        }
+    if (!expandedDirs.has(path) && !dirContents.has(path)) {
+      try {
+        const contents = await readDirectory(path);
+        setDirContents(new Map(dirContents).set(path, contents));
+      } catch (err) {
+        console.error('Failed to read directory:', err);
       }
     }
-    setExpandedDirs(newExpanded);
+    setExpandedDirs(toggleSetItem(expandedDirs, path));
   };
 
   const renderEntry = (entry: FileEntry, depth: number) => {
@@ -41,20 +36,11 @@ function BrowseFileList({ entries, activeFilePath, openFilePaths, onSelectFile, 
 
     const getFileIcon = () => {
       if (entry.isDirectory) {
-        return (
-          <svg className="h-4 w-4 text-yellow-500" viewBox="0 0 16 16" fill="currentColor">
-            <path d="M14.5 3H7.707l-.853-.854L6.5 2h-5l-.5.5v11l.5.5h13l.5-.5v-10l-.5-.5zM14 13H2V3h4.293l.853.854.354.146H14v9z" />
-          </svg>
-        );
+        return <FolderIcon className="h-4 w-4 text-yellow-500" />;
       }
 
       const color = getFileIconColor(entry.name);
-
-      return (
-        <svg className={`h-4 w-4 ${color}`} viewBox="0 0 16 16" fill="currentColor">
-          <path d="M13.85 4.44l-3.28-3.3-.35-.14H3.5l-.5.5v13l.5.5h10l.5-.5V4.8l-.15-.36zM10 1.94L12.06 4H10V1.94zM13 14H4V2h5v2.5l.5.5H13v9z" />
-        </svg>
-      );
+      return <FileIcon className={`h-4 w-4 ${color}`} />;
     };
 
     const isOpen = openFilePaths.has(entry.path);
@@ -75,13 +61,7 @@ function BrowseFileList({ entries, activeFilePath, openFilePaths, onSelectFile, 
           style={{ paddingLeft: `${depth * 12 + 8}px` }}
         >
           {entry.isDirectory && (
-            <svg
-              className={`h-3 w-3 text-tertiary transition-transform ${isExpanded ? 'rotate-90' : ''}`}
-              viewBox="0 0 16 16"
-              fill="currentColor"
-            >
-              <path d="M6 4l4 4-4 4V4z" />
-            </svg>
+            <ChevronIcon className={`h-3 w-3 text-tertiary transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
           )}
           {!entry.isDirectory && <span className="w-3" />}
           {getFileIcon()}
@@ -137,9 +117,7 @@ export function BrowseFileListPanel() {
           className="rounded-md p-1 text-secondary hover:bg-surface-3"
           title="Refresh"
         >
-          <svg className="h-4 w-4" viewBox="0 0 16 16" fill="currentColor">
-            <path d="M13.451 5.609l-.579-.939-1.068.812-.076.094c-.335.415-.927 1.341-1.124 2.876l-.021.165.033.163.071.345c.013.065.027.134.041.204H8.46l3.027 3.097L14.58 8.92l-2.857.07.035-.146.019-.074.012-.039v-.039c.212-1.082.211-2.136-.338-3.083zM6.514 6.027L3.487 2.933.393 6.028l2.86-.07-.037.147-.018.072-.013.04v.04c-.211 1.082-.21 2.136.339 3.083l.578.939 1.068-.812.076-.094c.335-.415.927-1.341 1.124-2.876l.021-.165-.033-.163-.071-.345a7.085 7.085 0 00-.041-.204h2.269L6.514 6.027z" />
-          </svg>
+          <RefreshIcon />
         </button>
       </div>
       <BrowseFileList

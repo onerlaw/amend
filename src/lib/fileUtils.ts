@@ -32,7 +32,7 @@ export async function openFileInBrowseMode(fullPath: string, displayName?: strin
   }
 
   const content = await readFile(fullPath);
-  const name = displayName || fullPath.split('/').pop() || fullPath;
+  const name = displayName || getFileName(fullPath);
   const language = getLanguageFromPath(fullPath) || '';
   const newFile: OpenFile = {
     path: fullPath,
@@ -42,6 +42,23 @@ export async function openFileInBrowseMode(fullPath: string, displayName?: strin
     language,
   };
   openBrowseFile(newFile);
+}
+
+/**
+ * Extract the file name from a path string.
+ */
+export function getFileName(path: string): string {
+  return path.split('/').pop() || path;
+}
+
+/**
+ * Toggle an item in a Set, returning a new Set.
+ */
+export function toggleSetItem<T>(set: Set<T>, item: T): Set<T> {
+  const newSet = new Set(set);
+  if (newSet.has(item)) newSet.delete(item);
+  else newSet.add(item);
+  return newSet;
 }
 
 /**

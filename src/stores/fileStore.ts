@@ -1,6 +1,5 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { FileEntry } from '@/lib/tauri';
 
 export interface OpenFile {
   path: string;
@@ -57,18 +56,6 @@ interface FileState {
   setCurrentDirectory: (path: string) => void;
   activeWorktreePath: string | null;
   setActiveWorktreePath: (path: string | null) => void;
-  fileTree: FileEntry[];
-  setFileTree: (entries: FileEntry[]) => void;
-  expandedDirs: Set<string>;
-  toggleDirectory: (path: string) => void;
-  // Editor mode files
-  openFiles: OpenFile[];
-  activeFilePath: string | null;
-  openFile: (file: OpenFile) => void;
-  setActiveFile: (path: string) => void;
-  closeFile: (path: string) => void;
-  updateFileContent: (path: string, content: string) => void;
-  markFileSaved: (path: string) => void;
   // Browse mode files
   browseOpenFiles: OpenFile[];
   browseActiveFilePath: string | null;
@@ -82,7 +69,6 @@ interface FileState {
   pendingScrollToFile: string | null;
   clearPendingScrollToLine: () => void;
   openBrowseFileAtLine: (file: OpenFile, line: number) => void;
-  openFileAtLine: (file: OpenFile, line: number) => void;
 }
 
 export const useFileStore = create<FileState>()(
@@ -98,37 +84,6 @@ export const useFileStore = create<FileState>()(
         }),
       activeWorktreePath: null,
       setActiveWorktreePath: (path: string | null) => set({ activeWorktreePath: path }),
-      fileTree: [],
-      setFileTree: (entries: FileEntry[]) => set({ fileTree: entries }),
-      expandedDirs: new Set<string>(),
-      toggleDirectory: (path: string) => {
-        const expanded = new Set(get().expandedDirs);
-        if (expanded.has(path)) {
-          expanded.delete(path);
-        } else {
-          expanded.add(path);
-        }
-        set({ expandedDirs: expanded });
-      },
-      openFiles: [],
-      activeFilePath: null,
-      openFile: (file: OpenFile) => {
-        const { files, activePath } = tabOpen(get().openFiles, file);
-        set({ openFiles: files, activeFilePath: activePath });
-      },
-      setActiveFile: (path: string) => {
-        set({ activeFilePath: path });
-      },
-      closeFile: (path: string) => {
-        const { files, activePath } = tabClose(get().openFiles, get().activeFilePath, path);
-        set({ openFiles: files, activeFilePath: activePath });
-      },
-      updateFileContent: (path: string, content: string) => {
-        set({ openFiles: tabUpdateContent(get().openFiles, path, content) });
-      },
-      markFileSaved: (path: string) => {
-        set({ openFiles: tabMarkSaved(get().openFiles, path) });
-      },
       // Browse mode state
       browseOpenFiles: [],
       browseActiveFilePath: null,
@@ -158,15 +113,6 @@ export const useFileStore = create<FileState>()(
         set({
           browseOpenFiles: result.files,
           browseActiveFilePath: result.activePath,
-          pendingScrollToLine: result.pendingScrollToLine,
-          pendingScrollToFile: result.pendingScrollToFile,
-        });
-      },
-      openFileAtLine: (file: OpenFile, line: number) => {
-        const result = tabOpenAtLine(get().openFiles, file, line);
-        set({
-          openFiles: result.files,
-          activeFilePath: result.activePath,
           pendingScrollToLine: result.pendingScrollToLine,
           pendingScrollToFile: result.pendingScrollToFile,
         });

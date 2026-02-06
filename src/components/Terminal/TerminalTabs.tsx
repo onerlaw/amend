@@ -9,6 +9,7 @@ import { useWorktrees } from '@/hooks/useWorktrees';
 import { TerminalPane } from './TerminalPane';
 import { WorktreeSelector } from './WorktreeSelector';
 import { GitWorktree } from '@/lib/tauri';
+import { CloseIcon, FolderIcon } from '@/components/Icons';
 
 export interface TerminalTabsHandle {
   openNewTerminal: () => void;
@@ -165,9 +166,7 @@ export const TerminalTabs = forwardRef<TerminalTabsHandle>(function TerminalTabs
                 onClick={(e) => handleCloseTerminal(e, tab.id)}
                 className="ml-1 rounded-full p-0.5 opacity-0 hover:bg-surface-3 group-hover:opacity-100"
               >
-                <svg className="h-3 w-3" viewBox="0 0 12 12" fill="currentColor">
-                  <path d="M9.5 3.205L8.795 2.5 6 5.295 3.205 2.5l-.705.705L5.295 6 2.5 8.795l.705.705L6 6.705 8.795 9.5l.705-.705L6.705 6z" />
-                </svg>
+                <CloseIcon />
               </span>
             </button>
           ))}
@@ -217,9 +216,7 @@ export const TerminalTabs = forwardRef<TerminalTabsHandle>(function TerminalTabs
                     onClick={() => handleProjectSelect(project)}
                     className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs text-primary hover:bg-surface-3"
                   >
-                    <svg className="h-4 w-4 flex-shrink-0" viewBox="0 0 16 16" fill="currentColor">
-                      <path d="M14.5 3H7.707l-.853-.854L6.5 2h-5l-.5.5v11l.5.5h13l.5-.5v-10l-.5-.5zM14 13H2V3h4.293l.853.854.354.146H14v9z" />
-                    </svg>
+                    <FolderIcon className="h-4 w-4 flex-shrink-0" />
                     <span className="truncate" title={project.path}>{project.name}</span>
                   </button>
                 ))}

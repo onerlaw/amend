@@ -4,7 +4,7 @@ import { useFileStore } from '@/stores/fileStore';
 import { useUIStore } from '@/stores/uiStore';
 import { useGitStatus } from '@/hooks/useGit';
 import { useMultiFileDiff } from '@/hooks/useMultiFileDiff';
-import { openFileInBrowseMode } from '@/lib/fileUtils';
+import { openFileInBrowseMode, getFileName } from '@/lib/fileUtils';
 
 export interface FileWithCategory {
   path: string;
@@ -92,7 +92,7 @@ export function useDiffViewerState() {
     async (filePath: string) => {
       if (!contextPath) return;
       const fullPath = `${contextPath}/${filePath}`;
-      const displayName = filePath.split('/').pop() || filePath;
+      const displayName = getFileName(filePath);
 
       try {
         await openFileInBrowseMode(fullPath, displayName);
