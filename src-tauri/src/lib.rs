@@ -68,4 +68,3 @@ fn find_definition(
 ) -> Vec<SymbolDefinition> {
     manager.find_definition(&symbol, &current_file)
 }
-
