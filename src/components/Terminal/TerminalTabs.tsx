@@ -44,6 +44,12 @@ export const TerminalTabs = forwardRef<TerminalTabsHandle>(function TerminalTabs
     }
   }, [tabs.length, createTerminal, currentDirectory, projects]);
 
+  const handleDuplicateTerminal = useCallback(() => {
+    const activeTab = tabs.find(t => t.id === activeTabId);
+    if (!activeTab) return;
+    createTerminal(activeTab.worktreePath, activeTab.projectId);
+  }, [tabs, activeTabId, createTerminal]);
+
   const handleNewTerminal = useCallback(() => {
     if (projects.length === 0) {
       // No projects, show open folder dialog
@@ -165,6 +171,28 @@ export const TerminalTabs = forwardRef<TerminalTabsHandle>(function TerminalTabs
               </span>
             </button>
           ))}
+        </div>
+        <div className="flex items-center gap-0.5 px-1">
+          {activeTabId && (
+            <button
+              onClick={handleDuplicateTerminal}
+              className="flex items-center justify-center rounded-md p-1 text-secondary hover:bg-surface-3 hover:text-primary"
+              title="Duplicate Terminal"
+            >
+              <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="currentColor">
+                <path d="M10.5 1h-7l-.5.5v7l.5.5H5v3.5l.5.5h7l.5-.5v-7l-.5-.5H11V1.5l-.5-.5zM10 8h2v4H6V9h3.5l.5-.5V8zm0-1V2H4v6h3V5.5l.5-.5H10z" />
+              </svg>
+            </button>
+          )}
+          <button
+            onClick={handleNewTerminal}
+            className="flex items-center justify-center rounded-md p-1 text-secondary hover:bg-surface-3 hover:text-primary"
+            title="New Terminal"
+          >
+            <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="currentColor">
+              <path d="M8 1v6H2v2h6v6h2V9h6V7H10V1z" />
+            </svg>
+          </button>
         </div>
       </div>
 
