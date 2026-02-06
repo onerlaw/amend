@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { homeDir } from '@tauri-apps/api/path';
 import { GitWorktree, GitBranch, listBranches } from '@/lib/tauri';
-import { PlusIcon } from '@/components/Icons';
+import { PlusIcon, MainBranchIcon, BranchIcon, TrashIcon } from '@/components/Icons';
+import { getFileName } from '@/lib/fileUtils';
 
 interface WorktreeSelectorProps {
   worktrees: GitWorktree[];
@@ -131,11 +132,6 @@ export function WorktreeSelector({ worktrees, onSelect, onCreate, onDelete, onCa
     handleCreate(branch.name);
   };
 
-  const getWorktreeName = (worktree: GitWorktree) => {
-    const pathParts = worktree.path.split('/');
-    return pathParts[pathParts.length - 1] || worktree.path;
-  };
-
   return (
     <div
       ref={containerRef}
@@ -167,18 +163,10 @@ export function WorktreeSelector({ worktrees, onSelect, onCreate, onDelete, onCa
                     className="flex flex-1 items-center gap-2 text-left"
                   >
                     <span className="flex-shrink-0">
-                      {worktree.isMain ? (
-                        <svg className="h-4 w-4" viewBox="0 0 16 16" fill="currentColor">
-                          <path d="M8 0a8 8 0 1 0 8 8A8 8 0 0 0 8 0zm3.65 4.36L7.5 10.75 4.35 7.6l1.3-1.35L7.5 8.1l2.85-2.85z" />
-                        </svg>
-                      ) : (
-                        <svg className="h-4 w-4" viewBox="0 0 16 16" fill="currentColor">
-                          <path d="M9.5 3.25a2.25 2.25 0 1 1 3 2.122V6A2.5 2.5 0 0 1 10 8.5H6a1 1 0 0 0-1 1v1.128a2.251 2.251 0 1 1-1.5 0V5.372a2.25 2.25 0 1 1 1.5 0v1.836A2.5 2.5 0 0 1 6 7h4a1 1 0 0 0 1-1v-.628A2.25 2.25 0 0 1 9.5 3.25z" />
-                        </svg>
-                      )}
+                      {worktree.isMain ? <MainBranchIcon /> : <BranchIcon />}
                     </span>
                     <div className="flex flex-1 flex-col overflow-hidden">
-                      <span className="truncate font-medium">{getWorktreeName(worktree)}</span>
+                      <span className="truncate font-medium">{getFileName(worktree.path)}</span>
                       <span className="truncate text-xs opacity-60">{worktree.branch}</span>
                     </div>
                   </button>
@@ -195,10 +183,7 @@ export function WorktreeSelector({ worktrees, onSelect, onCreate, onDelete, onCa
                       }`}
                       title="Delete worktree"
                     >
-                      <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="currentColor">
-                        <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z" />
-                        <path fillRule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z" />
-                      </svg>
+                      <TrashIcon />
                     </button>
                   )}
                 </div>
@@ -271,9 +256,7 @@ export function WorktreeSelector({ worktrees, onSelect, onCreate, onDelete, onCa
                           index === branchSelectedIndex ? 'bg-accent text-white' : 'text-primary hover:bg-surface-3'
                         }`}
                       >
-                        <svg className="h-3.5 w-3.5 flex-shrink-0 opacity-60" viewBox="0 0 16 16" fill="currentColor">
-                          <path d="M9.5 3.25a2.25 2.25 0 1 1 3 2.122V6A2.5 2.5 0 0 1 10 8.5H6a1 1 0 0 0-1 1v1.128a2.251 2.251 0 1 1-1.5 0V5.372a2.25 2.25 0 1 1 1.5 0v1.836A2.5 2.5 0 0 1 6 7h4a1 1 0 0 0 1-1v-.628A2.25 2.25 0 0 1 9.5 3.25z" />
-                        </svg>
+                        <BranchIcon className="h-3.5 w-3.5 flex-shrink-0 opacity-60" />
                         <span className="truncate">{branch.name}</span>
                         {branch.isRemote && (
                           <span className="ml-auto text-xs opacity-50">remote</span>

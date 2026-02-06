@@ -12,9 +12,7 @@ export interface FileWithCategory {
 }
 
 export function useDiffViewerState() {
-  const { currentDirectory, activeWorktreePath } =
-    useFileStore();
-  const contextPath = activeWorktreePath ?? currentDirectory;
+  const { currentDirectory, contextPath } = useFileStore();
   const {
     collapsedDiffFiles,
     toggleDiffFileCollapse,
@@ -30,22 +28,11 @@ export function useDiffViewerState() {
   // Build ordered list of all changed files with their categories
   const allFiles = useMemo((): FileWithCategory[] => {
     if (!status) return [];
-
-    const files: FileWithCategory[] = [];
-
-    status.staged.forEach((f) => {
-      files.push({ path: f.path, category: 'staged' });
-    });
-
-    status.unstaged.forEach((f) => {
-      files.push({ path: f.path, category: 'unstaged' });
-    });
-
-    status.untracked.forEach((path) => {
-      files.push({ path, category: 'untracked' });
-    });
-
-    return files;
+    return [
+      ...status.staged.map(f => ({ path: f.path, category: 'staged' as const })),
+      ...status.unstaged.map(f => ({ path: f.path, category: 'unstaged' as const })),
+      ...status.untracked.map(path => ({ path, category: 'untracked' as const })),
+    ];
   }, [status]);
 
   // Load all diffs when files change (expanded by default)

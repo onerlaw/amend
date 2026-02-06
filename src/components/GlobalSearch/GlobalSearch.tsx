@@ -4,7 +4,7 @@ import { searchFiles, SearchResult } from '@/lib/tauri';
 import { useFileStore } from '@/stores/fileStore';
 import { useUIStore } from '@/stores/uiStore';
 import { getFileIconColor, openFileInBrowseMode } from '@/lib/fileUtils';
-import { SearchIcon, FileIcon } from '@/components/Icons';
+import { SearchIcon, FileIcon, SpinnerIcon } from '@/components/Icons';
 
 export function GlobalSearch() {
   const [isOpen, setIsOpen] = useState(false);
@@ -15,9 +15,8 @@ export function GlobalSearch() {
   const inputRef = useRef<HTMLInputElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
 
-  const { currentDirectory, activeWorktreePath } = useFileStore();
+  const { contextPath: searchRoot } = useFileStore();
   const { setPanelMode } = useUIStore();
-  const searchRoot = activeWorktreePath ?? currentDirectory;
 
   const openSearch = useCallback(() => {
     setIsOpen(true);
@@ -121,8 +120,6 @@ export function GlobalSearch() {
     }
   };
 
-  const getFileColor = (name: string) => getFileIconColor(name);
-
   const getRelativePath = (fullPath: string) => {
     if (!searchRoot) return fullPath;
     return fullPath.replace(searchRoot + '/', '');
@@ -167,22 +164,7 @@ export function GlobalSearch() {
                 className="flex-1 bg-transparent text-sm text-primary outline-none placeholder:text-tertiary"
               />
               {isSearching && (
-                <svg className="h-4 w-4 animate-spin text-tertiary" viewBox="0 0 24 24">
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                    fill="none"
-                  />
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-                  />
-                </svg>
+                <SpinnerIcon className="h-4 w-4 animate-spin text-tertiary" />
               )}
             </div>
 
@@ -204,7 +186,7 @@ export function GlobalSearch() {
                     index === selectedIndex ? 'bg-surface-3' : ''
                   }`}
                 >
-                  <FileIcon className={`h-4 w-4 flex-shrink-0 ${getFileColor(result.name)}`} />
+                  <FileIcon className={`h-4 w-4 flex-shrink-0 ${getFileIconColor(result.name)}`} />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <span className="truncate text-sm text-primary">{result.name}</span>

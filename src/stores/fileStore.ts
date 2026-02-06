@@ -56,6 +56,7 @@ interface FileState {
   setCurrentDirectory: (path: string) => void;
   activeWorktreePath: string | null;
   setActiveWorktreePath: (path: string | null) => void;
+  contextPath: string | null;
   // Browse mode files
   browseOpenFiles: OpenFile[];
   browseActiveFilePath: string | null;
@@ -79,11 +80,13 @@ export const useFileStore = create<FileState>()(
         set({
           currentDirectory: path,
           activeWorktreePath: path, // Default activeWorktreePath to project root
+          contextPath: path,
           browseOpenFiles: [],
           browseActiveFilePath: null,
         }),
       activeWorktreePath: null,
-      setActiveWorktreePath: (path: string | null) => set({ activeWorktreePath: path }),
+      setActiveWorktreePath: (path: string | null) => set({ activeWorktreePath: path, contextPath: path ?? get().currentDirectory }),
+      contextPath: null,
       // Browse mode state
       browseOpenFiles: [],
       browseActiveFilePath: null,
@@ -123,6 +126,11 @@ export const useFileStore = create<FileState>()(
       partialize: (state) => ({
         currentDirectory: state.currentDirectory,
       }),
+      onRehydrateStorage: () => (state) => {
+        if (state) {
+          state.contextPath = state.activeWorktreePath ?? state.currentDirectory;
+        }
+      },
     }
   )
 );

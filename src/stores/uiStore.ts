@@ -16,7 +16,6 @@ interface UIState {
   setPanelMode: (mode: PanelMode) => void;
   toggleDiffFileCollapse: (path: string) => void;
   setScrollTargetFile: (path: string | null) => void;
-  setCollapsedDiffFiles: (files: Set<string>) => void;
   setThemeMode: (mode: ThemeMode) => void;
   setFocusedPanel: (panel: FocusedPanel) => void;
 }
@@ -37,7 +36,6 @@ export const useUIStore = create<UIState>()(
           collapsedDiffFiles: toggleSetItem(state.collapsedDiffFiles, path),
         })),
       setScrollTargetFile: (path: string | null) => set({ scrollTargetFile: path }),
-      setCollapsedDiffFiles: (files: Set<string>) => set({ collapsedDiffFiles: files }),
       setThemeMode: (mode: ThemeMode) => set({ themeMode: mode }),
     }),
     {

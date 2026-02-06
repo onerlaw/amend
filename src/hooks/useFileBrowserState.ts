@@ -8,8 +8,7 @@ const AUTO_SAVE_DELAY = 1000;
 export type SaveStatus = 'idle' | 'pending' | 'saving' | 'error';
 
 export function useFileBrowserState() {
-  const { currentDirectory, activeWorktreePath } = useFileStore();
-  const contextPath = activeWorktreePath ?? currentDirectory;
+  const { currentDirectory, contextPath } = useFileStore();
   const {
     browseOpenFiles,
     browseActiveFilePath,
@@ -43,9 +42,8 @@ export function useFileBrowserState() {
 
   // Refresh file tree when file operations occur (rename, delete, paste)
   useEffect(() => {
-    const handleRefreshEvent = () => loadDirectory();
-    window.addEventListener('file-tree-refresh', handleRefreshEvent);
-    return () => window.removeEventListener('file-tree-refresh', handleRefreshEvent);
+    window.addEventListener('file-tree-refresh', loadDirectory);
+    return () => window.removeEventListener('file-tree-refresh', loadDirectory);
   }, [loadDirectory]);
 
   // Cleanup timers on unmount
@@ -128,10 +126,6 @@ export function useFileBrowserState() {
     [updateBrowseFileContent, markBrowseFileSaved, setSaveStatus]
   );
 
-  const handleRefresh = useCallback(() => {
-    loadDirectory();
-  }, [loadDirectory]);
-
   // Get currently active file
   const activeFile = browseOpenFiles.find((f) => f.path === browseActiveFilePath) || null;
 
@@ -146,7 +140,7 @@ export function useFileBrowserState() {
     handleSelectFile,
     handleCloseFile,
     handleContentChange,
-    handleRefresh,
+    handleRefresh: loadDirectory,
     setBrowseActiveFile,
     getSaveStatus,
   };

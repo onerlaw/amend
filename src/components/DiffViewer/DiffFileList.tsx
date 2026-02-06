@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { GitStatus, FileEntry, restoreFile, unstageFile } from '@/lib/tauri';
 import { sortDirectoriesFirst, getFileName } from '@/lib/fileUtils';
 import { ContextMenu } from '@/components/ContextMenu/ContextMenu';
-import { ChevronIcon, FolderIcon } from '@/components/Icons';
+import { ChevronIcon, FolderIcon, DiscardIcon } from '@/components/Icons';
 
 interface DiffFileListProps {
   status: GitStatus | null;
@@ -157,9 +157,7 @@ function FileTreeItem({
           className="mr-2 flex-shrink-0 rounded p-0.5 opacity-0 group-hover:opacity-100 hover:bg-surface-3 text-secondary hover:text-primary transition-opacity"
           onClick={(e) => onDiscardClick(e, node.path)}
         >
-          <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="currentColor">
-            <path d="M8 1a7 7 0 100 14A7 7 0 008 1zm3.11 9.34l-1.06 1.06L8 9.35l-2.05 2.05-1.06-1.06L6.94 8.3 4.89 6.25l1.06-1.06L8 7.24l2.05-2.05 1.06 1.06L9.06 8.3l2.05 2.04z" />
-          </svg>
+          <DiscardIcon />
         </span>
       )}
     </button>

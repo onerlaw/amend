@@ -9,7 +9,8 @@ import { useWorktrees } from '@/hooks/useWorktrees';
 import { TerminalPane } from './TerminalPane';
 import { WorktreeSelector } from './WorktreeSelector';
 import { GitWorktree } from '@/lib/tauri';
-import { CloseIcon, FolderIcon } from '@/components/Icons';
+import { CloseIcon, FolderIcon, DuplicateIcon, PlusIcon } from '@/components/Icons';
+import { getFileName } from '@/lib/fileUtils';
 
 export interface TerminalTabsHandle {
   openNewTerminal: () => void;
@@ -135,11 +136,6 @@ export const TerminalTabs = forwardRef<TerminalTabsHandle>(function TerminalTabs
     setSelectedProjectId(null);
   };
 
-  const getWorktreeDisplayName = (worktreePath: string) => {
-    const pathParts = worktreePath.split('/');
-    return pathParts[pathParts.length - 1] || worktreePath;
-  };
-
   const handleCloseTerminal = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
     closeTerminal(id);
@@ -161,7 +157,7 @@ export const TerminalTabs = forwardRef<TerminalTabsHandle>(function TerminalTabs
               }`}
               title={tab.worktreePath}
             >
-              <span className="truncate max-w-[120px]">{getWorktreeDisplayName(tab.worktreePath)}</span>
+              <span className="truncate max-w-[120px]">{getFileName(tab.worktreePath)}</span>
               <span
                 onClick={(e) => handleCloseTerminal(e, tab.id)}
                 className="ml-1 rounded-full p-0.5 opacity-0 hover:bg-surface-3 group-hover:opacity-100"
@@ -178,9 +174,7 @@ export const TerminalTabs = forwardRef<TerminalTabsHandle>(function TerminalTabs
               className="flex items-center justify-center rounded-md p-1 text-secondary hover:bg-surface-3 hover:text-primary"
               title="Duplicate Terminal"
             >
-              <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="currentColor">
-                <path d="M10.5 1h-7l-.5.5v7l.5.5H5v3.5l.5.5h7l.5-.5v-7l-.5-.5H11V1.5l-.5-.5zM10 8h2v4H6V9h3.5l.5-.5V8zm0-1V2H4v6h3V5.5l.5-.5H10z" />
-              </svg>
+              <DuplicateIcon />
             </button>
           )}
           <button
@@ -188,9 +182,7 @@ export const TerminalTabs = forwardRef<TerminalTabsHandle>(function TerminalTabs
             className="flex items-center justify-center rounded-md p-1 text-secondary hover:bg-surface-3 hover:text-primary"
             title="New Terminal"
           >
-            <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="currentColor">
-              <path d="M8 1v6H2v2h6v6h2V9h6V7H10V1z" />
-            </svg>
+            <PlusIcon className="h-3.5 w-3.5" />
           </button>
         </div>
       </div>
@@ -225,9 +217,7 @@ export const TerminalTabs = forwardRef<TerminalTabsHandle>(function TerminalTabs
                   onClick={handleOpenFolder}
                   className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs text-primary hover:bg-surface-3 border-t border-surface-3 mt-2 pt-2"
                 >
-                  <svg className="h-4 w-4 flex-shrink-0" viewBox="0 0 16 16" fill="currentColor">
-                    <path d="M14.5 3H7.707l-.853-.854L6.5 2h-5l-.5.5v11l.5.5h13l.5-.5v-10l-.5-.5zM14 13H2V3h4.293l.853.854.354.146H14v9z" />
-                  </svg>
+                  <FolderIcon className="h-4 w-4 flex-shrink-0" />
                   <span>Open Folder...</span>
                 </button>
               </div>
