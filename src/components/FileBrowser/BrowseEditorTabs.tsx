@@ -82,21 +82,24 @@ export const BrowseEditorTabs = forwardRef<BrowseEditorTabsHandle>(
       }
     }, [pendingScrollToLine, pendingScrollToFile, activeFile?.path, clearPendingScrollToLine]);
 
-    const handleEditorView = useCallback(
-      (view: EditorView | null) => {
-        editorViewRef.current = view;
+    const handleEditorView = useCallback((view: EditorView | null) => {
+      editorViewRef.current = view;
 
-        // When a new editor mounts, check if there's a pending scroll for it
-        if (view && pendingScrollToLine != null && pendingScrollToFile === activeFile?.path) {
-          // Use requestAnimationFrame to let the editor finish rendering
+      // When a new editor mounts, check if there's a pending scroll for it
+      if (view) {
+        const state = useFileStore.getState();
+        if (
+          state.pendingScrollToLine != null &&
+          state.pendingScrollToFile &&
+          state.pendingScrollToFile === state.browseActiveFilePath
+        ) {
           requestAnimationFrame(() => {
-            scrollToLine(view, pendingScrollToLine!);
-            clearPendingScrollToLine();
+            scrollToLine(view, state.pendingScrollToLine!);
+            state.clearPendingScrollToLine();
           });
         }
-      },
-      [pendingScrollToLine, pendingScrollToFile, activeFile?.path, clearPendingScrollToLine]
-    );
+      }
+    }, []);
 
     useImperativeHandle(ref, () => ({
       openSearch() {

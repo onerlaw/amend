@@ -197,13 +197,9 @@ export function findDefinitionInFile(view: EditorView, symbolName: string): Loca
             }
           }
 
-          // Track depth
-          if (cursor.firstChild()) {
+          // Track depth — check before entering to avoid enter-then-back-out infinite loop
+          if (depth < maxDepth && cursor.firstChild()) {
             depth++;
-            if (depth > maxDepth) {
-              cursor.parent();
-              depth--;
-            }
           } else if (!cursor.nextSibling()) {
             while (depth > 0 && !cursor.nextSibling()) {
               cursor.parent();
