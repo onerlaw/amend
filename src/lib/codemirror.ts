@@ -1,5 +1,6 @@
-import { EditorView } from '@codemirror/view';
-import { HighlightStyle } from '@codemirror/language';
+import { EditorView, keymap, lineNumbers, highlightActiveLine } from '@codemirror/view';
+import { HighlightStyle, syntaxHighlighting } from '@codemirror/language';
+import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
 import { tags } from '@lezer/highlight';
 import { javascript } from '@codemirror/lang-javascript';
 import { rust } from '@codemirror/lang-rust';
@@ -204,6 +205,21 @@ export const darkTheme = EditorView.theme(
   },
   { dark: false } // Set to false so it adapts to CSS variables
 );
+
+/**
+ * Creates the base set of CodeMirror extensions shared across all editor instances.
+ */
+export function createBaseExtensions(language: string | undefined): Extension[] {
+  return [
+    lineNumbers(),
+    highlightActiveLine(),
+    history(),
+    keymap.of([...defaultKeymap, ...historyKeymap]),
+    darkTheme,
+    syntaxHighlighting(customHighlightStyle),
+    getLanguageExtension(language),
+  ];
+}
 
 // Map language names to CodeMirror language extensions
 // Supports languages from getLanguageFromPath() in highlight.ts

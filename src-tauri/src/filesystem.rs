@@ -1,10 +1,11 @@
+use crate::error::impl_serialize_as_string;
 use ignore::WalkBuilder;
 use notify::{Config, RecommendedWatcher, RecursiveMode, Watcher};
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter};
 use thiserror::Error;
@@ -17,15 +18,30 @@ pub enum FileSystemError {
     NotFound(String),
     #[error("Watch error: {0}")]
     Watch(String),
+    #[error("Invalid path: {0}")]
+    InvalidPath(String),
 }
 
-impl Serialize for FileSystemError {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        serializer.serialize_str(&self.to_string())
+impl_serialize_as_string!(FileSystemError);
+
+/// Validate that a path is absolute and contains no `..` components.
+fn validate_path(path: &str) -> Result<PathBuf, FileSystemError> {
+    let p = PathBuf::from(path);
+    if !p.is_absolute() {
+        return Err(FileSystemError::InvalidPath(format!(
+            "path must be absolute: {}",
+            path
+        )));
     }
+    for component in p.components() {
+        if let std::path::Component::ParentDir = component {
+            return Err(FileSystemError::InvalidPath(format!(
+                "path must not contain '..': {}",
+                path
+            )));
+        }
+    }
+    Ok(p)
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -127,6 +143,7 @@ impl FileSystemManager {
     }
 
     pub fn write_file(&self, path: &str, contents: &str) -> Result<(), FileSystemError> {
+        validate_path(path)?;
         fs::write(path, contents)?;
         Ok(())
     }
@@ -231,8 +248,11 @@ impl FileSystemManager {
                 });
             }
 
-            // Check content match if enabled
+            // Check content match if enabled (skip files >1MB for performance)
             if search_content && filename_matches.len() + content_matches.len() < MAX_RESULTS {
+                if metadata.len() > 1_048_576 {
+                    continue;
+                }
                 if let Ok(content) = fs::read_to_string(entry_path) {
                     for (line_num, line) in content.lines().enumerate() {
                         if line.to_lowercase().contains(&query_lower) {
@@ -259,6 +279,8 @@ impl FileSystemManager {
     }
 
     pub fn rename_entry(&self, old_path: &str, new_path: &str) -> Result<(), FileSystemError> {
+        validate_path(old_path)?;
+        validate_path(new_path)?;
         let old = Path::new(old_path);
         if !old.exists() {
             return Err(FileSystemError::NotFound(old_path.to_string()));
@@ -268,6 +290,7 @@ impl FileSystemManager {
     }
 
     pub fn delete_file(&self, path: &str) -> Result<(), FileSystemError> {
+        validate_path(path)?;
         let p = Path::new(path);
         if !p.exists() {
             return Err(FileSystemError::NotFound(path.to_string()));
@@ -277,6 +300,7 @@ impl FileSystemManager {
     }
 
     pub fn delete_directory(&self, path: &str) -> Result<(), FileSystemError> {
+        validate_path(path)?;
         let p = Path::new(path);
         if !p.exists() {
             return Err(FileSystemError::NotFound(path.to_string()));
@@ -286,6 +310,8 @@ impl FileSystemManager {
     }
 
     pub fn copy_entry(&self, src: &str, dest: &str) -> Result<(), FileSystemError> {
+        validate_path(src)?;
+        validate_path(dest)?;
         let src_path = Path::new(src);
         if !src_path.exists() {
             return Err(FileSystemError::NotFound(src.to_string()));
@@ -316,6 +342,8 @@ impl FileSystemManager {
     }
 
     pub fn move_entry(&self, src: &str, dest: &str) -> Result<(), FileSystemError> {
+        validate_path(src)?;
+        validate_path(dest)?;
         let src_path = Path::new(src);
         if !src_path.exists() {
             return Err(FileSystemError::NotFound(src.to_string()));

@@ -1,11 +1,9 @@
 import { useEffect, useRef } from 'react';
 import { EditorState } from '@codemirror/state';
-import { EditorView, keymap, lineNumbers, highlightActiveLine } from '@codemirror/view';
-import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
-import { syntaxHighlighting } from '@codemirror/language';
+import { EditorView, keymap } from '@codemirror/view';
 import { useFileStore, OpenFile } from '@/stores/fileStore';
 import { writeFile } from '@/lib/tauri';
-import { customHighlightStyle, darkTheme, getLanguageExtension } from '@/lib/codemirror';
+import { createBaseExtensions } from '@/lib/codemirror';
 
 interface EditorProps {
   file: OpenFile;
@@ -39,14 +37,8 @@ export function Editor({ file }: EditorProps) {
     const state = EditorState.create({
       doc: file.content,
       extensions: [
-        lineNumbers(),
-        highlightActiveLine(),
-        history(),
-        keymap.of([...defaultKeymap, ...historyKeymap]),
+        ...createBaseExtensions(file.language),
         saveKeymap,
-        darkTheme,
-        syntaxHighlighting(customHighlightStyle),
-        getLanguageExtension(file.language),
         updateListener,
       ],
     });

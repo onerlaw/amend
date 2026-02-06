@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { useFileStore, OpenFile } from '@/stores/fileStore';
-import { readDirectory, readFile, writeFile, FileEntry } from '@/lib/tauri';
-import { getLanguageFromPath } from '@/lib/highlight';
+import { useFileStore } from '@/stores/fileStore';
+import { readDirectory, writeFile, FileEntry } from '@/lib/tauri';
+import { openFileInBrowseMode } from '@/lib/fileUtils';
 
 const AUTO_SAVE_DELAY = 1000;
 
@@ -13,7 +13,6 @@ export function useFileBrowserState() {
   const {
     browseOpenFiles,
     browseActiveFilePath,
-    openBrowseFile,
     setBrowseActiveFile,
     closeBrowseFile,
     updateBrowseFileContent,
@@ -71,34 +70,15 @@ export function useFileBrowserState() {
 
   const handleSelectFile = useCallback(
     async (path: string) => {
-      // Check if file is already open
-      const existingFile = browseOpenFiles.find((f) => f.path === path);
-      if (existingFile) {
-        setBrowseActiveFile(path);
-        return;
-      }
-
-      // Load file content and open it
       setIsLoadingContent(true);
       try {
-        const content = await readFile(path);
-        const name = path.split('/').pop() || path;
-        const language = getLanguageFromPath(path) || '';
-
-        const newFile: OpenFile = {
-          path,
-          name,
-          content,
-          isDirty: false,
-          language,
-        };
-        openBrowseFile(newFile);
+        await openFileInBrowseMode(path);
       } catch (err) {
         console.error('Failed to read file:', err);
       }
       setIsLoadingContent(false);
     },
-    [browseOpenFiles, openBrowseFile, setBrowseActiveFile]
+    []
   );
 
   const handleCloseFile = useCallback(

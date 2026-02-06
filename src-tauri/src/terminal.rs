@@ -1,3 +1,4 @@
+use crate::error::impl_serialize_as_string;
 use parking_lot::Mutex;
 use portable_pty::{native_pty_system, CommandBuilder, MasterPty, PtySize};
 use serde::{Deserialize, Serialize};
@@ -18,14 +19,7 @@ pub enum TerminalError {
     Io(#[from] std::io::Error),
 }
 
-impl Serialize for TerminalError {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        serializer.serialize_str(&self.to_string())
-    }
-}
+impl_serialize_as_string!(TerminalError);
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct TerminalOutput {
@@ -36,6 +30,7 @@ pub struct TerminalOutput {
 struct TerminalSession {
     master: Box<dyn MasterPty + Send>,
     writer: Box<dyn Write + Send>,
+    child: Box<dyn portable_pty::Child + Send>,
 }
 
 pub struct TerminalManager {
@@ -84,7 +79,7 @@ impl TerminalManager {
             cmd.cwd(dir);
         }
 
-        let _child = pair
+        let child = pair
             .slave
             .spawn_command(cmd)
             .map_err(|e| TerminalError::Pty(e.to_string()))?;
@@ -103,6 +98,7 @@ impl TerminalManager {
         let session = TerminalSession {
             master: pair.master,
             writer,
+            child,
         };
 
         self.sessions.lock().insert(id.clone(), session);
@@ -163,9 +159,14 @@ impl TerminalManager {
 
     pub fn close_terminal(&self, id: &str) -> Result<(), TerminalError> {
         let mut sessions = self.sessions.lock();
-        sessions
+        let mut session = sessions
             .remove(id)
             .ok_or_else(|| TerminalError::NotFound(id.to_string()))?;
+
+        // Kill the child process and wait for it to exit
+        let _ = session.child.kill();
+        let _ = session.child.wait();
+
         Ok(())
     }
 }

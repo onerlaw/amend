@@ -274,7 +274,14 @@ export function FileContextMenu() {
       { label: 'Copy Relative Path', onClick: handleCopyRelativePath },
       { label: 'Copy Full Path', onClick: handleCopyFullPath },
       { label: '', onClick: () => {}, separator: true },
-      { label: 'Reveal in Finder', onClick: handleRevealInFinder },
+      {
+        label: navigator.platform.includes('Mac')
+          ? 'Reveal in Finder'
+          : navigator.platform.includes('Win')
+            ? 'Reveal in File Explorer'
+            : 'Open Containing Folder',
+        onClick: handleRevealInFinder,
+      },
     );
 
     return menuItems;

@@ -112,10 +112,6 @@ export function highlightCode(code: string, language?: string): string {
   }
 }
 
-export function highlightLine(line: string, language?: string): string {
-  return highlightCode(line, language);
-}
-
 function escapeHtml(text: string): string {
   return text
     .replace(/&/g, '&amp;')

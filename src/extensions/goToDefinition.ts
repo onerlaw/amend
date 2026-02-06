@@ -3,6 +3,7 @@ import { Extension } from '@codemirror/state';
 import { getSymbolAtPosition, findDefinitionInFile, hasGoToDefinitionModifier } from '@/lib/symbolNavigation';
 import { findDefinition, SymbolDefinition, readFile } from '@/lib/tauri';
 import { OpenFile } from '@/stores/fileStore';
+import { getLanguageFromPath } from '@/lib/highlight';
 
 export interface GoToDefinitionConfig {
   currentFilePath: string;
@@ -74,7 +75,7 @@ async function handleNavigation(
       try {
         const content = await readFile(targetDef.filePath);
         const fileName = targetDef.filePath.split('/').pop() || targetDef.filePath;
-        const language = getLanguageFromPath(targetDef.filePath);
+        const language = getLanguageFromPath(targetDef.filePath) || 'plaintext';
 
         onNavigate(
           {
@@ -100,23 +101,6 @@ async function handleNavigation(
   } catch (err) {
     console.error('Navigation error:', err);
   }
-}
-
-function getLanguageFromPath(filePath: string): string {
-  const ext = filePath.split('.').pop()?.toLowerCase() || '';
-  const languageMap: Record<string, string> = {
-    js: 'javascript',
-    jsx: 'javascript',
-    ts: 'typescript',
-    tsx: 'typescript',
-    rs: 'rust',
-    py: 'python',
-    json: 'json',
-    html: 'html',
-    css: 'css',
-    md: 'markdown',
-  };
-  return languageMap[ext] || 'plaintext';
 }
 
 /**

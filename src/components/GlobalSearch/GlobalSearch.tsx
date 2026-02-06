@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { searchFiles, SearchResult, readFile } from '@/lib/tauri';
-import { useFileStore, OpenFile } from '@/stores/fileStore';
+import { searchFiles, SearchResult } from '@/lib/tauri';
+import { useFileStore } from '@/stores/fileStore';
 import { useUIStore } from '@/stores/uiStore';
-import { getLanguageFromPath } from '@/lib/highlight';
+import { getFileIconColor, openFileInBrowseMode } from '@/lib/fileUtils';
 
 export function GlobalSearch() {
   const [isOpen, setIsOpen] = useState(false);
@@ -15,7 +15,7 @@ export function GlobalSearch() {
   const inputRef = useRef<HTMLInputElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
 
-  const { currentDirectory, browseOpenFiles, openBrowseFile, setBrowseActiveFile } = useFileStore();
+  const { currentDirectory } = useFileStore();
   const { setPanelMode } = useUIStore();
 
   const openSearch = useCallback((withContent: boolean) => {
@@ -35,31 +35,15 @@ export function GlobalSearch() {
 
   const handleSelectResult = useCallback(
     async (result: SearchResult) => {
-      // Check if file is already open
-      const existingFile = browseOpenFiles.find((f) => f.path === result.path);
-      if (existingFile) {
-        setBrowseActiveFile(result.path);
-      } else {
-        // Load file and open it
-        try {
-          const content = await readFile(result.path);
-          const language = getLanguageFromPath(result.path) || '';
-          const newFile: OpenFile = {
-            path: result.path,
-            name: result.name,
-            content,
-            isDirty: false,
-            language,
-          };
-          openBrowseFile(newFile);
-        } catch (err) {
-          console.error('Failed to open file:', err);
-        }
+      try {
+        await openFileInBrowseMode(result.path, result.name);
+      } catch (err) {
+        console.error('Failed to open file:', err);
       }
       setPanelMode('browse');
       closeSearch();
     },
-    [browseOpenFiles, setBrowseActiveFile, openBrowseFile, setPanelMode, closeSearch]
+    [setPanelMode, closeSearch]
   );
 
   // Keyboard shortcuts for opening search
@@ -139,18 +123,7 @@ export function GlobalSearch() {
     }
   };
 
-  const getFileColor = (name: string) => {
-    const ext = name.split('.').pop()?.toLowerCase();
-    if (['ts', 'tsx'].includes(ext || '')) return 'text-blue-400';
-    if (['js', 'jsx'].includes(ext || '')) return 'text-yellow-400';
-    if (['rs'].includes(ext || '')) return 'text-orange-400';
-    if (['py'].includes(ext || '')) return 'text-green-400';
-    if (['json'].includes(ext || '')) return 'text-yellow-300';
-    if (['md'].includes(ext || '')) return 'text-blue-300';
-    if (['css', 'scss'].includes(ext || '')) return 'text-pink-400';
-    if (['html'].includes(ext || '')) return 'text-orange-300';
-    return 'text-tertiary';
-  };
+  const getFileColor = (name: string) => getFileIconColor(name);
 
   const getRelativePath = (fullPath: string) => {
     if (!currentDirectory) return fullPath;

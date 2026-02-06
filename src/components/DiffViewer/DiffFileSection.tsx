@@ -1,6 +1,6 @@
 import { useMemo, memo } from 'react';
 import * as Diff from 'diff';
-import { highlightLine, getLanguageFromPath } from '@/lib/highlight';
+import { highlightCode, getLanguageFromPath } from '@/lib/highlight';
 
 interface DiffFileSectionProps {
   filePath: string;
@@ -46,7 +46,7 @@ const DiffLine = memo(function DiffLine({
 
   const prefix = type === 'added' ? '+' : type === 'removed' ? '-' : ' ';
   const highlightedContent = useMemo(
-    () => highlightLine(content, language),
+    () => highlightCode(content, language),
     [content, language]
   );
 
@@ -90,56 +90,15 @@ function getStatusBadge(category: 'staged' | 'unstaged' | 'untracked') {
   }
 }
 
-// Diff content component
+// Diff content component - receives pre-computed lines
 const DiffContent = memo(function DiffContent({
-  oldContent,
-  newContent,
+  lines,
   filePath,
 }: {
-  oldContent: string;
-  newContent: string;
+  lines: Omit<DiffLineProps, 'language'>[];
   filePath: string;
 }) {
   const language = getLanguageFromPath(filePath);
-
-  const lines = useMemo(() => {
-    const changes = Diff.diffLines(oldContent, newContent);
-    const result: Omit<DiffLineProps, 'language'>[] = [];
-    let oldLineNum = 1;
-    let newLineNum = 1;
-
-    for (const change of changes) {
-      const changeLines = change.value.split('\n');
-      if (changeLines[changeLines.length - 1] === '') {
-        changeLines.pop();
-      }
-
-      for (const line of changeLines) {
-        if (change.added) {
-          result.push({
-            type: 'added',
-            content: line,
-            newLineNum: newLineNum++,
-          });
-        } else if (change.removed) {
-          result.push({
-            type: 'removed',
-            content: line,
-            oldLineNum: oldLineNum++,
-          });
-        } else {
-          result.push({
-            type: 'unchanged',
-            content: line,
-            oldLineNum: oldLineNum++,
-            newLineNum: newLineNum++,
-          });
-        }
-      }
-    }
-
-    return result;
-  }, [oldContent, newContent]);
 
   if (lines.length === 0) {
     return (
@@ -171,23 +130,52 @@ export const DiffFileSection = memo(function DiffFileSection({
   onToggleCollapse,
   onEditFile,
 }: DiffFileSectionProps) {
-  // Calculate stats from content (only when loaded)
-  const { additions, deletions } = useMemo(() => {
+  // Compute diff once — extract both stats and lines from the same computation
+  const { additions, deletions, lines } = useMemo(() => {
     if (isLoading || error || (!oldContent && !newContent)) {
-      return { additions: 0, deletions: 0 };
+      return { additions: 0, deletions: 0, lines: [] as Omit<DiffLineProps, 'language'>[] };
     }
 
     const changes = Diff.diffLines(oldContent, newContent);
     let adds = 0;
     let dels = 0;
+    const result: Omit<DiffLineProps, 'language'>[] = [];
+    let oldLineNum = 1;
+    let newLineNum = 1;
 
     for (const change of changes) {
-      const lineCount = change.value.split('\n').filter((l) => l !== '').length;
-      if (change.added) adds += lineCount;
-      else if (change.removed) dels += lineCount;
+      const changeLines = change.value.split('\n');
+      if (changeLines[changeLines.length - 1] === '') {
+        changeLines.pop();
+      }
+
+      for (const line of changeLines) {
+        if (change.added) {
+          adds++;
+          result.push({
+            type: 'added',
+            content: line,
+            newLineNum: newLineNum++,
+          });
+        } else if (change.removed) {
+          dels++;
+          result.push({
+            type: 'removed',
+            content: line,
+            oldLineNum: oldLineNum++,
+          });
+        } else {
+          result.push({
+            type: 'unchanged',
+            content: line,
+            oldLineNum: oldLineNum++,
+            newLineNum: newLineNum++,
+          });
+        }
+      }
     }
 
-    return { additions: adds, deletions: dels };
+    return { additions: adds, deletions: dels, lines: result };
   }, [oldContent, newContent, isLoading, error]);
 
   const fileName = filePath.split('/').pop() || filePath;
@@ -257,7 +245,7 @@ export const DiffFileSection = memo(function DiffFileSection({
           )}
 
           {hasContent && (
-            <DiffContent oldContent={oldContent} newContent={newContent} filePath={filePath} />
+            <DiffContent lines={lines} filePath={filePath} />
           )}
         </div>
       )}

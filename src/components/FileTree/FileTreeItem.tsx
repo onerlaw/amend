@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { FileEntry, readDirectory, readFile } from '@/lib/tauri';
 import { useFileStore } from '@/stores/fileStore';
 import { useContextMenuStore } from '@/stores/contextMenuStore';
+import { getFileIconColor } from '@/lib/fileUtils';
 
 interface FileTreeItemProps {
   entry: FileEntry;
@@ -59,17 +60,7 @@ export function FileTreeItem({ entry, depth, align = 'left' }: FileTreeItemProps
       );
     }
 
-    const ext = entry.name.split('.').pop()?.toLowerCase();
-    let color = 'text-gray-400';
-
-    if (['ts', 'tsx'].includes(ext || '')) color = 'text-blue-400';
-    else if (['js', 'jsx'].includes(ext || '')) color = 'text-yellow-400';
-    else if (['rs'].includes(ext || '')) color = 'text-orange-400';
-    else if (['py'].includes(ext || '')) color = 'text-green-400';
-    else if (['json'].includes(ext || '')) color = 'text-yellow-300';
-    else if (['md'].includes(ext || '')) color = 'text-blue-300';
-    else if (['css', 'scss'].includes(ext || '')) color = 'text-pink-400';
-    else if (['html'].includes(ext || '')) color = 'text-orange-300';
+    const color = getFileIconColor(entry.name, 'text-gray-400');
 
     return (
       <svg className={`h-4 w-4 ${color}`} viewBox="0 0 16 16" fill="currentColor">

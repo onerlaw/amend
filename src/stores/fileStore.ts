@@ -10,6 +10,48 @@ export interface OpenFile {
   language: string;
 }
 
+// Internal tab helpers
+function tabOpen(files: OpenFile[], file: OpenFile): { files: OpenFile[]; activePath: string } {
+  const existing = files.find((f) => f.path === file.path);
+  if (!existing) {
+    return { files: [...files, file], activePath: file.path };
+  }
+  return { files, activePath: file.path };
+}
+
+function tabClose(files: OpenFile[], activePath: string | null, path: string): { files: OpenFile[]; activePath: string | null } {
+  const filtered = files.filter((f) => f.path !== path);
+  const newActivePath =
+    activePath === path
+      ? filtered.length > 0
+        ? filtered[filtered.length - 1].path
+        : null
+      : activePath;
+  return { files: filtered, activePath: newActivePath };
+}
+
+function tabUpdateContent(files: OpenFile[], path: string, content: string): OpenFile[] {
+  return files.map((f) => (f.path === path ? { ...f, content, isDirty: true } : f));
+}
+
+function tabMarkSaved(files: OpenFile[], path: string): OpenFile[] {
+  return files.map((f) => (f.path === path ? { ...f, isDirty: false } : f));
+}
+
+function tabOpenAtLine(
+  files: OpenFile[],
+  file: OpenFile,
+  line: number
+): { files: OpenFile[]; activePath: string; pendingScrollToLine: number; pendingScrollToFile: string } {
+  const { files: newFiles, activePath } = tabOpen(files, file);
+  return {
+    files: newFiles,
+    activePath,
+    pendingScrollToLine: line,
+    pendingScrollToFile: file.path,
+  };
+}
+
 interface FileState {
   currentDirectory: string | null;
   setCurrentDirectory: (path: string) => void;
@@ -21,7 +63,6 @@ interface FileState {
   toggleDirectory: (path: string) => void;
   // Editor mode files
   openFiles: OpenFile[];
-  activeFile: string | null;
   activeFilePath: string | null;
   openFile: (file: OpenFile) => void;
   setActiveFile: (path: string) => void;
@@ -70,132 +111,65 @@ export const useFileStore = create<FileState>()(
         set({ expandedDirs: expanded });
       },
       openFiles: [],
-      activeFile: null,
       activeFilePath: null,
       openFile: (file: OpenFile) => {
-        const openFiles = get().openFiles;
-        const existing = openFiles.find((f) => f.path === file.path);
-        if (!existing) {
-          set({ openFiles: [...openFiles, file], activeFile: file.path, activeFilePath: file.path });
-        } else {
-          set({ activeFile: file.path, activeFilePath: file.path });
-        }
+        const { files, activePath } = tabOpen(get().openFiles, file);
+        set({ openFiles: files, activeFilePath: activePath });
       },
       setActiveFile: (path: string) => {
-        set({ activeFile: path, activeFilePath: path });
+        set({ activeFilePath: path });
       },
       closeFile: (path: string) => {
-        const openFiles = get().openFiles.filter((f) => f.path !== path);
-        const activeFile = get().activeFile;
-        const newActiveFile =
-          activeFile === path
-            ? openFiles.length > 0
-              ? openFiles[openFiles.length - 1].path
-              : null
-            : activeFile;
-        set({
-          openFiles,
-          activeFile: newActiveFile,
-          activeFilePath: newActiveFile,
-        });
+        const { files, activePath } = tabClose(get().openFiles, get().activeFilePath, path);
+        set({ openFiles: files, activeFilePath: activePath });
       },
       updateFileContent: (path: string, content: string) => {
-        const openFiles = get().openFiles.map((f) =>
-          f.path === path ? { ...f, content, isDirty: true } : f
-        );
-        set({ openFiles });
+        set({ openFiles: tabUpdateContent(get().openFiles, path, content) });
       },
       markFileSaved: (path: string) => {
-        const openFiles = get().openFiles.map((f) =>
-          f.path === path ? { ...f, isDirty: false } : f
-        );
-        set({ openFiles });
+        set({ openFiles: tabMarkSaved(get().openFiles, path) });
       },
       // Browse mode state
       browseOpenFiles: [],
       browseActiveFilePath: null,
       openBrowseFile: (file: OpenFile) => {
-        const browseOpenFiles = get().browseOpenFiles;
-        const existing = browseOpenFiles.find((f) => f.path === file.path);
-        if (!existing) {
-          set({
-            browseOpenFiles: [...browseOpenFiles, file],
-            browseActiveFilePath: file.path,
-          });
-        } else {
-          set({ browseActiveFilePath: file.path });
-        }
+        const { files, activePath } = tabOpen(get().browseOpenFiles, file);
+        set({ browseOpenFiles: files, browseActiveFilePath: activePath });
       },
       setBrowseActiveFile: (path: string) => {
         set({ browseActiveFilePath: path });
       },
       closeBrowseFile: (path: string) => {
-        const browseOpenFiles = get().browseOpenFiles.filter((f) => f.path !== path);
-        const browseActiveFilePath = get().browseActiveFilePath;
-        const newActiveFilePath =
-          browseActiveFilePath === path
-            ? browseOpenFiles.length > 0
-              ? browseOpenFiles[browseOpenFiles.length - 1].path
-              : null
-            : browseActiveFilePath;
-        set({
-          browseOpenFiles,
-          browseActiveFilePath: newActiveFilePath,
-        });
+        const { files, activePath } = tabClose(get().browseOpenFiles, get().browseActiveFilePath, path);
+        set({ browseOpenFiles: files, browseActiveFilePath: activePath });
       },
       updateBrowseFileContent: (path: string, content: string) => {
-        const browseOpenFiles = get().browseOpenFiles.map((f) =>
-          f.path === path ? { ...f, content, isDirty: true } : f
-        );
-        set({ browseOpenFiles });
+        set({ browseOpenFiles: tabUpdateContent(get().browseOpenFiles, path, content) });
       },
       markBrowseFileSaved: (path: string) => {
-        const browseOpenFiles = get().browseOpenFiles.map((f) =>
-          f.path === path ? { ...f, isDirty: false } : f
-        );
-        set({ browseOpenFiles });
+        set({ browseOpenFiles: tabMarkSaved(get().browseOpenFiles, path) });
       },
       // Line navigation (for go-to-definition)
       pendingScrollToLine: null,
       pendingScrollToFile: null,
       clearPendingScrollToLine: () => set({ pendingScrollToLine: null, pendingScrollToFile: null }),
       openBrowseFileAtLine: (file: OpenFile, line: number) => {
-        const browseOpenFiles = get().browseOpenFiles;
-        const existing = browseOpenFiles.find((f) => f.path === file.path);
-        if (!existing) {
-          set({
-            browseOpenFiles: [...browseOpenFiles, file],
-            browseActiveFilePath: file.path,
-            pendingScrollToLine: line,
-            pendingScrollToFile: file.path,
-          });
-        } else {
-          set({
-            browseActiveFilePath: file.path,
-            pendingScrollToLine: line,
-            pendingScrollToFile: file.path,
-          });
-        }
+        const result = tabOpenAtLine(get().browseOpenFiles, file, line);
+        set({
+          browseOpenFiles: result.files,
+          browseActiveFilePath: result.activePath,
+          pendingScrollToLine: result.pendingScrollToLine,
+          pendingScrollToFile: result.pendingScrollToFile,
+        });
       },
       openFileAtLine: (file: OpenFile, line: number) => {
-        const openFiles = get().openFiles;
-        const existing = openFiles.find((f) => f.path === file.path);
-        if (!existing) {
-          set({
-            openFiles: [...openFiles, file],
-            activeFile: file.path,
-            activeFilePath: file.path,
-            pendingScrollToLine: line,
-            pendingScrollToFile: file.path,
-          });
-        } else {
-          set({
-            activeFile: file.path,
-            activeFilePath: file.path,
-            pendingScrollToLine: line,
-            pendingScrollToFile: file.path,
-          });
-        }
+        const result = tabOpenAtLine(get().openFiles, file, line);
+        set({
+          openFiles: result.files,
+          activeFilePath: result.activePath,
+          pendingScrollToLine: result.pendingScrollToLine,
+          pendingScrollToFile: result.pendingScrollToFile,
+        });
       },
     }),
     {

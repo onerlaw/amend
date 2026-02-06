@@ -1,3 +1,4 @@
+use crate::error::impl_serialize_as_string;
 use git2::{DiffOptions, Repository, StatusOptions};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
@@ -12,18 +13,14 @@ pub enum GitError {
     NotARepo(String),
     #[error("Command failed: {0}")]
     CommandFailed(String),
+    #[error("Invalid argument: {0}")]
+    InvalidArgument(String),
 }
 
-impl Serialize for GitError {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        serializer.serialize_str(&self.to_string())
-    }
-}
+impl_serialize_as_string!(GitError);
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
 pub struct GitFileStatus {
     pub path: String,
     pub status: String,
@@ -38,6 +35,7 @@ pub struct GitWorktree {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
 pub struct GitStatus {
     pub staged: Vec<GitFileStatus>,
     pub unstaged: Vec<GitFileStatus>,
@@ -53,14 +51,55 @@ pub struct GitDiff {
     pub new_content: String,
 }
 
-fn status_to_string(status: git2::Status) -> &'static str {
-    if status.is_index_new() || status.is_wt_new() {
+/// Run a git command in the given repo directory and return stdout on success.
+fn run_git_command(repo_path: &str, args: &[&str]) -> Result<String, GitError> {
+    let output = Command::new("git")
+        .args(args)
+        .current_dir(repo_path)
+        .output()
+        .map_err(|e| GitError::CommandFailed(e.to_string()))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(GitError::CommandFailed(stderr.to_string()));
+    }
+
+    Ok(String::from_utf8_lossy(&output.stdout).to_string())
+}
+
+/// Validate that a user-provided argument doesn't start with '-' (flag injection prevention).
+fn validate_no_flag(arg: &str, label: &str) -> Result<(), GitError> {
+    if arg.starts_with('-') {
+        return Err(GitError::InvalidArgument(format!(
+            "{} must not start with '-': {}",
+            label, arg
+        )));
+    }
+    Ok(())
+}
+
+fn index_status_to_string(status: git2::Status) -> &'static str {
+    if status.is_index_new() {
         "added"
-    } else if status.is_index_modified() || status.is_wt_modified() {
+    } else if status.is_index_modified() {
         "modified"
-    } else if status.is_index_deleted() || status.is_wt_deleted() {
+    } else if status.is_index_deleted() {
         "deleted"
-    } else if status.is_index_renamed() || status.is_wt_renamed() {
+    } else if status.is_index_renamed() {
+        "renamed"
+    } else {
+        "unknown"
+    }
+}
+
+fn wt_status_to_string(status: git2::Status) -> &'static str {
+    if status.is_wt_new() {
+        "added"
+    } else if status.is_wt_modified() {
+        "modified"
+    } else if status.is_wt_deleted() {
+        "deleted"
+    } else if status.is_wt_renamed() {
         "renamed"
     } else {
         "unknown"
@@ -104,7 +143,7 @@ pub fn get_git_status(repo_path: String) -> Result<GitStatus, GitError> {
             {
                 result.staged.push(GitFileStatus {
                     path: path.clone(),
-                    status: status_to_string(status).to_string(),
+                    status: index_status_to_string(status).to_string(),
                 });
             }
 
@@ -112,7 +151,7 @@ pub fn get_git_status(repo_path: String) -> Result<GitStatus, GitError> {
             if status.is_wt_modified() || status.is_wt_deleted() || status.is_wt_renamed() {
                 result.unstaged.push(GitFileStatus {
                     path,
-                    status: status_to_string(status).to_string(),
+                    status: wt_status_to_string(status).to_string(),
                 });
             }
         }
@@ -220,18 +259,7 @@ pub fn get_staged_diff(repo_path: String) -> Result<Vec<GitDiff>, GitError> {
 
 #[tauri::command]
 pub fn list_worktrees(repo_path: String) -> Result<Vec<GitWorktree>, GitError> {
-    let output = Command::new("git")
-        .args(["worktree", "list", "--porcelain"])
-        .current_dir(&repo_path)
-        .output()
-        .map_err(|e| GitError::CommandFailed(e.to_string()))?;
-
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(GitError::CommandFailed(stderr.to_string()));
-    }
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stdout = run_git_command(&repo_path, &["worktree", "list", "--porcelain"])?;
     let mut worktrees = Vec::new();
     let mut current_path: Option<String> = None;
     let mut current_branch: Option<String> = None;
@@ -287,6 +315,14 @@ pub fn add_worktree(
     branch: Option<String>,
     new_branch: Option<String>,
 ) -> Result<GitWorktree, GitError> {
+    // Validate branch names don't start with '-'
+    if let Some(ref b) = branch {
+        validate_no_flag(b, "branch name")?;
+    }
+    if let Some(ref nb) = new_branch {
+        validate_no_flag(nb, "new branch name")?;
+    }
+
     let mut args = vec!["worktree", "add"];
 
     // Build arguments based on options
@@ -305,16 +341,7 @@ pub fn add_worktree(
         args.push(&branch_arg);
     }
 
-    let output = Command::new("git")
-        .args(&args)
-        .current_dir(&repo_path)
-        .output()
-        .map_err(|e| GitError::CommandFailed(e.to_string()))?;
-
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(GitError::CommandFailed(stderr.to_string()));
-    }
+    run_git_command(&repo_path, &args)?;
 
     // Determine the branch name for the result
     let result_branch = new_branch
@@ -352,49 +379,21 @@ pub fn remove_worktree(
 
     args.push(&worktree_path);
 
-    let output = Command::new("git")
-        .args(&args)
-        .current_dir(&repo_path)
-        .output()
-        .map_err(|e| GitError::CommandFailed(e.to_string()))?;
-
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(GitError::CommandFailed(stderr.to_string()));
-    }
-
+    run_git_command(&repo_path, &args)?;
     Ok(())
 }
 
 #[tauri::command]
 pub fn restore_file(repo_path: String, file_path: String) -> Result<(), GitError> {
-    let output = Command::new("git")
-        .args(["restore", &file_path])
-        .current_dir(&repo_path)
-        .output()
-        .map_err(|e| GitError::CommandFailed(e.to_string()))?;
-
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(GitError::CommandFailed(stderr.to_string()));
-    }
-
+    validate_no_flag(&file_path, "file path")?;
+    run_git_command(&repo_path, &["restore", "--", &file_path])?;
     Ok(())
 }
 
 #[tauri::command]
 pub fn unstage_file(repo_path: String, file_path: String) -> Result<(), GitError> {
-    let output = Command::new("git")
-        .args(["restore", "--staged", &file_path])
-        .current_dir(&repo_path)
-        .output()
-        .map_err(|e| GitError::CommandFailed(e.to_string()))?;
-
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(GitError::CommandFailed(stderr.to_string()));
-    }
-
+    validate_no_flag(&file_path, "file path")?;
+    run_git_command(&repo_path, &["restore", "--staged", "--", &file_path])?;
     Ok(())
 }
 
@@ -452,18 +451,11 @@ pub struct GitBranch {
 #[tauri::command]
 pub fn list_branches(repo_path: String) -> Result<Vec<GitBranch>, GitError> {
     // Get local branches
-    let output = Command::new("git")
-        .args(["branch", "--format=%(refname:short)|%(HEAD)"])
-        .current_dir(&repo_path)
-        .output()
-        .map_err(|e| GitError::CommandFailed(e.to_string()))?;
+    let stdout = run_git_command(
+        &repo_path,
+        &["branch", "--format=%(refname:short)|%(HEAD)"],
+    )?;
 
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(GitError::CommandFailed(stderr.to_string()));
-    }
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
     let mut branches: Vec<GitBranch> = stdout
         .lines()
         .filter(|line| !line.is_empty())
@@ -480,14 +472,9 @@ pub fn list_branches(repo_path: String) -> Result<Vec<GitBranch>, GitError> {
         .collect();
 
     // Get remote branches
-    let remote_output = Command::new("git")
-        .args(["branch", "-r", "--format=%(refname:short)"])
-        .current_dir(&repo_path)
-        .output()
-        .map_err(|e| GitError::CommandFailed(e.to_string()))?;
-
-    if remote_output.status.success() {
-        let remote_stdout = String::from_utf8_lossy(&remote_output.stdout);
+    if let Ok(remote_stdout) =
+        run_git_command(&repo_path, &["branch", "-r", "--format=%(refname:short)"])
+    {
         for line in remote_stdout.lines() {
             if !line.is_empty() && !line.contains("HEAD") {
                 branches.push(GitBranch {

@@ -11,6 +11,7 @@ import {
 } from '@/lib/tauri';
 import { useTerminalStore } from '@/stores/terminalStore';
 import { useUIStore } from '@/stores/uiStore';
+import { isDarkMode } from '@/hooks/useTheme';
 
 let initializationCounter = 0;
 
@@ -92,11 +93,7 @@ export function useTerminal(containerId: string | null) {
   useEffect(() => {
     if (!terminalRef.current || !isInitializedRef.current) return;
 
-    const isDark =
-      themeMode === 'dark' ||
-      (themeMode === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
-
-    terminalRef.current.options.theme = getTerminalTheme(isDark);
+    terminalRef.current.options.theme = getTerminalTheme(isDarkMode(themeMode));
   }, [themeMode]);
 
   // Also listen for system preference changes when in system mode
@@ -132,9 +129,7 @@ export function useTerminal(containerId: string | null) {
 
       // Determine initial theme
       const currentThemeMode = useUIStore.getState().themeMode;
-      const isDark =
-        currentThemeMode === 'dark' ||
-        (currentThemeMode === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+      const isDark = isDarkMode(currentThemeMode);
 
       const terminal = new Terminal({
         cursorBlink: true,

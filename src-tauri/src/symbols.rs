@@ -249,16 +249,8 @@ impl SymbolIndex {
         }
 
         // Deduplicate by (name, line)
-        let mut seen: HashMap<(String, u32), bool> = HashMap::new();
-        definitions.retain(|d| {
-            let key = (d.name.clone(), d.line);
-            if seen.contains_key(&key) {
-                false
-            } else {
-                seen.insert(key, true);
-                true
-            }
-        });
+        let mut seen = std::collections::HashSet::new();
+        definitions.retain(|d| seen.insert((d.name.clone(), d.line)));
 
         definitions
     }
@@ -316,7 +308,8 @@ fn is_common_name(name: &str) -> bool {
     )
 }
 
-/// Get language string from file extension
+/// Get language string from file extension.
+/// Intentionally limited to tree-sitter-supported languages (JS/TS only).
 pub fn get_language_from_path(path: &str) -> Option<&'static str> {
     let ext = Path::new(path).extension()?.to_str()?;
     match ext {
@@ -415,7 +408,9 @@ impl SymbolManager {
         Ok(())
     }
 
-    /// Find definitions for a symbol
+    /// Find definitions for a symbol.
+    /// `_current_file` is accepted for future use (e.g., ranking results by proximity)
+    /// but is not currently used for filtering.
     pub fn find_definition(&self, symbol: &str, _current_file: &str) -> Vec<SymbolDefinition> {
         self.index.find_definition(symbol)
     }

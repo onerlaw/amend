@@ -1,10 +1,8 @@
 import { useEffect, useRef } from 'react';
 import { EditorState } from '@codemirror/state';
-import { EditorView, keymap, lineNumbers, highlightActiveLine } from '@codemirror/view';
-import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
-import { syntaxHighlighting } from '@codemirror/language';
+import { EditorView } from '@codemirror/view';
 import { OpenFile } from '@/stores/fileStore';
-import { customHighlightStyle, darkTheme, getLanguageExtension } from '@/lib/codemirror';
+import { createBaseExtensions } from '@/lib/codemirror';
 
 interface FileContentPanelProps {
   file: OpenFile;
@@ -40,13 +38,7 @@ export function FileContentPanel({ file, onContentChange }: FileContentPanelProp
     const state = EditorState.create({
       doc: file.content,
       extensions: [
-        lineNumbers(),
-        highlightActiveLine(),
-        history(),
-        keymap.of([...defaultKeymap, ...historyKeymap]),
-        darkTheme,
-        syntaxHighlighting(customHighlightStyle),
-        getLanguageExtension(file.language),
+        ...createBaseExtensions(file.language),
         updateListener,
       ],
     });

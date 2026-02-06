@@ -1,3 +1,4 @@
+mod error;
 mod filesystem;
 mod git;
 mod symbols;

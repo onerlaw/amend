@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useFileBrowserState } from '@/hooks/useFileBrowserState';
 import { readDirectory, FileEntry } from '@/lib/tauri';
 import { useContextMenuStore } from '@/stores/contextMenuStore';
+import { getFileIconColor, sortDirectoriesFirst } from '@/lib/fileUtils';
 
 interface BrowseFileListProps {
   entries: FileEntry[];
@@ -47,16 +48,7 @@ function BrowseFileList({ entries, activeFilePath, openFilePaths, onSelectFile, 
         );
       }
 
-      const ext = entry.name.split('.').pop()?.toLowerCase();
-      let color = 'text-tertiary';
-      if (['ts', 'tsx'].includes(ext || '')) color = 'text-blue-400';
-      else if (['js', 'jsx'].includes(ext || '')) color = 'text-yellow-400';
-      else if (['rs'].includes(ext || '')) color = 'text-orange-400';
-      else if (['py'].includes(ext || '')) color = 'text-green-400';
-      else if (['json'].includes(ext || '')) color = 'text-yellow-300';
-      else if (['md'].includes(ext || '')) color = 'text-blue-300';
-      else if (['css', 'scss'].includes(ext || '')) color = 'text-pink-400';
-      else if (['html'].includes(ext || '')) color = 'text-orange-300';
+      const color = getFileIconColor(entry.name);
 
       return (
         <svg className={`h-4 w-4 ${color}`} viewBox="0 0 16 16" fill="currentColor">
@@ -98,13 +90,7 @@ function BrowseFileList({ entries, activeFilePath, openFilePaths, onSelectFile, 
 
         {entry.isDirectory && isExpanded && (
           <div>
-            {children
-              .sort((a, b) => {
-                if (a.isDirectory && !b.isDirectory) return -1;
-                if (!a.isDirectory && b.isDirectory) return 1;
-                return a.name.localeCompare(b.name);
-              })
-              .map((child) => renderEntry(child, depth + 1))}
+            {sortDirectoriesFirst(children).map((child) => renderEntry(child, depth + 1))}
           </div>
         )}
       </div>
@@ -123,11 +109,7 @@ function BrowseFileList({ entries, activeFilePath, openFilePaths, onSelectFile, 
     );
   }
 
-  const sortedEntries = [...entries].sort((a, b) => {
-    if (a.isDirectory && !b.isDirectory) return -1;
-    if (!a.isDirectory && b.isDirectory) return 1;
-    return a.name.localeCompare(b.name);
-  });
+  const sortedEntries = sortDirectoriesFirst(entries);
 
   return (
     <div className="h-full overflow-y-auto py-1">

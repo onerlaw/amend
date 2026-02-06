@@ -36,7 +36,13 @@ export function useGitStatus(repoPath: string | null) {
       const gitStatus = await getGitStatus(repoPath);
 
       // Only update state if status actually changed (to avoid unnecessary re-renders)
-      const statusKey = JSON.stringify(gitStatus);
+      // Use a lightweight key instead of JSON.stringify for large status objects
+      const statusKey =
+        gitStatus.staged.map((f) => `${f.path}:${f.status}`).join('|') +
+        '||' +
+        gitStatus.unstaged.map((f) => `${f.path}:${f.status}`).join('|') +
+        '||' +
+        gitStatus.untracked.join('|');
       if (statusKey !== lastStatusRef.current) {
         lastStatusRef.current = statusKey;
         setStatus(gitStatus);

@@ -1,8 +1,9 @@
 import { useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { GitStatus, GitFileStatus, FileEntry, restoreFile, unstageFile } from '@/lib/tauri';
+import { GitStatus, FileEntry, restoreFile, unstageFile } from '@/lib/tauri';
 import { useContextMenuStore } from '@/stores/contextMenuStore';
 import { useFileStore } from '@/stores/fileStore';
+import { sortDirectoriesFirst } from '@/lib/fileUtils';
 
 interface DiffFileListProps {
   status: GitStatus | null;
@@ -20,7 +21,12 @@ interface FileTreeNode {
   status?: string;
 }
 
-function buildFileTree(paths: string[]): FileTreeNode {
+interface BuildTreeOptions<T> {
+  getPath: (item: T) => string;
+  getLeafData?: (item: T) => { status: string };
+}
+
+function buildTree<T>(items: T[], options: BuildTreeOptions<T>): FileTreeNode {
   const root: FileTreeNode = {
     name: '',
     path: '',
@@ -28,7 +34,8 @@ function buildFileTree(paths: string[]): FileTreeNode {
     children: new Map(),
   };
 
-  for (const filePath of paths) {
+  for (const item of items) {
+    const filePath = options.getPath(item);
     const parts = filePath.split('/');
     let current = root;
 
@@ -38,45 +45,13 @@ function buildFileTree(paths: string[]): FileTreeNode {
       const currentPath = parts.slice(0, i + 1).join('/');
 
       if (!current.children.has(part)) {
+        const leafData = isLast && options.getLeafData ? options.getLeafData(item) : undefined;
         current.children.set(part, {
           name: part,
           path: currentPath,
           isDirectory: !isLast,
           children: new Map(),
-        });
-      }
-
-      current = current.children.get(part)!;
-    }
-  }
-
-  return root;
-}
-
-function buildStatusFileTree(files: GitFileStatus[]): FileTreeNode {
-  const root: FileTreeNode = {
-    name: '',
-    path: '',
-    isDirectory: true,
-    children: new Map(),
-  };
-
-  for (const file of files) {
-    const parts = file.path.split('/');
-    let current = root;
-
-    for (let i = 0; i < parts.length; i++) {
-      const part = parts[i];
-      const isLast = i === parts.length - 1;
-      const currentPath = parts.slice(0, i + 1).join('/');
-
-      if (!current.children.has(part)) {
-        current.children.set(part, {
-          name: part,
-          path: currentPath,
-          isDirectory: !isLast,
-          children: new Map(),
-          status: isLast ? file.status : undefined,
+          status: leafData?.status,
         });
       }
 
@@ -122,11 +97,7 @@ function FileTreeItem({
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
 
   if (node.isDirectory) {
-    const children = Array.from(node.children.values()).sort((a, b) => {
-      if (a.isDirectory && !b.isDirectory) return -1;
-      if (!a.isDirectory && b.isDirectory) return 1;
-      return a.name.localeCompare(b.name);
-    });
+    const children = sortDirectoriesFirst(Array.from(node.children.values()));
 
     return (
       <div>
@@ -299,17 +270,17 @@ export function DiffFileList({ status, onScrollToFile, isLoading, onRefresh, rep
 
   const stagedTree = useMemo(() => {
     if (!status || status.staged.length === 0) return null;
-    return buildStatusFileTree(status.staged);
+    return buildTree(status.staged, { getPath: (f) => f.path, getLeafData: (f) => ({ status: f.status }) });
   }, [status]);
 
   const unstagedTree = useMemo(() => {
     if (!status || status.unstaged.length === 0) return null;
-    return buildStatusFileTree(status.unstaged);
+    return buildTree(status.unstaged, { getPath: (f) => f.path, getLeafData: (f) => ({ status: f.status }) });
   }, [status]);
 
   const untrackedTree = useMemo(() => {
     if (!status || status.untracked.length === 0) return null;
-    return buildFileTree(status.untracked);
+    return buildTree(status.untracked, { getPath: (p) => p });
   }, [status]);
 
   if (isLoading) {

@@ -1,11 +1,10 @@
 import { useEffect, useMemo, useCallback, useRef } from 'react';
 import { VirtuosoHandle } from 'react-virtuoso';
-import { useFileStore, OpenFile } from '@/stores/fileStore';
+import { useFileStore } from '@/stores/fileStore';
 import { useUIStore } from '@/stores/uiStore';
 import { useGitStatus } from '@/hooks/useGit';
 import { useMultiFileDiff } from '@/hooks/useMultiFileDiff';
-import { readFile } from '@/lib/tauri';
-import { getLanguageFromPath } from '@/lib/highlight';
+import { openFileInBrowseMode } from '@/lib/fileUtils';
 
 export interface FileWithCategory {
   path: string;
@@ -13,7 +12,7 @@ export interface FileWithCategory {
 }
 
 export function useDiffViewerState() {
-  const { currentDirectory, activeWorktreePath, browseOpenFiles, openBrowseFile, setBrowseActiveFile } =
+  const { currentDirectory, activeWorktreePath } =
     useFileStore();
   const contextPath = activeWorktreePath ?? currentDirectory;
   const {
@@ -93,32 +92,16 @@ export function useDiffViewerState() {
     async (filePath: string) => {
       if (!contextPath) return;
       const fullPath = `${contextPath}/${filePath}`;
+      const displayName = filePath.split('/').pop() || filePath;
 
-      // Check if file is already open
-      const existingFile = browseOpenFiles.find((f) => f.path === fullPath);
-      if (existingFile) {
-        setBrowseActiveFile(fullPath);
-      } else {
-        // Load file and open it
-        try {
-          const content = await readFile(fullPath);
-          const name = filePath.split('/').pop() || filePath;
-          const language = getLanguageFromPath(fullPath) || '';
-          const newFile: OpenFile = {
-            path: fullPath,
-            name,
-            content,
-            isDirty: false,
-            language,
-          };
-          openBrowseFile(newFile);
-        } catch (err) {
-          console.error('Failed to open file:', err);
-        }
+      try {
+        await openFileInBrowseMode(fullPath, displayName);
+      } catch (err) {
+        console.error('Failed to open file:', err);
       }
       setPanelMode('browse');
     },
-    [contextPath, browseOpenFiles, setBrowseActiveFile, openBrowseFile, setPanelMode]
+    [contextPath, setPanelMode]
   );
 
   const handleScrollToFile = useCallback(
