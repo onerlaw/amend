@@ -48,7 +48,6 @@ pub fn run() {
             // Symbol navigation commands
             index_project,
             find_definition,
-            reindex_file,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -70,11 +69,3 @@ fn find_definition(
     manager.find_definition(&symbol, &current_file)
 }
 
-#[tauri::command]
-fn reindex_file(
-    path: String,
-    content: String,
-    manager: State<SymbolManager>,
-) -> Result<(), String> {
-    manager.reindex_file(&path, &content)
-}

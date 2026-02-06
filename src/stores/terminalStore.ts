@@ -2,7 +2,6 @@ import { create } from 'zustand';
 
 export interface TerminalTab {
   id: string;
-  title: string;
   worktreePath: string;
   projectId: string | null;
 }
@@ -10,21 +9,18 @@ export interface TerminalTab {
 interface TerminalState {
   tabs: TerminalTab[];
   activeTabId: string | null;
-  addTab: (id: string, worktreePath: string, projectId: string | null, title?: string) => void;
+  addTab: (id: string, worktreePath: string, projectId: string | null) => void;
   removeTab: (id: string) => void;
   setActiveTab: (id: string) => void;
-  updateTabTitle: (id: string, title: string) => void;
 }
 
 export const useTerminalStore = create<TerminalState>((set, get) => ({
   tabs: [],
   activeTabId: null,
 
-  addTab: (id: string, worktreePath: string, projectId: string | null, title?: string) => {
-    const { tabs } = get();
-    const tabNumber = tabs.length + 1;
+  addTab: (id: string, worktreePath: string, projectId: string | null) => {
     set({
-      tabs: [...tabs, { id, worktreePath, projectId, title: title || `Terminal ${tabNumber}` }],
+      tabs: [...get().tabs, { id, worktreePath, projectId }],
       activeTabId: id,
     });
   },
@@ -48,11 +44,5 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
 
   setActiveTab: (id: string) => {
     set({ activeTabId: id });
-  },
-
-  updateTabTitle: (id: string, title: string) => {
-    set((state) => ({
-      tabs: state.tabs.map((t) => (t.id === id ? { ...t, title } : t)),
-    }));
   },
 }));

@@ -165,17 +165,12 @@ export function DiffFileList({ status, onScrollToFile, isLoading, onRefresh, rep
   const [restoreTarget, setRestoreTarget] = useState<{ path: string; action: 'restore' | 'unstage' } | null>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; path: string; action: 'restore' | 'unstage' } | null>(null);
 
-  const handleStagedContextMenu = useCallback((e: React.MouseEvent, entry: FileEntry) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setContextMenu({ x: e.clientX, y: e.clientY, path: entry.path, action: 'unstage' });
-  }, []);
-
-  const handleUnstagedContextMenu = useCallback((e: React.MouseEvent, entry: FileEntry) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setContextMenu({ x: e.clientX, y: e.clientY, path: entry.path, action: 'restore' });
-  }, []);
+  const makeContextMenuHandler = useCallback((action: 'unstage' | 'restore') =>
+    (e: React.MouseEvent, entry: FileEntry) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setContextMenu({ x: e.clientX, y: e.clientY, path: entry.path, action });
+    }, []);
 
   const handleRestoreConfirm = async () => {
     if (!restoreTarget || !repoPath) return;
@@ -247,7 +242,7 @@ export function DiffFileList({ status, onScrollToFile, isLoading, onRefresh, rep
             node={stagedTree}
             depth={0}
             onScrollToFile={onScrollToFile}
-            onContextMenuEntry={handleStagedContextMenu}
+            onContextMenuEntry={makeContextMenuHandler('unstage')}
             onDiscardClick={repoPath ? (e, path) => {
               e.stopPropagation();
               setRestoreTarget({ path, action: 'unstage' });
@@ -266,7 +261,7 @@ export function DiffFileList({ status, onScrollToFile, isLoading, onRefresh, rep
             node={unstagedTree}
             depth={0}
             onScrollToFile={onScrollToFile}
-            onContextMenuEntry={handleUnstagedContextMenu}
+            onContextMenuEntry={makeContextMenuHandler('restore')}
             onDiscardClick={repoPath ? (e, path) => {
               e.stopPropagation();
               setRestoreTarget({ path, action: 'restore' });

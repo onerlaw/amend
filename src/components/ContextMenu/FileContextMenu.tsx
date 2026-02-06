@@ -4,6 +4,7 @@ import { useContextMenuStore, dispatchFileTreeRefresh } from '@/stores/contextMe
 import { useFileStore } from '@/stores/fileStore';
 import { ModalOverlay } from '@/components/ModalOverlay';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { revealLabel } from '@/lib/platform';
 import {
   renameEntry,
   deleteFile,
@@ -238,11 +239,7 @@ export function FileContextMenu() {
       { label: 'Copy Full Path', onClick: handleCopyFullPath },
       { label: '', onClick: () => {}, separator: true },
       {
-        label: navigator.platform.includes('Mac')
-          ? 'Reveal in Finder'
-          : navigator.platform.includes('Win')
-            ? 'Reveal in File Explorer'
-            : 'Open Containing Folder',
+        label: revealLabel,
         onClick: handleRevealInFinder,
       },
     );

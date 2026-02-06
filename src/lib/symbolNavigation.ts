@@ -1,6 +1,7 @@
 import { EditorView } from '@codemirror/view';
 import { syntaxTree } from '@codemirror/language';
 import { SyntaxNode } from '@lezer/common';
+import { isMac } from '@/lib/platform';
 
 /**
  * Information about a symbol at a position
@@ -261,6 +262,5 @@ function inferDefinitionKind(nodeType: string): string {
  * Check if the click position has the modifier key held (Cmd on Mac, Ctrl otherwise)
  */
 export function hasGoToDefinitionModifier(event: MouseEvent): boolean {
-  const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
   return isMac ? event.metaKey : event.ctrlKey;
 }

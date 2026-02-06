@@ -53,14 +53,6 @@ impl SymbolIndex {
             _ => Vec::new(),
         };
 
-        if !definitions.is_empty() {
-            eprintln!(
-                "[symbols] Indexed {} symbols from {}",
-                definitions.len(),
-                path.split('/').next_back().unwrap_or(path)
-            );
-        }
-
         if definitions.is_empty() {
             return;
         }
@@ -98,19 +90,12 @@ impl SymbolIndex {
     /// Find all definitions of a symbol
     pub fn find_definition(&self, name: &str) -> Vec<SymbolDefinition> {
         let symbols = self.symbols.read();
-        let result = symbols.get(name).cloned().unwrap_or_default();
-        eprintln!(
-            "[symbols] find_definition('{}') -> {} results",
-            name,
-            result.len()
-        );
-        result
+        symbols.get(name).cloned().unwrap_or_default()
     }
 
     /// Parse JavaScript/TypeScript file and extract symbol definitions
     fn parse_js_ts(&self, path: &str, content: &str, lang: &str) -> Vec<SymbolDefinition> {
         let mut definitions = Vec::new();
-        let filename = path.split('/').next_back().unwrap_or(path);
         let is_typescript = matches!(lang, "typescript" | "typescriptreact");
 
         // Get the appropriate language
@@ -127,16 +112,12 @@ impl SymbolIndex {
 
         let mut parser = Parser::new();
         if parser.set_language(&language).is_err() {
-            eprintln!("[symbols] Failed to set language for {}", filename);
             return definitions;
         }
 
         let tree = match parser.parse(content, None) {
             Some(t) => t,
-            None => {
-                eprintln!("[symbols] Failed to parse {}", filename);
-                return definitions;
-            }
+            None => return definitions,
         };
 
         // Use different queries for JavaScript vs TypeScript
@@ -189,10 +170,7 @@ impl SymbolIndex {
 
         let query = match Query::new(&language, query_source) {
             Ok(q) => q,
-            Err(e) => {
-                eprintln!("[symbols] Query error for {}: {:?}", path, e);
-                return definitions;
-            }
+            Err(_) => return definitions,
         };
 
         let mut cursor = QueryCursor::new();
@@ -351,9 +329,6 @@ impl SymbolManager {
     pub fn index_project(&self, root_path: &str) -> Result<(), String> {
         use ignore::WalkBuilder;
 
-        eprintln!("[symbols] Starting project indexing: {}", root_path);
-        let mut file_count = 0;
-
         let walker = WalkBuilder::new(root_path)
             .hidden(false)
             .git_ignore(true)
@@ -393,22 +368,8 @@ impl SymbolManager {
             };
 
             self.index.index_file(&path_str, &content, lang);
-            file_count += 1;
         }
 
-        let symbol_count = self.index.symbols.read().len();
-        eprintln!(
-            "[symbols] Indexing complete: {} files, {} unique symbols",
-            file_count, symbol_count
-        );
-
-        Ok(())
-    }
-
-    /// Re-index a single file
-    pub fn reindex_file(&self, path: &str, content: &str) -> Result<(), String> {
-        let lang = get_language_from_path(path).ok_or("Unsupported file type")?;
-        self.index.index_file(path, content, lang);
         Ok(())
     }
 

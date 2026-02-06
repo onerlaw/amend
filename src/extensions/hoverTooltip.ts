@@ -1,6 +1,7 @@
 import { hoverTooltip, Tooltip, EditorView } from '@codemirror/view';
 import { Extension } from '@codemirror/state';
 import { getSymbolAtPosition, findDefinitionInFile, LocalDefinition } from '@/lib/symbolNavigation';
+import { isMac } from '@/lib/platform';
 
 export interface HoverTooltipConfig {
   currentFilePath: string;
@@ -84,7 +85,6 @@ function createTooltipContent(
   // Add hint for go-to-definition
   const hint = document.createElement('div');
   hint.className = 'cm-tooltip-signature-hint';
-  const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
   hint.textContent = `${isMac ? 'Cmd' : 'Ctrl'}+Click to go to definition`;
   container.appendChild(hint);
 

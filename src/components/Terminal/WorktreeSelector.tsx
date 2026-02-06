@@ -114,12 +114,7 @@ export function WorktreeSelector({ worktrees, onSelect, onCreate, onDelete, onCa
       return;
     }
 
-    // Determine the worktree path based on the branch
     const finalPath = `${homePath}/.amend/${projectName}/${finalBranch}`;
-    if (!finalPath) {
-      setError('Unable to generate path');
-      return;
-    }
 
     // Check if this is an existing branch
     const existingBranch = branches.find(b => b.name === finalBranch);

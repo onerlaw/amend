@@ -5,17 +5,20 @@ import { useFileStore, OpenFile } from '@/stores/fileStore';
 /**
  * Get the CSS color class for a file icon based on file extension.
  */
+const FILE_ICON_COLORS: Record<string, string> = {
+  ts: 'text-blue-400', tsx: 'text-blue-400',
+  js: 'text-yellow-400', jsx: 'text-yellow-400',
+  rs: 'text-orange-400',
+  py: 'text-green-400',
+  json: 'text-yellow-300',
+  md: 'text-blue-300',
+  css: 'text-pink-400', scss: 'text-pink-400',
+  html: 'text-orange-300',
+};
+
 export function getFileIconColor(fileName: string, defaultColor = 'text-tertiary'): string {
-  const ext = fileName.split('.').pop()?.toLowerCase();
-  if (['ts', 'tsx'].includes(ext || '')) return 'text-blue-400';
-  if (['js', 'jsx'].includes(ext || '')) return 'text-yellow-400';
-  if (['rs'].includes(ext || '')) return 'text-orange-400';
-  if (['py'].includes(ext || '')) return 'text-green-400';
-  if (['json'].includes(ext || '')) return 'text-yellow-300';
-  if (['md'].includes(ext || '')) return 'text-blue-300';
-  if (['css', 'scss'].includes(ext || '')) return 'text-pink-400';
-  if (['html'].includes(ext || '')) return 'text-orange-300';
-  return defaultColor;
+  const ext = fileName.split('.').pop()?.toLowerCase() ?? '';
+  return FILE_ICON_COLORS[ext] ?? defaultColor;
 }
 
 /**

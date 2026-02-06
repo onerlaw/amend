@@ -4,6 +4,7 @@ import { searchFiles, SearchResult } from '@/lib/tauri';
 import { useFileStore } from '@/stores/fileStore';
 import { useUIStore } from '@/stores/uiStore';
 import { getFileIconColor, openFileInBrowseMode } from '@/lib/fileUtils';
+import { modifierKey } from '@/lib/platform';
 import { SearchIcon, FileIcon, SpinnerIcon } from '@/components/Icons';
 
 export function GlobalSearch() {
@@ -18,19 +19,15 @@ export function GlobalSearch() {
   const { contextPath: searchRoot } = useFileStore();
   const { setPanelMode } = useUIStore();
 
-  const openSearch = useCallback(() => {
-    setIsOpen(true);
+  const resetSearch = useCallback((open: boolean) => {
+    setIsOpen(open);
     setQuery('');
     setResults([]);
     setSelectedIndex(0);
   }, []);
 
-  const closeSearch = useCallback(() => {
-    setIsOpen(false);
-    setQuery('');
-    setResults([]);
-    setSelectedIndex(0);
-  }, []);
+  const openSearch = useCallback(() => resetSearch(true), [resetSearch]);
+  const closeSearch = useCallback(() => resetSearch(false), [resetSearch]);
 
   const handleSelectResult = useCallback(
     async (result: SearchResult) => {
@@ -136,7 +133,7 @@ export function GlobalSearch() {
         <SearchIcon className="h-4 w-4 text-tertiary" />
         <span className="flex-1 text-left text-tertiary">Search...</span>
         <kbd className="rounded-md bg-surface-3 px-1.5 py-0.5 font-mono text-[10px] text-tertiary">
-          {navigator.platform.includes('Mac') ? '⌘P' : 'Ctrl+P'}
+          {modifierKey}+P
         </kbd>
       </button>
 
