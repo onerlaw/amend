@@ -8,20 +8,33 @@ import { buildImageDataUrl } from '@/lib/fileUtils';
 interface FileContentPanelProps {
   file: OpenFile;
   onContentChange: (content: string) => void;
+  onEditorView?: (view: EditorView | null) => void;
 }
 
-export function FileContentPanel({ file, onContentChange }: FileContentPanelProps) {
+export function FileContentPanel({
+  file,
+  onContentChange,
+  onEditorView,
+}: FileContentPanelProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
   const onContentChangeRef = useRef(onContentChange);
+  const onEditorViewRef = useRef(onEditorView);
 
-  // Keep callback ref updated
+  // Keep callback refs updated
   useEffect(() => {
     onContentChangeRef.current = onContentChange;
   }, [onContentChange]);
 
   useEffect(() => {
-    if (!containerRef.current || file.isImage) return;
+    onEditorViewRef.current = onEditorView;
+  }, [onEditorView]);
+
+  useEffect(() => {
+    if (!containerRef.current || file.isImage) {
+      onEditorViewRef.current?.(null);
+      return;
+    }
 
     // Clear any existing editor
     if (viewRef.current) {
@@ -47,9 +60,11 @@ export function FileContentPanel({ file, onContentChange }: FileContentPanelProp
     });
 
     viewRef.current = view;
+    onEditorViewRef.current?.(view);
 
     return () => {
       view.destroy();
+      onEditorViewRef.current?.(null);
     };
   }, [file.path, file.isImage]); // Only recreate when file path changes
 

@@ -11,7 +11,7 @@ import { TerminalTabs, TerminalTabsHandle } from '@/components/Terminal/Terminal
 import { DiffContentPanel } from '@/components/DiffViewer/DiffContentPanel';
 import { DiffFileListPanel } from '@/components/DiffViewer/DiffFileListPanel';
 import { DiffViewerProvider } from '@/components/DiffViewer/DiffViewerContext';
-import { BrowseEditorTabs } from '@/components/FileBrowser/BrowseEditorTabs';
+import { BrowseEditorTabs, BrowseEditorTabsHandle } from '@/components/FileBrowser/BrowseEditorTabs';
 import { BrowseFileListPanel } from '@/components/FileBrowser/BrowseFileListPanel';
 import { GlobalSearch } from '@/components/GlobalSearch/GlobalSearch';
 import { ModalOverlay } from '@/components/ModalOverlay';
@@ -50,6 +50,7 @@ export function MainLayout() {
   const closeTerminal = useCloseTerminal();
   const [showShortcuts, setShowShortcuts] = useState(false);
   const terminalTabsRef = useRef<TerminalTabsHandle>(null);
+  const browseEditorTabsRef = useRef<BrowseEditorTabsHandle>(null);
   const migrationDone = useRef(false);
   const gitPolling = useGitPolling(contextPath);
   const diffStats = gitPolling.diffStats;
@@ -111,6 +112,14 @@ export function MainLayout() {
       if ((e.metaKey || e.ctrlKey) && e.key === 'd') {
         e.preventDefault();
         terminalTabsRef.current?.duplicateTerminal();
+      }
+
+      // Cmd/Ctrl + F (without Shift): Find in file (browse mode)
+      if ((e.metaKey || e.ctrlKey) && e.key === 'f' && !e.shiftKey) {
+        if (panelMode === 'browse' && browseActiveFilePath) {
+          e.preventDefault();
+          browseEditorTabsRef.current?.openSearch();
+        }
       }
 
       // Cmd/Ctrl + W: Close current tab
@@ -263,7 +272,7 @@ export function MainLayout() {
             <PanelResizeHandle />
 
             <Panel defaultSize={40} minSize={20}>
-              <BrowseEditorTabs />
+              <BrowseEditorTabs ref={browseEditorTabsRef} />
             </Panel>
 
             <PanelResizeHandle />
@@ -317,6 +326,12 @@ export function MainLayout() {
                 <span className="text-primary">Search</span>
                 <kbd className="rounded-md bg-surface-1 px-2 py-0.5 font-mono text-secondary">
                   Cmd+P / Cmd+Shift+F
+                </kbd>
+              </div>
+              <div className="flex items-center justify-between py-1">
+                <span className="text-primary">Find in File</span>
+                <kbd className="rounded-md bg-surface-1 px-2 py-0.5 font-mono text-secondary">
+                  Cmd+F
                 </kbd>
               </div>
             </div>

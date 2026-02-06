@@ -1,6 +1,7 @@
 import { EditorView, keymap, lineNumbers, highlightActiveLine } from '@codemirror/view';
 import { HighlightStyle, syntaxHighlighting } from '@codemirror/language';
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
+import { search, searchKeymap, highlightSelectionMatches } from '@codemirror/search';
 import { tags } from '@lezer/highlight';
 import { javascript } from '@codemirror/lang-javascript';
 import { rust } from '@codemirror/lang-rust';
@@ -202,6 +203,56 @@ const darkTheme = EditorView.theme(
       paddingTop: '8px',
       borderTop: '1px solid var(--border)',
     },
+    // Search panel styles
+    '.cm-panels': {
+      backgroundColor: 'var(--surface-1)',
+      borderBottom: '1px solid var(--border)',
+      color: 'var(--text-primary)',
+    },
+    '.cm-search': {
+      display: 'flex',
+      alignItems: 'center',
+      flexWrap: 'wrap',
+      gap: '4px',
+      padding: '4px 8px',
+      fontSize: '12px',
+    },
+    '.cm-search input': {
+      backgroundColor: 'var(--surface-0)',
+      border: '1px solid var(--border)',
+      borderRadius: '4px',
+      color: 'var(--text-primary)',
+      padding: '2px 6px',
+      fontSize: '12px',
+      outline: 'none',
+    },
+    '.cm-search input:focus': {
+      borderColor: 'var(--accent)',
+    },
+    '.cm-search button': {
+      backgroundColor: 'var(--surface-2)',
+      border: '1px solid var(--border)',
+      borderRadius: '4px',
+      color: 'var(--text-secondary)',
+      padding: '2px 8px',
+      fontSize: '12px',
+      cursor: 'pointer',
+    },
+    '.cm-search button:hover': {
+      backgroundColor: 'var(--surface-3)',
+      color: 'var(--text-primary)',
+    },
+    '.cm-search label': {
+      color: 'var(--text-secondary)',
+      fontSize: '12px',
+    },
+    '.cm-searchMatch': {
+      backgroundColor: 'rgba(250, 204, 21, 0.3)',
+      borderRadius: '2px',
+    },
+    '.cm-searchMatch-selected': {
+      backgroundColor: 'rgba(250, 204, 21, 0.6)',
+    },
   },
   { dark: false } // Set to false so it adapts to CSS variables
 );
@@ -214,7 +265,9 @@ export function createBaseExtensions(language: string | undefined): Extension[] 
     lineNumbers(),
     highlightActiveLine(),
     history(),
-    keymap.of([...defaultKeymap, ...historyKeymap]),
+    search(),
+    highlightSelectionMatches(),
+    keymap.of([...defaultKeymap, ...historyKeymap, ...searchKeymap]),
     darkTheme,
     syntaxHighlighting(customHighlightStyle),
     getLanguageExtension(language),
