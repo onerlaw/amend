@@ -143,7 +143,7 @@ async function resolveImportPath(
   const currentDir = lastSlash >= 0 ? currentFilePath.slice(0, lastSlash) : '';
 
   // Resolve the relative path
-  const segments = (`${currentDir}/${importSource}`).split('/');
+  const segments = `${currentDir}/${importSource}`.split('/');
   const resolved: string[] = [];
   for (const seg of segments) {
     if (seg === '' || seg === '.') continue;
