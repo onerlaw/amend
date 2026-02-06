@@ -1,7 +1,7 @@
+use base64::{engine::general_purpose::STANDARD, Engine as _};
 use crate::error::impl_serialize_as_string;
 use parking_lot::Mutex;
 use portable_pty::{native_pty_system, CommandBuilder, MasterPty, PtySize};
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::sync::Arc;
@@ -20,12 +20,6 @@ pub enum TerminalError {
 }
 
 impl_serialize_as_string!(TerminalError);
-
-#[derive(Serialize, Deserialize, Clone)]
-pub struct TerminalOutput {
-    pub id: String,
-    pub data: Vec<u8>,
-}
 
 struct TerminalSession {
     master: Box<dyn MasterPty + Send>,
@@ -75,6 +69,23 @@ impl TerminalManager {
         });
 
         let mut cmd = CommandBuilder::new(&shell);
+
+        // Set terminal type
+        cmd.env("TERM", "xterm-256color");
+
+        // Set locale if not inherited
+        if std::env::var("LANG").is_err() {
+            cmd.env("LANG", "en_US.UTF-8");
+        }
+        if std::env::var("LC_ALL").is_err() {
+            cmd.env("LC_ALL", "en_US.UTF-8");
+        }
+
+        // Login shell (sources .zprofile/.bash_profile)
+        if !cfg!(target_os = "windows") {
+            cmd.arg("-l");
+        }
+
         if let Some(dir) = cwd {
             cmd.cwd(dir);
         }
@@ -109,19 +120,21 @@ impl TerminalManager {
 
         thread::spawn(move || {
             let mut buffer = [0u8; 4096];
+            let event_name = format!("terminal-output-{}", id_clone);
             loop {
                 match reader.read(&mut buffer) {
                     Ok(0) => break,
                     Ok(n) => {
-                        let output = TerminalOutput {
-                            id: id_clone.clone(),
-                            data: buffer[..n].to_vec(),
-                        };
-                        let _ = app_handle_clone.emit("terminal-output", output);
+                        let encoded = STANDARD.encode(&buffer[..n]);
+                        let _ = app_handle_clone.emit(&event_name, encoded);
                     }
-                    Err(_) => break,
+                    Err(e) => {
+                        eprintln!("Terminal reader error for {}: {}", id_clone, e);
+                        break;
+                    }
                 }
             }
+            let _ = app_handle_clone.emit(&format!("terminal-exit-{}", id_clone), ());
         });
 
         Ok(id)

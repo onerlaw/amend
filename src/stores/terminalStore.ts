@@ -4,6 +4,7 @@ export interface TerminalTab {
   id: string;
   worktreePath: string;
   projectId: string | null;
+  title?: string;
 }
 
 interface TerminalState {
@@ -12,6 +13,7 @@ interface TerminalState {
   addTab: (id: string, worktreePath: string, projectId: string | null) => void;
   removeTab: (id: string) => void;
   setActiveTab: (id: string) => void;
+  setTabTitle: (id: string, title: string) => void;
 }
 
 export const useTerminalStore = create<TerminalState>((set, get) => ({
@@ -44,5 +46,13 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
 
   setActiveTab: (id: string) => {
     set({ activeTabId: id });
+  },
+
+  setTabTitle: (id: string, title: string) => {
+    set({
+      tabs: get().tabs.map((tab) =>
+        tab.id === id ? { ...tab, title } : tab
+      ),
+    });
   },
 }));

@@ -157,7 +157,7 @@ export const TerminalTabs = forwardRef<TerminalTabsHandle>(function TerminalTabs
               }`}
               title={tab.worktreePath}
             >
-              <span className="truncate max-w-[120px]">{getFileName(tab.worktreePath)}</span>
+              <span className="truncate max-w-[120px]">{tab.title || getFileName(tab.worktreePath)}</span>
               <span
                 onClick={(e) => handleCloseTerminal(e, tab.id)}
                 className="ml-1 rounded-full p-0.5 opacity-0 hover:bg-surface-3 group-hover:opacity-100"

@@ -84,13 +84,17 @@ export function TerminalPane({ id, isActive }: TerminalPaneProps) {
     const container = containerRef.current;
     if (!container || status !== 'ready') return;
 
+    let resizeTimer: ReturnType<typeof setTimeout>;
     const observer = new ResizeObserver(() => {
-      // Debounce fit calls
-      fit();
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => fit(), 100);
     });
 
     observer.observe(container);
-    return () => observer.disconnect();
+    return () => {
+      clearTimeout(resizeTimer);
+      observer.disconnect();
+    };
   }, [fit, status]);
 
   // Fit when becoming active (in case size changed while inactive)

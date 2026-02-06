@@ -19,10 +19,20 @@ export async function closeTerminal(id: string): Promise<void> {
 }
 
 export async function onTerminalOutput(
-  callback: (event: { id: string; data: number[] }) => void
+  id: string,
+  callback: (base64Data: string) => void
 ): Promise<UnlistenFn> {
-  return listen('terminal-output', (event) => {
-    callback(event.payload as { id: string; data: number[] });
+  return listen(`terminal-output-${id}`, (event) => {
+    callback(event.payload as string);
+  });
+}
+
+export async function onTerminalExit(
+  id: string,
+  callback: () => void
+): Promise<UnlistenFn> {
+  return listen(`terminal-exit-${id}`, () => {
+    callback();
   });
 }
 

@@ -8,6 +8,7 @@ import {
   resizeTerminal,
   closeTerminal,
   onTerminalOutput,
+  onTerminalExit,
 } from '@/lib/tauri';
 import { useTerminalStore } from '@/stores/terminalStore';
 import { useUIStore } from '@/stores/uiStore';
@@ -71,7 +72,8 @@ export function useTerminal(containerId: string | null) {
   const terminalRef = useRef<Terminal | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const unlistenRef = useRef<(() => void) | null>(null);
+  const unlistenRef = useRef<(() => void)[]>([]);
+  const decoderRef = useRef<TextDecoder | null>(null);
   const currentInitIdRef = useRef<number>(0);
   const isInitializedRef = useRef(false);
 
@@ -136,6 +138,7 @@ export function useTerminal(containerId: string | null) {
         fontSize: 13,
         fontFamily: 'Menlo, Monaco, "Courier New", monospace',
         theme: getTerminalTheme(isDark),
+        scrollback: 10000,
       });
 
       const fitAddon = new FitAddon();
@@ -162,19 +165,37 @@ export function useTerminal(containerId: string | null) {
         writeToTerminal(containerId, data).catch(console.error);
       });
 
-      // Set up output listener
+      // Set up streaming UTF-8 decoder
+      decoderRef.current = new TextDecoder('utf-8', { fatal: false });
+
+      // Set up output listener (per-terminal, base64-encoded)
       const listenerInitId = initId;
-      const unlisten = await onTerminalOutput((event) => {
-        // Check if this listener is still for the current initialization
-        if (listenerInitId !== currentInitIdRef.current) {
-          return; // This listener is from a stale initialization, ignore events
+      const unlistenOutput = await onTerminalOutput(containerId, (base64Data) => {
+        if (listenerInitId !== currentInitIdRef.current) return;
+        if (!terminalRef.current || !decoderRef.current) return;
+        const binaryStr = atob(base64Data);
+        const bytes = new Uint8Array(binaryStr.length);
+        for (let i = 0; i < binaryStr.length; i++) {
+          bytes[i] = binaryStr.charCodeAt(i);
         }
-        if (event.id === containerId && terminalRef.current) {
-          const text = new TextDecoder().decode(new Uint8Array(event.data));
-          terminalRef.current.write(text);
+        const text = decoderRef.current.decode(bytes, { stream: true });
+        terminalRef.current.write(text);
+      });
+
+      // Set up exit listener
+      const unlistenExit = await onTerminalExit(containerId, () => {
+        if (listenerInitId !== currentInitIdRef.current) return;
+        if (terminalRef.current) {
+          terminalRef.current.write('\r\n\x1b[90m[Process exited]\x1b[0m\r\n');
         }
       });
-      unlistenRef.current = unlisten;
+
+      // Set up title change listener
+      const titleDisposable = terminal.onTitleChange((title) => {
+        useTerminalStore.getState().setTabTitle(containerId, title);
+      });
+
+      unlistenRef.current = [unlistenOutput, unlistenExit, () => titleDisposable.dispose()];
 
       // Mark as initialized before fitting
       isInitializedRef.current = true;
@@ -196,10 +217,11 @@ export function useTerminal(containerId: string | null) {
   const dispose = useCallback(() => {
     currentInitIdRef.current = 0; // Invalidate current init ID to stop event processing
     isInitializedRef.current = false;
-    if (unlistenRef.current) {
-      unlistenRef.current();
-      unlistenRef.current = null;
+    for (const unlisten of unlistenRef.current) {
+      unlisten();
     }
+    unlistenRef.current = [];
+    decoderRef.current = null;
     if (terminalRef.current) {
       terminalRef.current.dispose();
       terminalRef.current = null;
