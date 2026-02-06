@@ -86,6 +86,30 @@ export async function searchFiles(
   return invoke('search_files', { rootPath, query, searchContent });
 }
 
+export async function renameEntry(oldPath: string, newPath: string): Promise<void> {
+  return invoke('rename_entry', { oldPath, newPath });
+}
+
+export async function deleteFile(path: string): Promise<void> {
+  return invoke('delete_file', { path });
+}
+
+export async function deleteDirectory(path: string): Promise<void> {
+  return invoke('delete_directory', { path });
+}
+
+export async function revealInFileManager(path: string): Promise<void> {
+  return invoke('reveal_in_file_manager', { path });
+}
+
+export async function copyEntry(src: string, dest: string): Promise<void> {
+  return invoke('copy_entry', { src, dest });
+}
+
+export async function moveEntry(src: string, dest: string): Promise<void> {
+  return invoke('move_entry', { src, dest });
+}
+
 // Git types
 export interface GitStatus {
   staged: GitFileStatus[];
@@ -147,6 +171,24 @@ export async function removeWorktree(
   force: boolean = false
 ): Promise<void> {
   return invoke('remove_worktree', { repoPath, worktreePath, force });
+}
+
+export interface GitBranch {
+  name: string;
+  isRemote: boolean;
+  isCurrent: boolean;
+}
+
+export async function listBranches(repoPath: string): Promise<GitBranch[]> {
+  return invoke('list_branches', { repoPath });
+}
+
+export async function restoreFile(repoPath: string, filePath: string): Promise<void> {
+  return invoke('restore_file', { repoPath, filePath });
+}
+
+export async function unstageFile(repoPath: string, filePath: string): Promise<void> {
+  return invoke('unstage_file', { repoPath, filePath });
 }
 
 // Symbol navigation types

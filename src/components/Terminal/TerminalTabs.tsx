@@ -166,15 +166,6 @@ export const TerminalTabs = forwardRef<TerminalTabsHandle>(function TerminalTabs
             </button>
           ))}
         </div>
-        <button
-          onClick={handleNewTerminal}
-          className="flex items-center justify-center px-2 py-1 text-secondary hover:bg-surface-1 rounded-md"
-          title="New Terminal"
-        >
-          <svg className="h-4 w-4" viewBox="0 0 16 16" fill="currentColor">
-            <path d="M8 1v6H2v1h6v6h1V8h6V7H9V1z" />
-          </svg>
-        </button>
       </div>
 
       {/* Terminal content */}

@@ -1,9 +1,25 @@
+import { useEffect } from 'react';
 import { MainLayout } from '@/components/Layout/MainLayout';
 import { useTheme } from '@/hooks/useTheme';
+import { FileContextMenu } from '@/components/ContextMenu/FileContextMenu';
 
 function App() {
   useTheme();
-  return <MainLayout />;
+
+  useEffect(() => {
+    const handleContextMenu = (e: MouseEvent) => {
+      e.preventDefault();
+    };
+    document.addEventListener('contextmenu', handleContextMenu);
+    return () => document.removeEventListener('contextmenu', handleContextMenu);
+  }, []);
+
+  return (
+    <>
+      <MainLayout />
+      <FileContextMenu />
+    </>
+  );
 }
 
 export default App;

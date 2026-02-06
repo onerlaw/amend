@@ -29,6 +29,12 @@ pub fn run() {
             filesystem::watch_directory,
             filesystem::unwatch_directory,
             filesystem::search_files,
+            filesystem::rename_entry,
+            filesystem::delete_file,
+            filesystem::delete_directory,
+            filesystem::reveal_in_file_manager,
+            filesystem::copy_entry,
+            filesystem::move_entry,
             // Git commands
             git::is_git_repository,
             git::get_git_status,
@@ -37,6 +43,9 @@ pub fn run() {
             git::list_worktrees,
             git::add_worktree,
             git::remove_worktree,
+            git::list_branches,
+            git::restore_file,
+            git::unstage_file,
             // Symbol navigation commands
             index_project,
             find_definition,

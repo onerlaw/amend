@@ -1,6 +1,6 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { homeDir } from '@tauri-apps/api/path';
-import { GitWorktree } from '@/lib/tauri';
+import { GitWorktree, GitBranch, listBranches } from '@/lib/tauri';
 
 interface WorktreeSelectorProps {
   worktrees: GitWorktree[];
@@ -20,9 +20,10 @@ export function WorktreeSelector({ worktrees, onSelect, onCreate, onDelete, onCa
 
   // Create form state
   const [branchName, setBranchName] = useState('');
-  const [isNewBranch, setIsNewBranch] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [homePath, setHomePath] = useState<string>('');
+  const [branches, setBranches] = useState<GitBranch[]>([]);
+  const [branchSelectedIndex, setBranchSelectedIndex] = useState(0);
 
   const branchInputRef = useRef<HTMLInputElement>(null);
 
@@ -34,10 +35,29 @@ export function WorktreeSelector({ worktrees, onSelect, onCreate, onDelete, onCa
     ? `${homePath}/.amend/${projectName}/${branchName.trim()}`
     : '';
 
-  // Fetch home directory on mount
+  // Fetch home directory and branches on mount
   useEffect(() => {
     homeDir().then(setHomePath).catch(console.error);
-  }, []);
+    listBranches(repoPath).then(setBranches).catch(console.error);
+  }, [repoPath]);
+
+  // Filter branches based on input - exclude branches already used by worktrees
+  const filteredBranches = useMemo(() => {
+    const query = branchName.trim().toLowerCase();
+    if (!query) return [];
+    const usedBranches = new Set(worktrees.map(w => w.branch));
+    return branches
+      .filter(b => !usedBranches.has(b.name) && b.name.toLowerCase().includes(query))
+      .slice(0, 5); // Limit to 5 suggestions
+  }, [branches, branchName, worktrees]);
+
+  const isNewBranch = branchName.trim() !== '' && filteredBranches.length === 0;
+  const exactMatch = filteredBranches.find(b => b.name.toLowerCase() === branchName.trim().toLowerCase());
+
+  // Reset selection when filtered results change
+  useEffect(() => {
+    setBranchSelectedIndex(0);
+  }, [filteredBranches.length]);
 
   // Total items = worktrees + "Create New" option
   const totalItems = worktrees.length + 1;
@@ -85,17 +105,29 @@ export function WorktreeSelector({ worktrees, onSelect, onCreate, onDelete, onCa
     }
   };
 
-  const handleCreate = () => {
-    if (!branchName.trim()) {
+  const handleCreate = (selectedBranch?: string) => {
+    const finalBranch = selectedBranch || branchName.trim();
+    if (!finalBranch) {
       setError('Branch name is required');
       return;
     }
-    if (!worktreePath) {
+
+    // Determine the worktree path based on the branch
+    const finalPath = `${homePath}/.amend/${projectName}/${finalBranch}`;
+    if (!finalPath) {
       setError('Unable to generate path');
       return;
     }
+
+    // Check if this is an existing branch
+    const existingBranch = branches.find(b => b.name === finalBranch);
     setError(null);
-    onCreate(worktreePath, branchName.trim(), isNewBranch);
+    onCreate(finalPath, finalBranch, !existingBranch);
+  };
+
+  const handleBranchSelect = (branch: GitBranch) => {
+    setBranchName(branch.name);
+    handleCreate(branch.name);
   };
 
   const getWorktreeName = (worktree: GitWorktree) => {
@@ -202,7 +234,7 @@ export function WorktreeSelector({ worktrees, onSelect, onCreate, onDelete, onCa
               <span className="text-sm font-medium text-primary">Create New Worktree</span>
             </div>
             <div className="space-y-3 p-3">
-              <div>
+              <div className="relative">
                 <label className="mb-1 block text-xs text-secondary">Branch Name</label>
                 <input
                   ref={branchInputRef}
@@ -212,29 +244,62 @@ export function WorktreeSelector({ worktrees, onSelect, onCreate, onDelete, onCa
                   placeholder="feature-branch"
                   className="w-full rounded-md bg-surface-1 px-2 py-1.5 text-sm text-primary placeholder-tertiary focus:outline-none focus:ring-1 focus:ring-accent"
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
+                    if (e.key === 'ArrowDown' && filteredBranches.length > 0) {
                       e.preventDefault();
-                      handleCreate();
+                      setBranchSelectedIndex(i => Math.min(i + 1, filteredBranches.length - 1));
+                    } else if (e.key === 'ArrowUp' && filteredBranches.length > 0) {
+                      e.preventDefault();
+                      setBranchSelectedIndex(i => Math.max(i - 1, 0));
+                    } else if (e.key === 'Enter') {
+                      e.preventDefault();
+                      if (filteredBranches.length > 0 && !exactMatch) {
+                        handleBranchSelect(filteredBranches[branchSelectedIndex]);
+                      } else {
+                        handleCreate();
+                      }
                     }
                   }}
                 />
+                {/* Branch suggestions dropdown */}
+                {filteredBranches.length > 0 && branchName.trim() && (
+                  <div className="absolute left-0 right-0 top-full z-10 mt-1 overflow-hidden rounded-md bg-surface-1 shadow-lg">
+                    {filteredBranches.map((branch, index) => (
+                      <button
+                        key={branch.name}
+                        onClick={() => handleBranchSelect(branch)}
+                        onMouseEnter={() => setBranchSelectedIndex(index)}
+                        className={`flex w-full items-center gap-2 px-2 py-1.5 text-left text-sm ${
+                          index === branchSelectedIndex ? 'bg-accent text-white' : 'text-primary hover:bg-surface-3'
+                        }`}
+                      >
+                        <svg className="h-3.5 w-3.5 flex-shrink-0 opacity-60" viewBox="0 0 16 16" fill="currentColor">
+                          <path d="M9.5 3.25a2.25 2.25 0 1 1 3 2.122V6A2.5 2.5 0 0 1 10 8.5H6a1 1 0 0 0-1 1v1.128a2.251 2.251 0 1 1-1.5 0V5.372a2.25 2.25 0 1 1 1.5 0v1.836A2.5 2.5 0 0 1 6 7h4a1 1 0 0 0 1-1v-.628A2.25 2.25 0 0 1 9.5 3.25z" />
+                        </svg>
+                        <span className="truncate">{branch.name}</span>
+                        {branch.isRemote && (
+                          <span className="ml-auto text-xs opacity-50">remote</span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="newBranch"
-                  checked={isNewBranch}
-                  onChange={(e) => setIsNewBranch(e.target.checked)}
-                  className="rounded"
-                />
-                <label htmlFor="newBranch" className="text-xs text-primary">
-                  Create new branch
-                </label>
-              </div>
-              {worktreePath && (
-                <div className="rounded-md bg-surface-1 px-2 py-1.5 text-xs text-secondary">
-                  <span className="opacity-50">Path: </span>
-                  <span className="font-mono">{worktreePath}</span>
+              {/* Status indicator */}
+              {branchName.trim() && (
+                <div className={`rounded-md px-2 py-1.5 text-xs ${isNewBranch ? 'bg-green-500/10 text-green-400' : 'bg-surface-1 text-secondary'}`}>
+                  {isNewBranch ? (
+                    <span className="flex items-center gap-1.5">
+                      <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M8 1v6H2v1h6v6h1V8h6V7H9V1z" />
+                      </svg>
+                      Will create new branch "{branchName.trim()}"
+                    </span>
+                  ) : (
+                    <span>
+                      <span className="opacity-50">Path: </span>
+                      <span className="font-mono">{worktreePath}</span>
+                    </span>
+                  )}
                 </div>
               )}
               {error && <div className="text-xs text-red-400">{error}</div>}
@@ -250,7 +315,7 @@ export function WorktreeSelector({ worktrees, onSelect, onCreate, onDelete, onCa
                 Back
               </button>
               <button
-                onClick={handleCreate}
+                onClick={() => handleCreate()}
                 className="rounded-md bg-accent px-3 py-1 text-xs text-white hover:bg-accent-hover"
               >
                 Create & Open Terminal

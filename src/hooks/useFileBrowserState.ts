@@ -43,6 +43,13 @@ export function useFileBrowserState() {
     loadDirectory();
   }, [loadDirectory]);
 
+  // Refresh file tree when file operations occur (rename, delete, paste)
+  useEffect(() => {
+    const handleRefreshEvent = () => loadDirectory();
+    window.addEventListener('file-tree-refresh', handleRefreshEvent);
+    return () => window.removeEventListener('file-tree-refresh', handleRefreshEvent);
+  }, [loadDirectory]);
+
   // Cleanup timers on unmount
   useEffect(() => {
     return () => {

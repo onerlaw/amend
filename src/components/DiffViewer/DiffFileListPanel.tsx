@@ -2,7 +2,7 @@ import { useDiffViewerState } from '@/hooks/useDiffViewerState';
 import { DiffFileList } from './DiffFileList';
 
 export function DiffFileListPanel() {
-  const { status, statusLoading, allFiles, handleRefresh, handleScrollToFile } =
+  const { status, statusLoading, allFiles, contextPath, handleRefresh, handleScrollToFile } =
     useDiffViewerState();
 
   const changedFilesCount = allFiles.length;
@@ -35,6 +35,8 @@ export function DiffFileListPanel() {
           status={status}
           onScrollToFile={handleScrollToFile}
           isLoading={statusLoading}
+          onRefresh={handleRefresh}
+          repoPath={contextPath}
         />
       </div>
     </div>

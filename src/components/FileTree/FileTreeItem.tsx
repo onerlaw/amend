@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { FileEntry, readDirectory, readFile } from '@/lib/tauri';
 import { useFileStore } from '@/stores/fileStore';
+import { useContextMenuStore } from '@/stores/contextMenuStore';
 
 interface FileTreeItemProps {
   entry: FileEntry;
@@ -10,6 +11,7 @@ interface FileTreeItemProps {
 
 export function FileTreeItem({ entry, depth, align = 'left' }: FileTreeItemProps) {
   const { expandedDirs, toggleDirectory, openFile } = useFileStore();
+  const { openMenu } = useContextMenuStore();
   const [children, setChildren] = useState<FileEntry[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -82,6 +84,11 @@ export function FileTreeItem({ entry, depth, align = 'left' }: FileTreeItemProps
     <div>
       <button
         onClick={handleClick}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          openMenu(entry, e.clientX, e.clientY);
+        }}
         className={`flex w-full items-center gap-1 py-0.5 text-sm text-editor-text hover:bg-editor-border/50 ${
           isRightAligned ? 'flex-row-reverse text-right pl-2' : 'text-left pr-2'
         }`}

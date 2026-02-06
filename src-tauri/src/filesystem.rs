@@ -257,6 +257,72 @@ impl FileSystemManager {
         filename_matches.extend(content_matches);
         Ok(filename_matches)
     }
+
+    pub fn rename_entry(&self, old_path: &str, new_path: &str) -> Result<(), FileSystemError> {
+        let old = Path::new(old_path);
+        if !old.exists() {
+            return Err(FileSystemError::NotFound(old_path.to_string()));
+        }
+        fs::rename(old_path, new_path)?;
+        Ok(())
+    }
+
+    pub fn delete_file(&self, path: &str) -> Result<(), FileSystemError> {
+        let p = Path::new(path);
+        if !p.exists() {
+            return Err(FileSystemError::NotFound(path.to_string()));
+        }
+        fs::remove_file(path)?;
+        Ok(())
+    }
+
+    pub fn delete_directory(&self, path: &str) -> Result<(), FileSystemError> {
+        let p = Path::new(path);
+        if !p.exists() {
+            return Err(FileSystemError::NotFound(path.to_string()));
+        }
+        fs::remove_dir_all(path)?;
+        Ok(())
+    }
+
+    pub fn copy_entry(&self, src: &str, dest: &str) -> Result<(), FileSystemError> {
+        let src_path = Path::new(src);
+        if !src_path.exists() {
+            return Err(FileSystemError::NotFound(src.to_string()));
+        }
+
+        if src_path.is_dir() {
+            self.copy_dir_recursive(src_path, Path::new(dest))?;
+        } else {
+            fs::copy(src, dest)?;
+        }
+        Ok(())
+    }
+
+    fn copy_dir_recursive(&self, src: &Path, dest: &Path) -> Result<(), FileSystemError> {
+        fs::create_dir_all(dest)?;
+        for entry in fs::read_dir(src)? {
+            let entry = entry?;
+            let src_path = entry.path();
+            let dest_path = dest.join(entry.file_name());
+
+            if src_path.is_dir() {
+                self.copy_dir_recursive(&src_path, &dest_path)?;
+            } else {
+                fs::copy(&src_path, &dest_path)?;
+            }
+        }
+        Ok(())
+    }
+
+    pub fn move_entry(&self, src: &str, dest: &str) -> Result<(), FileSystemError> {
+        let src_path = Path::new(src);
+        if !src_path.exists() {
+            return Err(FileSystemError::NotFound(src.to_string()));
+        }
+        fs::rename(src, dest)?;
+        Ok(())
+    }
 }
 
 // Tauri commands
@@ -310,4 +376,82 @@ pub fn search_files(
     search_content: bool,
 ) -> Result<Vec<SearchResult>, FileSystemError> {
     state.search_files(&root_path, &query, search_content)
+}
+
+#[tauri::command]
+pub fn rename_entry(
+    state: tauri::State<'_, FileSystemManager>,
+    old_path: String,
+    new_path: String,
+) -> Result<(), FileSystemError> {
+    state.rename_entry(&old_path, &new_path)
+}
+
+#[tauri::command]
+pub fn delete_file(
+    state: tauri::State<'_, FileSystemManager>,
+    path: String,
+) -> Result<(), FileSystemError> {
+    state.delete_file(&path)
+}
+
+#[tauri::command]
+pub fn delete_directory(
+    state: tauri::State<'_, FileSystemManager>,
+    path: String,
+) -> Result<(), FileSystemError> {
+    state.delete_directory(&path)
+}
+
+#[tauri::command]
+pub fn reveal_in_file_manager(path: String) -> Result<(), FileSystemError> {
+    let p = Path::new(&path);
+    if !p.exists() {
+        return Err(FileSystemError::NotFound(path.clone()));
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        std::process::Command::new("open")
+            .args(["-R", &path])
+            .spawn()
+            .map_err(|e| FileSystemError::Io(e))?;
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        std::process::Command::new("explorer")
+            .args(["/select,", &path])
+            .spawn()
+            .map_err(|e| FileSystemError::Io(e))?;
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        let parent = p.parent().unwrap_or(p);
+        std::process::Command::new("xdg-open")
+            .arg(parent)
+            .spawn()
+            .map_err(|e| FileSystemError::Io(e))?;
+    }
+
+    Ok(())
+}
+
+#[tauri::command]
+pub fn copy_entry(
+    state: tauri::State<'_, FileSystemManager>,
+    src: String,
+    dest: String,
+) -> Result<(), FileSystemError> {
+    state.copy_entry(&src, &dest)
+}
+
+#[tauri::command]
+pub fn move_entry(
+    state: tauri::State<'_, FileSystemManager>,
+    src: String,
+    dest: String,
+) -> Result<(), FileSystemError> {
+    state.move_entry(&src, &dest)
 }

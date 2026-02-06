@@ -365,3 +365,96 @@ pub fn remove_worktree(
 
     Ok(())
 }
+
+#[tauri::command]
+pub fn restore_file(repo_path: String, file_path: String) -> Result<(), GitError> {
+    let output = Command::new("git")
+        .args(["restore", &file_path])
+        .current_dir(&repo_path)
+        .output()
+        .map_err(|e| GitError::CommandFailed(e.to_string()))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(GitError::CommandFailed(stderr.to_string()));
+    }
+
+    Ok(())
+}
+
+#[tauri::command]
+pub fn unstage_file(repo_path: String, file_path: String) -> Result<(), GitError> {
+    let output = Command::new("git")
+        .args(["restore", "--staged", &file_path])
+        .current_dir(&repo_path)
+        .output()
+        .map_err(|e| GitError::CommandFailed(e.to_string()))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(GitError::CommandFailed(stderr.to_string()));
+    }
+
+    Ok(())
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct GitBranch {
+    pub name: String,
+    pub is_remote: bool,
+    pub is_current: bool,
+}
+
+#[tauri::command]
+pub fn list_branches(repo_path: String) -> Result<Vec<GitBranch>, GitError> {
+    // Get local branches
+    let output = Command::new("git")
+        .args(["branch", "--format=%(refname:short)|%(HEAD)"])
+        .current_dir(&repo_path)
+        .output()
+        .map_err(|e| GitError::CommandFailed(e.to_string()))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(GitError::CommandFailed(stderr.to_string()));
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let mut branches: Vec<GitBranch> = stdout
+        .lines()
+        .filter(|line| !line.is_empty())
+        .map(|line| {
+            let parts: Vec<&str> = line.split('|').collect();
+            let name = parts.first().unwrap_or(&"").to_string();
+            let is_current = parts.get(1).map(|s| *s == "*").unwrap_or(false);
+            GitBranch {
+                name,
+                is_remote: false,
+                is_current,
+            }
+        })
+        .collect();
+
+    // Get remote branches
+    let remote_output = Command::new("git")
+        .args(["branch", "-r", "--format=%(refname:short)"])
+        .current_dir(&repo_path)
+        .output()
+        .map_err(|e| GitError::CommandFailed(e.to_string()))?;
+
+    if remote_output.status.success() {
+        let remote_stdout = String::from_utf8_lossy(&remote_output.stdout);
+        for line in remote_stdout.lines() {
+            if !line.is_empty() && !line.contains("HEAD") {
+                branches.push(GitBranch {
+                    name: line.to_string(),
+                    is_remote: true,
+                    is_current: false,
+                });
+            }
+        }
+    }
+
+    Ok(branches)
+}

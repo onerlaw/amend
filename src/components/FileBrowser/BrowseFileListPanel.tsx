@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useFileBrowserState } from '@/hooks/useFileBrowserState';
 import { readDirectory, FileEntry } from '@/lib/tauri';
+import { useContextMenuStore } from '@/stores/contextMenuStore';
 
 interface BrowseFileListProps {
   entries: FileEntry[];
@@ -11,6 +12,7 @@ interface BrowseFileListProps {
 }
 
 function BrowseFileList({ entries, activeFilePath, openFilePaths, onSelectFile, isLoading }: BrowseFileListProps) {
+  const { openMenu } = useContextMenuStore();
   const [expandedDirs, setExpandedDirs] = useState<Set<string>>(new Set());
   const [dirContents, setDirContents] = useState<Map<string, FileEntry[]>>(new Map());
 
@@ -70,7 +72,12 @@ function BrowseFileList({ entries, activeFilePath, openFilePaths, onSelectFile, 
       <div key={entry.path}>
         <button
           onClick={() => (entry.isDirectory ? toggleDir(entry.path) : onSelectFile(entry.path))}
-          className={`flex w-full items-center gap-1 py-0.5 pr-2 text-left text-sm hover:bg-surface-3/50 ${
+          onContextMenu={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            openMenu(entry, e.clientX, e.clientY);
+          }}
+          className={`flex w-full select-none items-center gap-1 py-0.5 pr-2 text-left text-sm hover:bg-surface-3/50 ${
             isActive ? 'bg-surface-3' : isOpen ? 'bg-surface-3/30' : ''
           }`}
           style={{ paddingLeft: `${depth * 12 + 8}px` }}

@@ -155,6 +155,15 @@ export function MainLayout() {
             </svg>
           </button>
           <ThemeToggle />
+          <button
+            onClick={() => terminalTabsRef.current?.openNewTerminal()}
+            className="rounded-md p-1.5 text-secondary hover:bg-surface-3"
+            title="New Terminal"
+          >
+            <svg className="h-4 w-4" viewBox="0 0 16 16" fill="currentColor">
+              <path d="M8 1v6H2v1h6v6h1V8h6V7H9V1z" />
+            </svg>
+          </button>
 
           {/* Global Search */}
           <GlobalSearch />
