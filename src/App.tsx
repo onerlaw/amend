@@ -1,10 +1,12 @@
 import { useEffect } from 'react';
 import { MainLayout } from '@/components/Layout/MainLayout';
 import { useTheme } from '@/hooks/useTheme';
+import { useUpdater } from '@/hooks/useUpdater';
 import { FileContextMenu } from '@/components/ContextMenu/FileContextMenu';
 
 function App() {
   useTheme();
+  useUpdater();
 
   useEffect(() => {
     const handleContextMenu = (e: MouseEvent) => {
