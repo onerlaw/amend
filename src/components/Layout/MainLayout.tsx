@@ -5,6 +5,7 @@ import { useTerminalStore } from '@/stores/terminalStore';
 import { useFileStore } from '@/stores/fileStore';
 import { useProjectStore } from '@/stores/projectStore';
 import { useCloseTerminal } from '@/hooks/useTerminal';
+import { useDiffStats } from '@/hooks/useGit';
 import { useTheme } from '@/hooks/useTheme';
 import { TerminalTabs, TerminalTabsHandle } from '@/components/Terminal/TerminalTabs';
 import { DiffContentPanel } from '@/components/DiffViewer/DiffContentPanel';
@@ -44,13 +45,14 @@ function ThemeToggle() {
 
 export function MainLayout() {
   const { panelMode, setPanelMode } = useUIStore();
-  const { currentDirectory, setCurrentDirectory, browseOpenFiles, browseActiveFilePath, closeBrowseFile, setActiveWorktreePath } = useFileStore();
+  const { currentDirectory, setCurrentDirectory, browseOpenFiles, browseActiveFilePath, closeBrowseFile, activeWorktreePath, setActiveWorktreePath } = useFileStore();
   const { projects, addProject, setActiveProject } = useProjectStore();
   const { tabs, activeTabId, setActiveTab } = useTerminalStore();
   const closeTerminal = useCloseTerminal();
   const [showShortcuts, setShowShortcuts] = useState(false);
   const terminalTabsRef = useRef<TerminalTabsHandle>(null);
   const migrationDone = useRef(false);
+  const diffStats = useDiffStats(activeWorktreePath ?? currentDirectory);
 
   // Migration: if currentDirectory exists but no projects, auto-create one
   useEffect(() => {
@@ -179,6 +181,17 @@ export function MainLayout() {
               }`}
             >
               Diff
+              {diffStats && (diffStats.additions > 0 || diffStats.deletions > 0) && (
+                <span className="ml-1.5">
+                  {diffStats.additions > 0 && (
+                    <span className={panelMode === 'diff' ? 'text-white/80' : 'text-diff-add-text'}>+{diffStats.additions}</span>
+                  )}
+                  {diffStats.additions > 0 && diffStats.deletions > 0 && ' '}
+                  {diffStats.deletions > 0 && (
+                    <span className={panelMode === 'diff' ? 'text-white/80' : 'text-diff-remove-text'}>-{diffStats.deletions}</span>
+                  )}
+                </span>
+              )}
             </button>
             <button
               onClick={() => setPanelMode(panelMode === 'browse' ? null : 'browse')}

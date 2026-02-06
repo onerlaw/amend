@@ -400,6 +400,49 @@ pub fn unstage_file(repo_path: String, file_path: String) -> Result<(), GitError
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
+pub struct DiffStats {
+    pub additions: usize,
+    pub deletions: usize,
+    pub files_changed: usize,
+}
+
+#[tauri::command]
+pub fn get_diff_stats(repo_path: String) -> Result<DiffStats, GitError> {
+    let repo = Repository::discover(&repo_path)?;
+
+    let mut total_additions = 0;
+    let mut total_deletions = 0;
+    let mut total_files = 0;
+
+    // Unstaged changes: index → workdir
+    let mut opts = DiffOptions::new();
+    let unstaged_diff = repo.diff_index_to_workdir(None, Some(&mut opts))?;
+    let unstaged_stats = unstaged_diff.stats()?;
+    total_additions += unstaged_stats.insertions();
+    total_deletions += unstaged_stats.deletions();
+    total_files += unstaged_stats.files_changed();
+
+    // Staged changes: HEAD tree → index
+    if let Ok(head) = repo.head() {
+        if let Ok(tree) = head.peel_to_tree() {
+            let mut opts2 = DiffOptions::new();
+            let staged_diff = repo.diff_tree_to_index(Some(&tree), None, Some(&mut opts2))?;
+            let staged_stats = staged_diff.stats()?;
+            total_additions += staged_stats.insertions();
+            total_deletions += staged_stats.deletions();
+            total_files += staged_stats.files_changed();
+        }
+    }
+
+    Ok(DiffStats {
+        additions: total_additions,
+        deletions: total_deletions,
+        files_changed: total_files,
+    })
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
 pub struct GitBranch {
     pub name: String,
     pub is_remote: bool,

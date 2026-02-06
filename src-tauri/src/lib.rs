@@ -46,6 +46,7 @@ pub fn run() {
             git::list_branches,
             git::restore_file,
             git::unstage_file,
+            git::get_diff_stats,
             // Symbol navigation commands
             index_project,
             find_definition,

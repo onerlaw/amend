@@ -191,6 +191,16 @@ export async function unstageFile(repoPath: string, filePath: string): Promise<v
   return invoke('unstage_file', { repoPath, filePath });
 }
 
+export interface DiffStats {
+  additions: number;
+  deletions: number;
+  filesChanged: number;
+}
+
+export async function getDiffStats(repoPath: string): Promise<DiffStats> {
+  return invoke('get_diff_stats', { repoPath });
+}
+
 // Symbol navigation types
 export interface SymbolDefinition {
   name: string;

@@ -2,9 +2,11 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import {
   getGitStatus,
   getFileDiff,
+  getDiffStats,
   isGitRepository,
   GitStatus,
   GitDiff,
+  DiffStats,
 } from '@/lib/tauri';
 
 const POLL_INTERVAL = 2000; // Poll every 2 seconds
@@ -124,4 +126,39 @@ export function useFileDiff() {
   const manualLoadDiff = useCallback((r: string, f: string) => loadDiff(r, f, false), [loadDiff]);
 
   return { diff, isLoading, error, loadDiff: manualLoadDiff, clearDiff };
+}
+
+export function useDiffStats(repoPath: string | null) {
+  const [stats, setStats] = useState<DiffStats | null>(null);
+  const lastStatsRef = useRef<string>('');
+
+  const refresh = useCallback(async () => {
+    if (!repoPath) return;
+
+    try {
+      const result = await getDiffStats(repoPath);
+      const key = JSON.stringify(result);
+      if (key !== lastStatsRef.current) {
+        lastStatsRef.current = key;
+        setStats(result);
+      }
+    } catch {
+      // Silently ignore — stats are best-effort
+    }
+  }, [repoPath]);
+
+  useEffect(() => {
+    if (!repoPath) {
+      setStats(null);
+      lastStatsRef.current = '';
+      return;
+    }
+
+    refresh();
+
+    const intervalId = setInterval(refresh, POLL_INTERVAL);
+    return () => clearInterval(intervalId);
+  }, [repoPath, refresh]);
+
+  return stats;
 }
