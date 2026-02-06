@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { EditorState } from '@codemirror/state';
+import { EditorState, Extension } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
 import { OpenFile } from '@/stores/fileStore';
 import { createBaseExtensions } from '@/lib/codemirror';
@@ -9,12 +9,14 @@ interface FileContentPanelProps {
   file: OpenFile;
   onContentChange: (content: string) => void;
   onEditorView?: (view: EditorView | null) => void;
+  additionalExtensions?: Extension[];
 }
 
 export function FileContentPanel({
   file,
   onContentChange,
   onEditorView,
+  additionalExtensions = [],
 }: FileContentPanelProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
@@ -51,7 +53,7 @@ export function FileContentPanel({
 
     const state = EditorState.create({
       doc: file.content,
-      extensions: [...createBaseExtensions(file.language), updateListener],
+      extensions: [...createBaseExtensions(file.language), updateListener, ...additionalExtensions],
     });
 
     const view = new EditorView({
@@ -66,7 +68,7 @@ export function FileContentPanel({
       view.destroy();
       onEditorViewRef.current?.(null);
     };
-  }, [file.path, file.isImage]); // Only recreate when file path changes
+  }, [file.path, file.isImage, additionalExtensions]); // Recreate when file path or extensions change
 
   // Update content when file content changes externally (not from typing)
   useEffect(() => {

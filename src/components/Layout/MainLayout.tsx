@@ -11,7 +11,10 @@ import { TerminalTabs, TerminalTabsHandle } from '@/components/Terminal/Terminal
 import { DiffContentPanel } from '@/components/DiffViewer/DiffContentPanel';
 import { DiffFileListPanel } from '@/components/DiffViewer/DiffFileListPanel';
 import { DiffViewerProvider } from '@/components/DiffViewer/DiffViewerContext';
-import { BrowseEditorTabs, BrowseEditorTabsHandle } from '@/components/FileBrowser/BrowseEditorTabs';
+import {
+  BrowseEditorTabs,
+  BrowseEditorTabsHandle,
+} from '@/components/FileBrowser/BrowseEditorTabs';
 import { BrowseFileListPanel } from '@/components/FileBrowser/BrowseFileListPanel';
 import { GlobalSearch } from '@/components/GlobalSearch/GlobalSearch';
 import { ModalOverlay } from '@/components/ModalOverlay';

@@ -1,10 +1,17 @@
-import { forwardRef, useImperativeHandle, useRef, useCallback } from 'react';
+import { forwardRef, useImperativeHandle, useRef, useCallback, useMemo, useEffect } from 'react';
 import { EditorView } from '@codemirror/view';
 import { openSearchPanel } from '@codemirror/search';
 import { useFileBrowserState, SaveStatus } from '@/hooks/useFileBrowserState';
+import { useFileStore } from '@/stores/fileStore';
 import { useUIStore } from '@/stores/uiStore';
 import { FileContentPanel } from './FileContentPanel';
 import { CloseIcon, DocumentIcon } from '@/components/Icons';
+import {
+  goToDefinitionExtension,
+  symbolHoverTooltip,
+  cmdHeldCursorExtension,
+  scrollToLine,
+} from '@/extensions';
 
 export interface BrowseEditorTabsHandle {
   openSearch: () => void;
@@ -34,10 +41,64 @@ export const BrowseEditorTabs = forwardRef<BrowseEditorTabsHandle>(
       getSaveStatus,
     } = useFileBrowserState();
     const { setFocusedPanel } = useUIStore();
+    const {
+      openBrowseFileAtLine,
+      pendingScrollToLine,
+      pendingScrollToFile,
+      clearPendingScrollToLine,
+    } = useFileStore();
     const editorViewRef = useRef<EditorView | null>(null);
+
+    // Build navigation extensions keyed on the active file path
+    const additionalExtensions = useMemo(() => {
+      if (!activeFile?.path) return [];
+
+      const currentFilePath = activeFile.path;
+
+      return [
+        goToDefinitionExtension({
+          currentFilePath,
+          onNavigate: (file, line) => openBrowseFileAtLine(file, line),
+          onLocalNavigate: (line) => {
+            const view = editorViewRef.current;
+            if (view) scrollToLine(view, line);
+          },
+        }),
+        symbolHoverTooltip({ currentFilePath }),
+        cmdHeldCursorExtension(),
+      ];
+    }, [activeFile?.path, openBrowseFileAtLine]);
+
+    // Consume pending scroll-to-line state
+    useEffect(() => {
+      if (
+        pendingScrollToLine != null &&
+        pendingScrollToFile &&
+        pendingScrollToFile === activeFile?.path &&
+        editorViewRef.current
+      ) {
+        scrollToLine(editorViewRef.current, pendingScrollToLine);
+        clearPendingScrollToLine();
+      }
+    }, [pendingScrollToLine, pendingScrollToFile, activeFile?.path, clearPendingScrollToLine]);
 
     const handleEditorView = useCallback((view: EditorView | null) => {
       editorViewRef.current = view;
+
+      // When a new editor mounts, check if there's a pending scroll for it
+      if (view) {
+        const state = useFileStore.getState();
+        if (
+          state.pendingScrollToLine != null &&
+          state.pendingScrollToFile &&
+          state.pendingScrollToFile === state.browseActiveFilePath
+        ) {
+          requestAnimationFrame(() => {
+            scrollToLine(view, state.pendingScrollToLine!);
+            state.clearPendingScrollToLine();
+          });
+        }
+      }
     }, []);
 
     useImperativeHandle(ref, () => ({
@@ -108,6 +169,7 @@ export const BrowseEditorTabs = forwardRef<BrowseEditorTabsHandle>(
               file={activeFile}
               onContentChange={(content) => handleContentChange(activeFile.path, content)}
               onEditorView={handleEditorView}
+              additionalExtensions={additionalExtensions}
             />
           )}
         </div>
