@@ -42,6 +42,13 @@ function tabMarkSaved(files: OpenFile[], path: string): OpenFile[] {
   return files.map((f) => (f.path === path ? { ...f, isDirty: false } : f));
 }
 
+function tabReorder<T>(items: T[], fromIndex: number, toIndex: number): T[] {
+  const result = [...items];
+  const [moved] = result.splice(fromIndex, 1);
+  result.splice(toIndex, 0, moved);
+  return result;
+}
+
 function tabOpenAtLine(
   files: OpenFile[],
   file: OpenFile,
@@ -80,6 +87,7 @@ interface FileState {
   pendingScrollToFile: string | null;
   clearPendingScrollToLine: () => void;
   openBrowseFileAtLine: (file: OpenFile, line: number) => void;
+  reorderBrowseFiles: (fromIndex: number, toIndex: number) => void;
 }
 
 export const useFileStore = create<FileState>()(
@@ -134,6 +142,9 @@ export const useFileStore = create<FileState>()(
           pendingScrollToLine: result.pendingScrollToLine,
           pendingScrollToFile: result.pendingScrollToFile,
         });
+      },
+      reorderBrowseFiles: (fromIndex: number, toIndex: number) => {
+        set({ browseOpenFiles: tabReorder(get().browseOpenFiles, fromIndex, toIndex) });
       },
     }),
     {

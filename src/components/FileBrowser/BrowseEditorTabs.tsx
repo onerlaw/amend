@@ -12,6 +12,7 @@ import {
   cmdHeldCursorExtension,
   scrollToLine,
 } from '@/extensions';
+import { useDraggableTabs } from '@/hooks/useDraggableTabs';
 
 export interface BrowseEditorTabsHandle {
   openSearch: () => void;
@@ -46,8 +47,13 @@ export const BrowseEditorTabs = forwardRef<BrowseEditorTabsHandle>(
       pendingScrollToLine,
       pendingScrollToFile,
       clearPendingScrollToLine,
+      reorderBrowseFiles,
     } = useFileStore();
     const editorViewRef = useRef<EditorView | null>(null);
+    const { getTabDragProps, containerRef, dropIndicatorIndex, dragFromIndex } = useDraggableTabs({
+      itemCount: browseOpenFiles.length,
+      onReorder: reorderBrowseFiles,
+    });
 
     // Build navigation extensions keyed on the active file path
     const additionalExtensions = useMemo(() => {
@@ -131,35 +137,48 @@ export const BrowseEditorTabs = forwardRef<BrowseEditorTabsHandle>(
     return (
       <div className="flex h-full flex-col bg-surface-0" onClick={() => setFocusedPanel('editor')}>
         {/* Tab bar */}
-        <div className="flex bg-surface-2 overflow-x-auto px-1 pt-1 gap-0.5">
-          {browseOpenFiles.map((file) => {
+        <div ref={containerRef} className="flex bg-surface-2 overflow-x-auto px-1 pt-1 gap-0.5">
+          {browseOpenFiles.map((file, index) => {
             const status = getSaveStatus(file.path);
             return (
-              <button
-                key={file.path}
-                onClick={() => setBrowseActiveFile(file.path)}
-                className={`group flex items-center gap-1.5 px-2 py-1 text-xs rounded-t-md ${
-                  browseActiveFilePath === file.path
-                    ? 'bg-surface-0 text-primary'
-                    : 'text-secondary hover:bg-surface-1 rounded-md'
-                }`}
-              >
-                <StatusIndicator status={status} />
-                <div className="flex flex-col items-start">
-                  <span className="truncate max-w-[150px]">{file.name}</span>
-                  {file.language && (
-                    <span className="text-[10px] text-tertiary leading-tight">{file.language}</span>
-                  )}
-                </div>
-                <span
-                  onClick={(e) => handleClose(e, file.path)}
-                  className="rounded-full p-0.5 opacity-0 hover:bg-surface-3 group-hover:opacity-100"
+              <div key={file.path} className="relative flex">
+                {dropIndicatorIndex === index && (
+                  <div className="absolute left-0 top-1 bottom-1 w-0.5 bg-accent rounded-full z-10 pointer-events-none" />
+                )}
+                <button
+                  {...getTabDragProps(index)}
+                  onClick={() => setBrowseActiveFile(file.path)}
+                  className={`group flex items-center gap-1.5 px-2 py-1 text-xs rounded-t-md ${
+                    browseActiveFilePath === file.path
+                      ? 'bg-surface-0 text-primary'
+                      : 'text-secondary hover:bg-surface-1 rounded-md'
+                  } ${dragFromIndex === index ? 'opacity-50' : ''}`}
                 >
-                  <CloseIcon />
-                </span>
-              </button>
+                  <StatusIndicator status={status} />
+                  <div className="flex flex-col items-start">
+                    <span className="truncate max-w-[150px]">{file.name}</span>
+                    {file.language && (
+                      <span className="text-[10px] text-tertiary leading-tight">
+                        {file.language}
+                      </span>
+                    )}
+                  </div>
+                  <span
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onClick={(e) => handleClose(e, file.path)}
+                    className="rounded-full p-0.5 opacity-0 hover:bg-surface-3 group-hover:opacity-100"
+                  >
+                    <CloseIcon />
+                  </span>
+                </button>
+              </div>
             );
           })}
+          {dropIndicatorIndex === browseOpenFiles.length && (
+            <div className="relative flex">
+              <div className="absolute left-0 top-1 bottom-1 w-0.5 bg-accent rounded-full z-10 pointer-events-none" />
+            </div>
+          )}
         </div>
 
         {/* Editor content */}

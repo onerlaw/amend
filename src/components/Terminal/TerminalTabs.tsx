@@ -11,6 +11,7 @@ import { WorktreeSelector } from './WorktreeSelector';
 import { GitWorktree } from '@/lib/tauri';
 import { CloseIcon, FolderIcon, DuplicateIcon, PlusIcon } from '@/components/Icons';
 import { getFileName } from '@/lib/fileUtils';
+import { useDraggableTabs } from '@/hooks/useDraggableTabs';
 
 export interface TerminalTabsHandle {
   openNewTerminal: () => void;
@@ -18,13 +19,17 @@ export interface TerminalTabsHandle {
 }
 
 export const TerminalTabs = forwardRef<TerminalTabsHandle>(function TerminalTabs(_, ref) {
-  const { tabs, activeTabId, setActiveTab } = useTerminalStore();
+  const { tabs, activeTabId, setActiveTab, reorderTabs } = useTerminalStore();
   const { currentDirectory, setCurrentDirectory } = useFileStore();
   const { setFocusedPanel } = useUIStore();
   const { projects, addProject } = useProjectStore();
   const createTerminal = useCreateTerminal();
   const closeTerminal = useCloseTerminal();
   const initializedRef = useRef(false);
+  const { getTabDragProps, containerRef, dropIndicatorIndex, dragFromIndex } = useDraggableTabs({
+    itemCount: tabs.length,
+    onReorder: reorderTabs,
+  });
   const [showWorktreeSelector, setShowWorktreeSelector] = useState(false);
   const [showProjectPicker, setShowProjectPicker] = useState(false);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
@@ -162,29 +167,40 @@ export const TerminalTabs = forwardRef<TerminalTabsHandle>(function TerminalTabs
     >
       {/* Tab bar */}
       <div className="flex items-center bg-surface-2 px-1 pt-1 gap-0.5">
-        <div className="flex flex-1 overflow-x-auto gap-0.5">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`group flex items-center gap-1.5 px-2 py-1 text-xs rounded-t-md ${
-                activeTabId === tab.id
-                  ? 'bg-terminal-bg text-primary'
-                  : 'text-secondary hover:bg-surface-1 rounded-md'
-              }`}
-              title={tab.worktreePath}
-            >
-              <span className="truncate max-w-[120px]">
-                {tab.title || getFileName(tab.worktreePath)}
-              </span>
-              <span
-                onClick={(e) => handleCloseTerminal(e, tab.id)}
-                className="ml-1 rounded-full p-0.5 opacity-0 hover:bg-surface-3 group-hover:opacity-100"
+        <div ref={containerRef} className="flex flex-1 overflow-x-auto gap-0.5">
+          {tabs.map((tab, index) => (
+            <div key={tab.id} className="relative flex">
+              {dropIndicatorIndex === index && (
+                <div className="absolute left-0 top-1 bottom-1 w-0.5 bg-accent rounded-full z-10 pointer-events-none" />
+              )}
+              <button
+                {...getTabDragProps(index)}
+                onClick={() => setActiveTab(tab.id)}
+                className={`group flex items-center gap-1.5 px-2 py-1 text-xs rounded-t-md ${
+                  activeTabId === tab.id
+                    ? 'bg-terminal-bg text-primary'
+                    : 'text-secondary hover:bg-surface-1 rounded-md'
+                } ${dragFromIndex === index ? 'opacity-50' : ''}`}
+                title={tab.worktreePath}
               >
-                <CloseIcon />
-              </span>
-            </button>
+                <span className="truncate max-w-[120px]">
+                  {tab.title || getFileName(tab.worktreePath)}
+                </span>
+                <span
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={(e) => handleCloseTerminal(e, tab.id)}
+                  className="ml-1 rounded-full p-0.5 opacity-0 hover:bg-surface-3 group-hover:opacity-100"
+                >
+                  <CloseIcon />
+                </span>
+              </button>
+            </div>
           ))}
+          {dropIndicatorIndex === tabs.length && (
+            <div className="relative flex">
+              <div className="absolute left-0 top-1 bottom-1 w-0.5 bg-accent rounded-full z-10 pointer-events-none" />
+            </div>
+          )}
         </div>
         <div className="flex items-center gap-0.5 px-1">
           {activeTabId && (
