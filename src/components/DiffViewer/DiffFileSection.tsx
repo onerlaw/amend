@@ -1,4 +1,4 @@
-import { useMemo, memo } from 'react';
+import { useMemo, useState, useEffect, useCallback, memo } from 'react';
 import * as Diff from 'diff';
 import { highlightCode, getLanguageFromPath } from '@/lib/highlight';
 
@@ -21,6 +21,10 @@ interface DiffLineProps {
   newLineNum?: number;
   language?: string;
 }
+
+type DiffSection =
+  | { kind: 'hunk'; lines: Omit<DiffLineProps, 'language'>[] }
+  | { kind: 'collapsed'; lines: Omit<DiffLineProps, 'language'>[]; hiddenCount: number };
 
 // Memoized diff line component
 const DiffLine = memo(function DiffLine({
@@ -67,6 +71,33 @@ const DiffLine = memo(function DiffLine({
   );
 });
 
+// Collapsed separator component
+const CollapsedSeparator = memo(function CollapsedSeparator({
+  hiddenCount,
+  isExpanded,
+  onToggle,
+}: {
+  hiddenCount: number;
+  isExpanded: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      onClick={onToggle}
+      className="flex w-full items-center gap-1.5 px-3 py-1 bg-surface-2 hover:bg-surface-3 border-y border-surface-3 font-mono text-xs text-tertiary cursor-pointer"
+    >
+      <svg
+        className={`h-3 w-3 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
+        viewBox="0 0 16 16"
+        fill="currentColor"
+      >
+        <path d="M6 4l4 4-4 4V4z" />
+      </svg>
+      {hiddenCount} hidden lines
+    </button>
+  );
+});
+
 function getStatusBadge(category: 'staged' | 'unstaged' | 'untracked') {
   switch (category) {
     case 'staged':
@@ -90,17 +121,22 @@ function getStatusBadge(category: 'staged' | 'unstaged' | 'untracked') {
   }
 }
 
-// Diff content component - receives pre-computed lines
+// Diff content component - renders sections with collapsible hunks
 const DiffContent = memo(function DiffContent({
-  lines,
+  sections,
+  expandedSections,
+  onToggleSection,
   filePath,
 }: {
-  lines: Omit<DiffLineProps, 'language'>[];
+  sections: DiffSection[];
+  expandedSections: Set<number>;
+  onToggleSection: (index: number) => void;
   filePath: string;
 }) {
   const language = getLanguageFromPath(filePath);
 
-  if (lines.length === 0) {
+  const totalLines = sections.reduce((sum, s) => sum + s.lines.length, 0);
+  if (totalLines === 0) {
     return (
       <div className="flex items-center justify-center py-4 text-tertiary text-sm">
         No differences (new file)
@@ -111,9 +147,31 @@ const DiffContent = memo(function DiffContent({
   return (
     <div className="overflow-x-auto">
       <div className="min-w-fit">
-        {lines.map((line, index) => (
-          <DiffLine key={index} {...line} language={language} />
-        ))}
+        {sections.map((section, sectionIndex) => {
+          if (section.kind === 'collapsed') {
+            const isExpanded = expandedSections.has(sectionIndex);
+            return (
+              <div key={sectionIndex}>
+                <CollapsedSeparator
+                  hiddenCount={section.hiddenCount}
+                  isExpanded={isExpanded}
+                  onToggle={() => onToggleSection(sectionIndex)}
+                />
+                {isExpanded &&
+                  section.lines.map((line, lineIndex) => (
+                    <DiffLine key={lineIndex} {...line} language={language} />
+                  ))}
+              </div>
+            );
+          }
+          return (
+            <div key={sectionIndex}>
+              {section.lines.map((line, lineIndex) => (
+                <DiffLine key={lineIndex} {...line} language={language} />
+              ))}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -130,10 +188,30 @@ export const DiffFileSection = memo(function DiffFileSection({
   onToggleCollapse,
   onEditFile,
 }: DiffFileSectionProps) {
-  // Compute diff once — extract both stats and lines from the same computation
-  const { additions, deletions, lines } = useMemo(() => {
+  // Expand state for collapsed sections
+  const [expandedSections, setExpandedSections] = useState<Set<number>>(new Set());
+
+  // Reset expanded state when content changes
+  useEffect(() => {
+    setExpandedSections(new Set());
+  }, [oldContent, newContent]);
+
+  const toggleSection = useCallback((index: number) => {
+    setExpandedSections(prev => {
+      const next = new Set(prev);
+      if (next.has(index)) {
+        next.delete(index);
+      } else {
+        next.add(index);
+      }
+      return next;
+    });
+  }, []);
+
+  // Compute diff once — extract stats and sections from the same computation
+  const { additions, deletions, sections } = useMemo(() => {
     if (isLoading || error || (!oldContent && !newContent)) {
-      return { additions: 0, deletions: 0, lines: [] as Omit<DiffLineProps, 'language'>[] };
+      return { additions: 0, deletions: 0, sections: [] as DiffSection[] };
     }
 
     const changes = Diff.diffLines(oldContent, newContent);
@@ -175,7 +253,59 @@ export const DiffFileSection = memo(function DiffFileSection({
       }
     }
 
-    return { additions: adds, deletions: dels, lines: result };
+    // Build sections: group changed lines with 10 lines of context
+    const CONTEXT = 10;
+
+    // Collect indices of changed lines
+    const changedIndices: number[] = [];
+    for (let i = 0; i < result.length; i++) {
+      if (result[i].type !== 'unchanged') {
+        changedIndices.push(i);
+      }
+    }
+
+    // If no changes or all lines are changes, return a single hunk
+    if (changedIndices.length === 0 || changedIndices.length === result.length) {
+      return { additions: adds, deletions: dels, sections: [{ kind: 'hunk' as const, lines: result }] };
+    }
+
+    // Compute context ranges around each changed line, then merge overlapping
+    type Range = { start: number; end: number };
+    const ranges: Range[] = [];
+
+    for (const idx of changedIndices) {
+      const start = Math.max(0, idx - CONTEXT);
+      const end = Math.min(result.length - 1, idx + CONTEXT);
+      if (ranges.length > 0 && start <= ranges[ranges.length - 1].end + 1) {
+        // Merge with previous range
+        ranges[ranges.length - 1].end = Math.max(ranges[ranges.length - 1].end, end);
+      } else {
+        ranges.push({ start, end });
+      }
+    }
+
+    // Build sections from ranges
+    const sects: DiffSection[] = [];
+    let cursor = 0;
+
+    for (const range of ranges) {
+      // Collapsed section before this range
+      if (cursor < range.start) {
+        const collapsedLines = result.slice(cursor, range.start);
+        sects.push({ kind: 'collapsed', lines: collapsedLines, hiddenCount: collapsedLines.length });
+      }
+      // Hunk section
+      sects.push({ kind: 'hunk', lines: result.slice(range.start, range.end + 1) });
+      cursor = range.end + 1;
+    }
+
+    // Collapsed section after last range
+    if (cursor < result.length) {
+      const collapsedLines = result.slice(cursor);
+      sects.push({ kind: 'collapsed', lines: collapsedLines, hiddenCount: collapsedLines.length });
+    }
+
+    return { additions: adds, deletions: dels, sections: sects };
   }, [oldContent, newContent, isLoading, error]);
 
   const fileName = filePath.split('/').pop() || filePath;
@@ -245,7 +375,12 @@ export const DiffFileSection = memo(function DiffFileSection({
           )}
 
           {hasContent && (
-            <DiffContent lines={lines} filePath={filePath} />
+            <DiffContent
+              sections={sections}
+              expandedSections={expandedSections}
+              onToggleSection={toggleSection}
+              filePath={filePath}
+            />
           )}
         </div>
       )}
