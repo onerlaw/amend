@@ -123,6 +123,7 @@ body,
   overflow: auto !important;
 }
 
+
 /* Allow tooltips to overflow editor containers */
 .cm-tooltip {
   z-index: 1000 !important;

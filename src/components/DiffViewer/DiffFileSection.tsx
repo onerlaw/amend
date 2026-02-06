@@ -29,14 +29,16 @@ type DiffSection =
   | { kind: 'hunk'; lines: Omit<DiffLineProps, 'language'>[] }
   | { kind: 'collapsed'; lines: Omit<DiffLineProps, 'language'>[]; hiddenCount: number };
 
-// Memoized diff line component
-const DiffLine = memo(function DiffLine({
+// Gutter (line numbers + prefix) — rendered in a fixed column outside the horizontal scroller
+const DiffLineGutter = memo(function DiffLineGutter({
   type,
-  content,
   oldLineNum,
   newLineNum,
-  language,
-}: DiffLineProps) {
+}: {
+  type: 'added' | 'removed' | 'unchanged';
+  oldLineNum?: number;
+  newLineNum?: number;
+}) {
   const bgClass =
     type === 'added' ? 'bg-diff-add-bg' : type === 'removed' ? 'bg-diff-remove-bg' : '';
 
@@ -48,17 +50,39 @@ const DiffLine = memo(function DiffLine({
         : 'text-tertiary';
 
   const prefix = type === 'added' ? '+' : type === 'removed' ? '-' : ' ';
-  const highlightedContent = useMemo(() => highlightCode(content, language), [content, language]);
 
   return (
-    <div className={`flex font-mono text-sm ${bgClass} whitespace-nowrap`}>
+    <div className={`flex font-mono text-sm ${bgClass}`}>
       <span className="w-12 flex-shrink-0 select-none px-2 text-right text-tertiary bg-surface-1">
         {oldLineNum ?? ''}
       </span>
       <span className="w-12 flex-shrink-0 select-none px-2 text-right text-tertiary bg-surface-1">
         {newLineNum ?? ''}
       </span>
-      <span className={`w-4 flex-shrink-0 text-center ${prefixClass}`}>{prefix}</span>
+      <span className={`w-4 flex-shrink-0 text-center ${prefixClass} ${bgClass || 'bg-surface-1'}`}>
+        {prefix}
+      </span>
+    </div>
+  );
+});
+
+// Code content — rendered inside the horizontally scrollable column
+const DiffLineCode = memo(function DiffLineCode({
+  type,
+  content,
+  language,
+}: {
+  type: 'added' | 'removed' | 'unchanged';
+  content: string;
+  language?: string;
+}) {
+  const bgClass =
+    type === 'added' ? 'bg-diff-add-bg' : type === 'removed' ? 'bg-diff-remove-bg' : '';
+
+  const highlightedContent = useMemo(() => highlightCode(content, language), [content, language]);
+
+  return (
+    <div className={`font-mono text-sm ${bgClass} whitespace-nowrap`}>
       <span
         className="px-2 whitespace-pre hljs"
         dangerouslySetInnerHTML={{ __html: highlightedContent }}
@@ -107,7 +131,10 @@ function getStatusBadge(category: 'staged' | 'unstaged' | 'untracked') {
   );
 }
 
-// Diff content component - renders sections with collapsible hunks
+// Diff content component - two-column layout: fixed gutter + scrollable code.
+// The gutter column is outside the horizontal scroll container so it never
+// scrolls sideways (works around WebKit position:sticky bugs in flex scroll
+// containers). Vertical scroll is handled by the parent and moves both columns.
 const DiffContent = memo(function DiffContent({
   sections,
   expandedSections,
@@ -131,21 +158,26 @@ const DiffContent = memo(function DiffContent({
   }
 
   return (
-    <div className="overflow-x-auto">
-      <div className="min-w-fit">
+    <div className="flex">
+      {/* Fixed gutter column — never scrolls horizontally */}
+      <div className="flex-shrink-0">
         {sections.map((section, sectionIndex) => {
           if (section.kind === 'collapsed') {
             const isExpanded = expandedSections.has(sectionIndex);
             return (
               <div key={sectionIndex}>
-                <CollapsedSeparator
-                  hiddenCount={section.hiddenCount}
-                  isExpanded={isExpanded}
-                  onToggle={() => onToggleSection(sectionIndex)}
-                />
+                {/* Height-matched placeholder for CollapsedSeparator */}
+                <div className="flex items-center gap-1.5 px-3 py-1 bg-surface-2 border-y border-surface-3 font-mono text-xs text-tertiary">
+                  {'\u00A0'}
+                </div>
                 {isExpanded &&
                   section.lines.map((line, lineIndex) => (
-                    <DiffLine key={lineIndex} {...line} language={language} />
+                    <DiffLineGutter
+                      key={lineIndex}
+                      type={line.type}
+                      oldLineNum={line.oldLineNum}
+                      newLineNum={line.newLineNum}
+                    />
                   ))}
               </div>
             );
@@ -153,11 +185,57 @@ const DiffContent = memo(function DiffContent({
           return (
             <div key={sectionIndex}>
               {section.lines.map((line, lineIndex) => (
-                <DiffLine key={lineIndex} {...line} language={language} />
+                <DiffLineGutter
+                  key={lineIndex}
+                  type={line.type}
+                  oldLineNum={line.oldLineNum}
+                  newLineNum={line.newLineNum}
+                />
               ))}
             </div>
           );
         })}
+      </div>
+
+      {/* Scrollable code column — horizontal scroll only */}
+      <div className="overflow-x-auto flex-1 min-w-0">
+        <div className="min-w-fit">
+          {sections.map((section, sectionIndex) => {
+            if (section.kind === 'collapsed') {
+              const isExpanded = expandedSections.has(sectionIndex);
+              return (
+                <div key={sectionIndex}>
+                  <CollapsedSeparator
+                    hiddenCount={section.hiddenCount}
+                    isExpanded={isExpanded}
+                    onToggle={() => onToggleSection(sectionIndex)}
+                  />
+                  {isExpanded &&
+                    section.lines.map((line, lineIndex) => (
+                      <DiffLineCode
+                        key={lineIndex}
+                        type={line.type}
+                        content={line.content}
+                        language={language}
+                      />
+                    ))}
+                </div>
+              );
+            }
+            return (
+              <div key={sectionIndex}>
+                {section.lines.map((line, lineIndex) => (
+                  <DiffLineCode
+                    key={lineIndex}
+                    type={line.type}
+                    content={line.content}
+                    language={language}
+                  />
+                ))}
+              </div>
+            );
+          })}
+        </div>
       </div>
     </div>
   );

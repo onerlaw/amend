@@ -1,4 +1,4 @@
-import { EditorView, keymap, lineNumbers, highlightActiveLine } from '@codemirror/view';
+import { EditorView, ViewPlugin, keymap, lineNumbers, highlightActiveLine } from '@codemirror/view';
 import { HighlightStyle, syntaxHighlighting } from '@codemirror/language';
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
 import { search, searchKeymap, highlightSelectionMatches } from '@codemirror/search';
@@ -257,6 +257,74 @@ const darkTheme = EditorView.theme(
   { dark: false } // Set to false so it adapts to CSS variables
 );
 
+// Fixed gutters — move the gutter element OUT of the horizontal scroll
+// container so it never scrolls sideways. Vertical scroll is synced via
+// scrollTop on a clipping wrapper. This avoids WebKit bugs with
+// position:sticky in flex scroll containers and the one-frame lag of
+// JS transform workarounds.
+const stickyGutters = ViewPlugin.fromClass(
+  class {
+    private wrapper: HTMLDivElement | null = null;
+    private gutterClip: HTMLDivElement | null = null;
+    private gutters: HTMLElement | null = null;
+
+    constructor(private view: EditorView) {
+      const scroller = view.scrollDOM;
+      const gutters = scroller.querySelector('.cm-gutters') as HTMLElement | null;
+      if (!gutters) return;
+      this.gutters = gutters;
+
+      // Remove CodeMirror's inline sticky (no longer needed)
+      gutters.style.position = '';
+
+      // Create a flex-row wrapper that sits where the scroller was
+      const wrapper = document.createElement('div');
+      wrapper.style.cssText = 'display:flex;flex:1;min-height:0;';
+      this.wrapper = wrapper;
+
+      // Gutter clip container — clips vertical overflow, never scrolls horizontally
+      const gutterClip = document.createElement('div');
+      gutterClip.style.cssText = 'overflow:hidden;flex-shrink:0;';
+      this.gutterClip = gutterClip;
+
+      // Move gutters from scroller into the clip container
+      gutterClip.appendChild(gutters);
+
+      // Insert wrapper where scroller was, then nest gutter-clip + scroller
+      const editor = view.dom;
+      editor.insertBefore(wrapper, scroller);
+      wrapper.appendChild(gutterClip);
+      wrapper.appendChild(scroller);
+
+      // Sync vertical scroll
+      scroller.addEventListener('scroll', this.syncScroll, { passive: true });
+      this.syncScroll();
+    }
+
+    syncScroll = () => {
+      if (this.gutterClip) {
+        this.gutterClip.scrollTop = this.view.scrollDOM.scrollTop;
+      }
+    };
+
+    update() {
+      this.syncScroll();
+    }
+
+    destroy() {
+      this.view.scrollDOM.removeEventListener('scroll', this.syncScroll);
+      // Restore the original DOM so CodeMirror can tear down cleanly
+      if (this.wrapper && this.gutters) {
+        const scroller = this.view.scrollDOM;
+        const editor = this.view.dom;
+        scroller.insertBefore(this.gutters, scroller.firstChild);
+        editor.insertBefore(scroller, this.wrapper);
+        this.wrapper.remove();
+      }
+    }
+  }
+);
+
 /**
  * Creates the base set of CodeMirror extensions shared across all editor instances.
  */
@@ -269,6 +337,7 @@ export function createBaseExtensions(language: string | undefined): Extension[] 
     highlightSelectionMatches(),
     keymap.of([...defaultKeymap, ...historyKeymap, ...searchKeymap]),
     darkTheme,
+    stickyGutters,
     syntaxHighlighting(customHighlightStyle),
     getLanguageExtension(language),
   ];
