@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, forwardRef, useImperativeHandle, useCallback } from 'react';
 import { open } from '@tauri-apps/plugin-dialog';
-import { useTerminalStore } from '@/stores/terminalStore';
+import { useTerminalStore, TerminalTab } from '@/stores/terminalStore';
 import { useFileStore } from '@/stores/fileStore';
 import { useUIStore } from '@/stores/uiStore';
 import { useProjectStore, Project } from '@/stores/projectStore';
@@ -12,6 +12,24 @@ import { GitWorktree } from '@/lib/tauri';
 import { CloseIcon, FolderIcon, DuplicateIcon, PlusIcon } from '@/components/Icons';
 import { getFileName } from '@/lib/fileUtils';
 import { useDraggableTabs } from '@/hooks/useDraggableTabs';
+
+function TerminalTabLabel({ tab, projects }: { tab: TerminalTab; projects: Project[] }) {
+  const project = tab.projectId ? projects.find((p) => p.id === tab.projectId) : null;
+  const worktreeName = getFileName(tab.worktreePath);
+  const mainText = tab.title || project?.name || worktreeName;
+  const showSubtitle = mainText !== worktreeName;
+
+  return (
+    <span className="flex flex-col max-w-[200px] min-w-0">
+      <span className="truncate leading-tight">{mainText}</span>
+      {showSubtitle && (
+        <span className="truncate text-[10px] leading-tight text-tertiary">
+          {worktreeName}
+        </span>
+      )}
+    </span>
+  );
+}
 
 export interface TerminalTabsHandle {
   openNewTerminal: () => void;
@@ -183,18 +201,7 @@ export const TerminalTabs = forwardRef<TerminalTabsHandle>(function TerminalTabs
                 } ${dragFromIndex === index ? 'opacity-50' : ''}`}
                 title={tab.worktreePath}
               >
-                <span className="truncate max-w-[200px]">
-                  {(() => {
-                    const project = tab.projectId
-                      ? projects.find((p) => p.id === tab.projectId)
-                      : null;
-                    const worktreeName = getFileName(tab.worktreePath);
-                    if (!project) return worktreeName;
-                    return project.name === worktreeName
-                      ? project.name
-                      : `${project.name} / ${worktreeName}`;
-                  })()}
-                </span>
+                <TerminalTabLabel tab={tab} projects={projects} />
                 <span
                   onMouseDown={(e) => e.stopPropagation()}
                   onClick={(e) => handleCloseTerminal(e, tab.id)}
