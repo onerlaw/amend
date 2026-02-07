@@ -77,7 +77,7 @@ impl FileSystemManager {
         let walker = WalkBuilder::new(&path)
             .max_depth(Some(1))
             .hidden(false)
-            .git_ignore(true)
+            .git_ignore(false)
             .build();
 
         for entry in walker.flatten() {
@@ -152,7 +152,7 @@ impl FileSystemManager {
 
         let walker = WalkBuilder::new(path)
             .hidden(false)
-            .git_ignore(true)
+            .git_ignore(false)
             .build();
 
         for entry in walker.flatten() {
