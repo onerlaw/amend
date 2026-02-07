@@ -171,6 +171,14 @@ export function DiscardIcon({ className = 'h-3.5 w-3.5' }: IconProps) {
   );
 }
 
+export function SidebarIcon({ className = 'h-4 w-4' }: IconProps) {
+  return (
+    <svg className={className} viewBox="0 0 16 16" fill="currentColor">
+      <path d="M2 2h12v12H2V2zm1 1v10h3V3H3zm4 0v10h6V3H7z" />
+    </svg>
+  );
+}
+
 export function SpinnerIcon({ className = 'h-4 w-4' }: IconProps) {
   return (
     <svg className={className} viewBox="0 0 24 24">

@@ -13,6 +13,7 @@ interface UIState {
   selectedDiffFile: string | null;
   themeMode: ThemeMode;
   focusedPanel: FocusedPanel;
+  diffFileListVisible: boolean;
 
   setPanelMode: (mode: PanelMode) => void;
   toggleDiffFileCollapse: (path: string) => void;
@@ -20,6 +21,7 @@ interface UIState {
   setSelectedDiffFile: (path: string | null) => void;
   setThemeMode: (mode: ThemeMode) => void;
   setFocusedPanel: (panel: FocusedPanel) => void;
+  toggleDiffFileList: () => void;
 }
 
 export const useUIStore = create<UIState>()(
@@ -31,9 +33,11 @@ export const useUIStore = create<UIState>()(
       selectedDiffFile: null,
       themeMode: 'system',
       focusedPanel: 'terminal',
+      diffFileListVisible: true,
 
       setPanelMode: (mode: PanelMode) => set({ panelMode: mode }),
       setFocusedPanel: (panel: FocusedPanel) => set({ focusedPanel: panel }),
+      toggleDiffFileList: () => set((state) => ({ diffFileListVisible: !state.diffFileListVisible })),
       toggleDiffFileCollapse: (path: string) =>
         set((state) => ({
           collapsedDiffFiles: toggleSetItem(state.collapsedDiffFiles, path),
@@ -47,6 +51,7 @@ export const useUIStore = create<UIState>()(
       partialize: (state) => ({
         panelMode: state.panelMode,
         themeMode: state.themeMode,
+        diffFileListVisible: state.diffFileListVisible,
       }),
     }
   )

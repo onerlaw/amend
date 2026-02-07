@@ -2,7 +2,7 @@ import { Virtuoso } from 'react-virtuoso';
 import { useDiffViewer } from './DiffViewerContext';
 import { useUIStore } from '@/stores/uiStore';
 import { DiffFileSection } from './DiffFileSection';
-import { DocumentIcon, CheckCircleIcon } from '@/components/Icons';
+import { DocumentIcon, CheckCircleIcon, SidebarIcon } from '@/components/Icons';
 import '@/styles/highlight-theme.css';
 
 export function DiffContentPanel() {
@@ -15,7 +15,7 @@ export function DiffContentPanel() {
     toggleDiffFileCollapse,
     handleEditFile,
   } = useDiffViewer();
-  const { setFocusedPanel } = useUIStore();
+  const { diffFileListVisible, toggleDiffFileList, setFocusedPanel } = useUIStore();
 
   // No directory open state
   if (!currentDirectory) {
@@ -52,6 +52,17 @@ export function DiffContentPanel() {
             <span className="text-xs text-tertiary">
               {changedFilesCount} file{changedFilesCount !== 1 ? 's' : ''} changed
             </span>
+            <button
+              onClick={toggleDiffFileList}
+              className={`rounded-md p-1 ${
+                diffFileListVisible
+                  ? 'text-accent hover:bg-surface-3'
+                  : 'text-secondary hover:bg-surface-3'
+              }`}
+              title={diffFileListVisible ? 'Hide file list' : 'Show file list'}
+            >
+              <SidebarIcon className="h-3.5 w-3.5" />
+            </button>
           </div>
 
           {/* Virtualized diff list */}

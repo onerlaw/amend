@@ -359,7 +359,7 @@ export const DiffFileSection = memo(function DiffFileSection({
     }
 
     // Build sections: group changed lines with 10 lines of context
-    const CONTEXT = 10;
+    const CONTEXT = 4;
 
     // Collect indices of changed lines
     const changedIndices: number[] = [];

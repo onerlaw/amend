@@ -38,7 +38,7 @@ function ThemeToggle() {
 }
 
 export function MainLayout() {
-  const { panelMode, setPanelMode } = useUIStore();
+  const { panelMode, setPanelMode, diffFileListVisible } = useUIStore();
   const {
     currentDirectory,
     setCurrentDirectory,
@@ -242,8 +242,8 @@ export function MainLayout() {
                 <DiffContentPanel />
               </Panel>
             )}
-            {panelMode === 'diff' && <PanelResizeHandle />}
-            {panelMode === 'diff' && (
+            {panelMode === 'diff' && diffFileListVisible && <PanelResizeHandle />}
+            {panelMode === 'diff' && diffFileListVisible && (
               <Panel id="diff-file-list" order={3} defaultSize={20} minSize={10} maxSize={40}>
                 <DiffFileListPanel />
               </Panel>
