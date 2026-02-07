@@ -77,5 +77,5 @@ jobs:
           tagName: ${{ github.ref_name }}
           releaseName: 'Amend v__VERSION__'
           releaseBody: ''
-          releaseDraft: true
+          releaseDraft: false
           args: ${{ matrix.args }}
