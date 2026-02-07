@@ -10,7 +10,7 @@ export async function checkForUpdates(silent: boolean = true) {
 
     const shouldUpdate = await ask(
       `Version ${update.version} is available. Would you like to download and install it?`,
-      { title: 'Update Available', kind: 'info', okLabel: 'Download', cancelLabel: 'Skip' },
+      { title: 'Update Available', kind: 'info', okLabel: 'Download', cancelLabel: 'Skip' }
     );
 
     if (!shouldUpdate) return;
@@ -19,7 +19,7 @@ export async function checkForUpdates(silent: boolean = true) {
 
     const shouldRestart = await ask(
       'Update installed successfully. Restart now to apply the update?',
-      { title: 'Restart Required', kind: 'info', okLabel: 'Restart', cancelLabel: 'Later' },
+      { title: 'Restart Required', kind: 'info', okLabel: 'Restart', cancelLabel: 'Later' }
     );
 
     if (shouldRestart) {

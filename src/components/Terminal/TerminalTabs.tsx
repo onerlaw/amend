@@ -23,9 +23,7 @@ function TerminalTabLabel({ tab, projects }: { tab: TerminalTab; projects: Proje
     <span className="flex flex-col max-w-[200px] min-w-0">
       <span className="truncate leading-tight">{mainText}</span>
       {showSubtitle && (
-        <span className="truncate text-[10px] leading-tight text-tertiary">
-          {worktreeName}
-        </span>
+        <span className="truncate text-[10px] leading-tight text-tertiary">{worktreeName}</span>
       )}
     </span>
   );

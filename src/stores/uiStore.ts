@@ -38,7 +38,8 @@ export const useUIStore = create<UIState>()(
       setPanelMode: (mode: PanelMode) => set({ panelMode: mode }),
       setFocusedPanel: (panel: FocusedPanel) =>
         set((state) => (state.focusedPanel === panel ? state : { focusedPanel: panel })),
-      toggleDiffFileList: () => set((state) => ({ diffFileListVisible: !state.diffFileListVisible })),
+      toggleDiffFileList: () =>
+        set((state) => ({ diffFileListVisible: !state.diffFileListVisible })),
       toggleDiffFileCollapse: (path: string) =>
         set((state) => ({
           collapsedDiffFiles: toggleSetItem(state.collapsedDiffFiles, path),
