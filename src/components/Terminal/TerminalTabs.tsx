@@ -62,15 +62,18 @@ export const TerminalTabs = forwardRef<TerminalTabsHandle>(function TerminalTabs
   const autoOpenRef = useRef(false);
 
   useEffect(() => {
-    // Create initial terminal if none exists (only once)
+    // Auto-create a terminal when none exist and a project is open
     if (tabs.length === 0 && !initializedRef.current && currentDirectory) {
       initializedRef.current = true;
-      // Find the project matching currentDirectory to associate with the terminal
       const project = projects.find((p) => p.path === currentDirectory);
       createTerminal(currentDirectory, project?.id ?? null).catch((err) => {
         console.error('Failed to create terminal:', err);
         initializedRef.current = false;
       });
+    }
+    // Reset so a new terminal is auto-created if all tabs are closed later
+    if (tabs.length > 0) {
+      initializedRef.current = false;
     }
   }, [tabs.length, createTerminal, currentDirectory, projects]);
 
