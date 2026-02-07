@@ -9,7 +9,7 @@ import { useWorktrees } from '@/hooks/useWorktrees';
 import { TerminalPane } from './TerminalPane';
 import { WorktreeSelector } from './WorktreeSelector';
 import { GitWorktree } from '@/lib/tauri';
-import { CloseIcon, FolderIcon, DuplicateIcon, PlusIcon } from '@/components/Icons';
+import { CloseIcon, FolderIcon, DuplicateIcon, PlusIcon, SpinnerIcon } from '@/components/Icons';
 import { getFileName } from '@/lib/fileUtils';
 import { useDraggableTabs } from '@/hooks/useDraggableTabs';
 
@@ -58,6 +58,8 @@ export const TerminalTabs = forwardRef<TerminalTabsHandle>(function TerminalTabs
     : null;
   const worktreeBasePath = selectedProject?.path ?? currentDirectory;
   const { worktrees, add: addWorktree, remove: removeWorktree } = useWorktrees(worktreeBasePath);
+
+  const autoOpenRef = useRef(false);
 
   useEffect(() => {
     // Create initial terminal if none exists (only once)
@@ -111,6 +113,14 @@ export const TerminalTabs = forwardRef<TerminalTabsHandle>(function TerminalTabs
       }
     }
   }, [projects, addProject, setCurrentDirectory]);
+
+  useEffect(() => {
+    // Auto-open folder picker on first launch (no projects, no terminals)
+    if (projects.length === 0 && tabs.length === 0 && !autoOpenRef.current) {
+      autoOpenRef.current = true;
+      handleOpenFolder();
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Expose methods to parent via ref
   useImperativeHandle(
@@ -243,8 +253,25 @@ export const TerminalTabs = forwardRef<TerminalTabsHandle>(function TerminalTabs
         {tabs.map((tab) => (
           <TerminalPane key={tab.id} id={tab.id} isActive={activeTabId === tab.id} />
         ))}
-        {tabs.length === 0 && (
-          <div className="flex h-full items-center justify-center text-tertiary">
+        {tabs.length === 0 && !currentDirectory && (
+          <div className="flex h-full flex-col items-center justify-center gap-4 text-center">
+            <FolderIcon className="h-12 w-12 text-tertiary" />
+            <div>
+              <h3 className="text-lg font-medium text-primary mb-1">Open a Project</h3>
+              <p className="text-sm text-tertiary">Get started by opening a project folder</p>
+            </div>
+            <button
+              onClick={handleOpenFolder}
+              className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90"
+            >
+              Open Folder
+            </button>
+            <kbd className="text-xs text-tertiary">⌘O</kbd>
+          </div>
+        )}
+        {tabs.length === 0 && currentDirectory && (
+          <div className="flex h-full items-center justify-center gap-2 text-tertiary">
+            <SpinnerIcon className="h-4 w-4 animate-spin" />
             Creating terminal...
           </div>
         )}

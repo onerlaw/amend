@@ -35,7 +35,13 @@ export function useDiffViewerState(gitPolling: GitPollingResult, enabled: boolea
     ];
   }, [status]);
 
-  // Load all diffs when files change (expanded by default)
+  // Reset when context path changes (must run before loadDiff to avoid race)
+  useEffect(() => {
+    if (!enabled) return;
+    clearDiffs();
+  }, [contextPath, clearDiffs, enabled]);
+
+  // Load all diffs when files change (runs into clean state after clearDiffs)
   useEffect(() => {
     if (!enabled) return;
     if (allFiles.length > 0) {
@@ -44,12 +50,6 @@ export function useDiffViewerState(gitPolling: GitPollingResult, enabled: boolea
       });
     }
   }, [allFiles, loadDiff, enabled]);
-
-  // Reset when context path changes
-  useEffect(() => {
-    if (!enabled) return;
-    clearDiffs();
-  }, [contextPath, clearDiffs, enabled]);
 
   useEffect(() => {
     if (!enabled) return;

@@ -106,6 +106,7 @@ function BrowseFileList({
 
 export function BrowseFileListPanel() {
   const {
+    contextPath,
     entries,
     isLoading,
     browseActiveFilePath,
@@ -133,13 +134,23 @@ export function BrowseFileListPanel() {
           <RefreshIcon />
         </button>
       </div>
-      <BrowseFileList
-        entries={entries}
-        activeFilePath={browseActiveFilePath}
-        openFilePaths={openFilePaths}
-        onSelectFile={handleSelectFile}
-        isLoading={isLoading}
-      />
+      {!contextPath ? (
+        <div className="flex h-full flex-col items-center justify-center px-6 text-center">
+          <FolderIcon className="h-12 w-12 text-tertiary mb-4" />
+          <h3 className="text-sm font-medium text-primary mb-1">No Repository Open</h3>
+          <p className="text-xs text-tertiary">
+            Use <kbd className="px-1 py-0.5 rounded bg-surface-3 text-tertiary">⌘O</kbd> to open a project
+          </p>
+        </div>
+      ) : (
+        <BrowseFileList
+          entries={entries}
+          activeFilePath={browseActiveFilePath}
+          openFilePaths={openFilePaths}
+          onSelectFile={handleSelectFile}
+          isLoading={isLoading}
+        />
+      )}
     </div>
   );
 }
