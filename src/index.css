@@ -92,11 +92,6 @@ body,
 
 /* Terminal specific styles */
 .xterm {
-  padding: 8px;
-  height: 100%;
-}
-
-.xterm-screen {
   height: 100%;
 }
 

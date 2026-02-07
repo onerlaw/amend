@@ -82,9 +82,22 @@ export function useTerminal(containerId: string | null) {
   const fit = useCallback(() => {
     if (fitAddonRef.current && terminalRef.current && containerId && isInitializedRef.current) {
       try {
+        const terminal = terminalRef.current;
+        // Preserve scroll position: check if user was at the bottom before fit
+        const viewport = terminal.buffer.active;
+        const wasAtBottom = viewport.baseY + terminal.rows >= viewport.length;
+
         fitAddonRef.current.fit();
-        const { cols, rows } = terminalRef.current;
+        const { cols, rows } = terminal;
         resizeTerminal(containerId, cols, rows).catch(console.error);
+
+        // Restore scroll position after fit
+        if (wasAtBottom) {
+          terminal.scrollToBottom();
+        } else {
+          // Keep the same scroll offset from the top
+          terminal.scrollToLine(viewport.viewportY);
+        }
       } catch (e) {
         // Renderer may not be ready yet, ignore
       }
