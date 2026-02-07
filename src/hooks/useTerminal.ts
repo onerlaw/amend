@@ -182,12 +182,11 @@ export function useTerminal(containerId: string | null) {
         terminalRef.current.write(text);
       });
 
-      // Set up exit listener
+      // Set up exit listener - close the tab when the process exits
       const unlistenExit = await onTerminalExit(containerId, () => {
         if (listenerInitId !== currentInitIdRef.current) return;
-        if (terminalRef.current) {
-          terminalRef.current.write('\r\n\x1b[90m[Process exited]\x1b[0m\r\n');
-        }
+        closeTerminal(containerId).catch(console.error);
+        useTerminalStore.getState().removeTab(containerId);
       });
 
       // Set up title change listener
