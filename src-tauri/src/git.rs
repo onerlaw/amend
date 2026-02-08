@@ -418,6 +418,35 @@ pub fn get_diff_stats(repo_path: String) -> Result<DiffStats, GitError> {
         }
     }
 
+    // Count untracked files
+    let workdir = repo
+        .workdir()
+        .ok_or_else(|| GitError::NotARepo(repo_path.clone()))?;
+    let mut status_opts = StatusOptions::new();
+    status_opts
+        .include_untracked(true)
+        .recurse_untracked_dirs(true)
+        .include_ignored(false);
+
+    let statuses = repo.statuses(Some(&mut status_opts))?;
+    for entry in statuses.iter() {
+        let status = entry.status();
+        if status.is_wt_new() {
+            // This is an untracked file
+            if let Some(path_str) = entry.path() {
+                let full_path = workdir.join(path_str);
+                if full_path.is_file() {
+                    // Count lines in the untracked file
+                    if let Ok(content) = std::fs::read_to_string(&full_path) {
+                        let line_count = content.lines().count();
+                        total_additions += line_count;
+                        total_files += 1;
+                    }
+                }
+            }
+        }
+    }
+
     Ok(DiffStats {
         additions: total_additions,
         deletions: total_deletions,
