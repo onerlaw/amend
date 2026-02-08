@@ -97,7 +97,6 @@ export const useFileStore = create<FileState>()(
       setCurrentDirectory: (path: string) =>
         set({
           currentDirectory: path,
-          activeWorktreePath: path, // Default activeWorktreePath to project root
           contextPath: path,
           browseOpenFiles: [],
           browseActiveFilePath: null,

@@ -1,6 +1,13 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useFileStore } from '@/stores/fileStore';
-import { readDirectory, writeFile, startWatchingDirectory, stopWatchingDirectory, onFsChanged, FileEntry } from '@/lib/tauri';
+import {
+  readDirectory,
+  writeFile,
+  startWatchingDirectory,
+  stopWatchingDirectory,
+  onFsChanged,
+  FileEntry,
+} from '@/lib/tauri';
 import { openFileInBrowseMode } from '@/lib/fileUtils';
 
 const AUTO_SAVE_DELAY = 1000;

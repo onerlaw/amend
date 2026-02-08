@@ -58,18 +58,21 @@ function BrowseFileList({
     return () => window.removeEventListener('file-tree-refresh', handleRefresh);
   }, [expandedDirs]);
 
-  const toggleDir = useCallback(async (path: string) => {
-    if (!expandedDirs.has(path) && !dirContentsCache.has(path)) {
-      try {
-        const contents = await readDirectory(path);
-        dirContentsCache.set(path, contents);
-        setCacheVersion((v) => v + 1);
-      } catch (err) {
-        console.error('Failed to read directory:', err);
+  const toggleDir = useCallback(
+    async (path: string) => {
+      if (!expandedDirs.has(path) && !dirContentsCache.has(path)) {
+        try {
+          const contents = await readDirectory(path);
+          dirContentsCache.set(path, contents);
+          setCacheVersion((v) => v + 1);
+        } catch (err) {
+          console.error('Failed to read directory:', err);
+        }
       }
-    }
-    toggleBrowseExpandedDir(path);
-  }, [expandedDirs, toggleBrowseExpandedDir]);
+      toggleBrowseExpandedDir(path);
+    },
+    [expandedDirs, toggleBrowseExpandedDir]
+  );
 
   const renderEntry = (entry: FileEntry, depth: number) => {
     const isExpanded = expandedDirs.has(entry.path);
@@ -156,7 +159,10 @@ export function BrowseFileListPanel() {
   );
 
   return (
-    <div className="h-full bg-surface-2 flex flex-col" onMouseDown={() => setFocusedPanel('file-list')}>
+    <div
+      className="h-full bg-surface-2 flex flex-col"
+      onMouseDown={() => setFocusedPanel('file-list')}
+    >
       <div className="flex items-center justify-between px-3 py-2">
         <div className="flex items-center gap-2">
           <span className="text-xs font-semibold uppercase tracking-wide text-primary">Files</span>
