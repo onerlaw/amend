@@ -33,7 +33,7 @@ export const useUIStore = create<UIState>()(
       selectedDiffFile: null,
       themeMode: 'system',
       focusedPanel: 'terminal',
-      diffFileListVisible: true,
+      diffFileListVisible: false,
 
       setPanelMode: (mode: PanelMode) => set({ panelMode: mode }),
       setFocusedPanel: (panel: FocusedPanel) =>

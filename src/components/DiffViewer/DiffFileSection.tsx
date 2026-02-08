@@ -422,6 +422,7 @@ export const DiffFileSection = memo(function DiffFileSection({
   }, [oldContent, newContent, isLoading, error]);
 
   const fileName = getFileName(filePath);
+  const dirPath = filePath.includes('/') ? filePath.slice(0, filePath.lastIndexOf('/') + 1) : '';
   const hasContent = !isLoading && !error && (oldContent || newContent);
 
   return (
@@ -441,8 +442,9 @@ export const DiffFileSection = memo(function DiffFileSection({
             />
           </button>
 
-          <span className="text-sm text-primary truncate" title={filePath}>
-            {fileName}
+          <span className="text-sm truncate" title={filePath}>
+            {dirPath && <span className="text-tertiary">{dirPath}</span>}
+            <span className="text-primary">{fileName}</span>
           </span>
 
           {getStatusBadge(category)}
