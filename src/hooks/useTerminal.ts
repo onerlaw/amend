@@ -260,10 +260,10 @@ export function useCreateTerminal() {
   const addTab = useTerminalStore((state) => state.addTab);
 
   const create = useCallback(
-    async (worktreePath: string, projectId: string | null = null) => {
+    async (worktreePath: string, projectId: string | null = null, afterTabId?: string) => {
       try {
         const id = await createTerminalBackend(worktreePath);
-        addTab(id, worktreePath, projectId);
+        addTab(id, worktreePath, projectId, afterTabId);
         return id;
       } catch (err) {
         console.error('Failed to create terminal:', err);
