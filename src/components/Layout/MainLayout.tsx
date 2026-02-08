@@ -82,8 +82,7 @@ export function MainLayout() {
   useEffect(() => {
     const activeTab = tabs.find((t) => t.id === activeTabId);
     if (activeTab) {
-      setActiveWorktreePath(activeTab.worktreePath);
-      // Sync project context when terminal has a projectId
+      // Sync project context first (sets contextPath to project root as default)
       if (activeTab.projectId) {
         const project = projects.find((p) => p.id === activeTab.projectId);
         if (project) {
@@ -91,6 +90,8 @@ export function MainLayout() {
           setCurrentDirectory(project.path);
         }
       }
+      // Set worktree path last — this overrides contextPath to the actual worktree
+      setActiveWorktreePath(activeTab.worktreePath);
     }
   }, [activeTabId, tabs, setActiveWorktreePath, projects, setActiveProject, setCurrentDirectory]);
 
