@@ -1,4 +1,11 @@
-import { EditorView, ViewPlugin, keymap, lineNumbers, highlightActiveLine } from '@codemirror/view';
+import {
+  EditorView,
+  ViewPlugin,
+  keymap,
+  lineNumbers,
+  highlightActiveLine,
+  tooltips,
+} from '@codemirror/view';
 import { HighlightStyle, syntaxHighlighting } from '@codemirror/language';
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
 import { search, searchKeymap, highlightSelectionMatches } from '@codemirror/search';
@@ -340,6 +347,7 @@ export function createBaseExtensions(language: string | undefined): Extension[] 
     stickyGutters,
     syntaxHighlighting(customHighlightStyle),
     getLanguageExtension(language),
+    tooltips({ parent: document.body }),
   ];
 }
 

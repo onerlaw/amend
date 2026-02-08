@@ -68,12 +68,20 @@ function tabOpenAtLine(
   };
 }
 
+interface SavedBrowseState {
+  files: OpenFile[];
+  activePath: string | null;
+}
+
 interface FileState {
   currentDirectory: string | null;
   setCurrentDirectory: (path: string) => void;
   activeWorktreePath: string | null;
   setActiveWorktreePath: (path: string | null) => void;
   contextPath: string | null;
+  // Per-context browse state saved when switching tabs
+  savedBrowseState: Record<string, SavedBrowseState>;
+  syncTabContext: (projectPath: string, worktreePath: string | null) => void;
   // Browse mode files
   browseOpenFiles: OpenFile[];
   browseActiveFilePath: string | null;
@@ -105,6 +113,36 @@ export const useFileStore = create<FileState>()(
       setActiveWorktreePath: (path: string | null) =>
         set({ activeWorktreePath: path, contextPath: path ?? get().currentDirectory }),
       contextPath: null,
+      savedBrowseState: {},
+      syncTabContext: (projectPath: string, worktreePath: string | null) => {
+        const state = get();
+        const newContextPath = worktreePath ?? projectPath;
+        const oldContextPath = state.contextPath;
+
+        // Nothing to do if context hasn't changed
+        if (oldContextPath === newContextPath) return;
+
+        // Save current browse state for the old context
+        const saved = { ...state.savedBrowseState };
+        if (oldContextPath) {
+          saved[oldContextPath] = {
+            files: state.browseOpenFiles,
+            activePath: state.browseActiveFilePath,
+          };
+        }
+
+        // Restore browse state for the new context (or start empty)
+        const restored = saved[newContextPath];
+
+        set({
+          currentDirectory: projectPath,
+          activeWorktreePath: worktreePath,
+          contextPath: newContextPath,
+          browseOpenFiles: restored?.files ?? [],
+          browseActiveFilePath: restored?.activePath ?? null,
+          savedBrowseState: saved,
+        });
+      },
       // Browse mode state
       browseOpenFiles: [],
       browseActiveFilePath: null,

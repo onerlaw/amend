@@ -43,11 +43,11 @@ export function MainLayout() {
   const { panelMode, setPanelMode, diffFileListVisible } = useUIStore();
   const {
     currentDirectory,
-    setCurrentDirectory,
     browseOpenFiles,
     browseActiveFilePath,
     closeBrowseFile,
     setActiveWorktreePath,
+    syncTabContext,
     contextPath,
   } = useFileStore();
   const { projects, addProject, setActiveProject } = useProjectStore();
@@ -82,18 +82,19 @@ export function MainLayout() {
   useEffect(() => {
     const activeTab = tabs.find((t) => t.id === activeTabId);
     if (activeTab) {
-      // Sync project context first (sets contextPath to project root as default)
       if (activeTab.projectId) {
         const project = projects.find((p) => p.id === activeTab.projectId);
         if (project) {
           setActiveProject(activeTab.projectId);
-          setCurrentDirectory(project.path);
+          // Atomically save old browse state and restore for the new context
+          syncTabContext(project.path, activeTab.worktreePath);
+          return;
         }
       }
-      // Set worktree path last — this overrides contextPath to the actual worktree
+      // Fallback: tab without a project, just update worktree
       setActiveWorktreePath(activeTab.worktreePath);
     }
-  }, [activeTabId, tabs, setActiveWorktreePath, projects, setActiveProject, setCurrentDirectory]);
+  }, [activeTabId, tabs, setActiveWorktreePath, projects, setActiveProject, syncTabContext]);
 
   // Keyboard shortcuts
   const handleKeyDown = useCallback(
