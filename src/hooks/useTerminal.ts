@@ -2,6 +2,8 @@ import { useEffect, useRef, useCallback } from 'react';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebglAddon } from '@xterm/addon-webgl';
+import { WebLinksAddon } from '@xterm/addon-web-links';
+import { openUrl } from '@tauri-apps/plugin-opener';
 import {
   createTerminal as createTerminalBackend,
   writeToTerminal,
@@ -169,6 +171,12 @@ export function useTerminal(containerId: string | null) {
       } catch (e) {
         console.warn('WebGL addon failed to load, using canvas renderer:', e);
       }
+
+      // Load web links addon for Cmd+Click URL opening
+      const webLinksAddon = new WebLinksAddon((_event, uri) => {
+        openUrl(uri).catch(console.error);
+      });
+      terminal.loadAddon(webLinksAddon);
 
       terminalRef.current = terminal;
       fitAddonRef.current = fitAddon;
