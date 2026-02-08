@@ -78,7 +78,7 @@ export const TerminalTabs = forwardRef<TerminalTabsHandle>(function TerminalTabs
   const handleDuplicateTerminal = useCallback(() => {
     const activeTab = tabs.find((t) => t.id === activeTabId);
     if (!activeTab) return;
-    createTerminal(activeTab.worktreePath, activeTab.projectId);
+    createTerminal(activeTab.worktreePath, activeTab.projectId, activeTabId ?? undefined);
   }, [tabs, activeTabId, createTerminal]);
 
   const handleNewTerminal = useCallback(() => {
