@@ -261,9 +261,9 @@ export function MainLayout() {
               <Panel
                 id="browse-file-list"
                 order={3}
-                defaultSize={browseOpenFiles.length > 0 ? 20 : 40}
-                minSize={browseOpenFiles.length > 0 ? 10 : 15}
-                maxSize={browseOpenFiles.length > 0 ? 40 : undefined}
+                defaultSize={20}
+                minSize={10}
+                maxSize={40}
               >
                 <BrowseFileListPanel />
               </Panel>
