@@ -8,7 +8,7 @@ case "$BUMP_TYPE" in
   *) echo "Invalid bump type: $BUMP_TYPE (use major, minor, or patch)" >&2; exit 1 ;;
 esac
 
-TAG="release:$BUMP_TYPE"
+TAG="release/$BUMP_TYPE"
 echo "Pushing trigger tag '$TAG' to start CI release..."
 git tag "$TAG"
 git push origin "$TAG"
