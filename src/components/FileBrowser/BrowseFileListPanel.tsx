@@ -65,7 +65,7 @@ function BrowseFileList({
           }}
           className={`flex w-full select-none items-center gap-1 py-0.5 pr-2 text-left text-sm hover:bg-surface-3/50 ${
             isActive || isContextTarget ? 'bg-surface-3' : isOpen ? 'bg-surface-3/30' : ''
-          }`}
+          } ${entry.isGitignored ? 'opacity-50' : ''}`}
           style={{ paddingLeft: `${depth * 12 + 8}px` }}
         >
           {entry.isDirectory && (

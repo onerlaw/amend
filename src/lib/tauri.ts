@@ -39,6 +39,7 @@ export interface FileEntry {
   path: string;
   isDirectory: boolean;
   isSymlink: boolean;
+  isGitignored: boolean;
   children?: FileEntry[];
 }
 

@@ -1,5 +1,6 @@
 use crate::error::impl_serialize_as_string;
 use base64::{engine::general_purpose::STANDARD, Engine as _};
+use git2::Repository;
 use ignore::WalkBuilder;
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -45,6 +46,7 @@ pub struct FileEntry {
     pub path: String,
     pub is_directory: bool,
     pub is_symlink: bool,
+    pub is_gitignored: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub children: Option<Vec<FileEntry>>,
 }
@@ -73,6 +75,8 @@ impl FileSystemManager {
             return Err(FileSystemError::NotFound(path.display().to_string()));
         }
 
+        let repo = Repository::discover(&path).ok();
+
         let mut entries = Vec::new();
         let walker = WalkBuilder::new(&path)
             .max_depth(Some(1))
@@ -92,11 +96,17 @@ impl FileSystemManager {
                 .map(|n| n.to_string_lossy().to_string())
                 .unwrap_or_default();
 
+            let is_gitignored = repo
+                .as_ref()
+                .and_then(|r| r.status_should_ignore(entry_path).ok())
+                .unwrap_or(false);
+
             entries.push(FileEntry {
                 name,
                 path: entry_path.display().to_string(),
                 is_directory: metadata.is_dir(),
                 is_symlink: metadata.is_symlink(),
+                is_gitignored,
                 children: None,
             });
         }

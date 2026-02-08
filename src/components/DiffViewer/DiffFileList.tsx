@@ -152,6 +152,7 @@ function FileTreeItem({
                 path: node.path,
                 isDirectory: false,
                 isSymlink: false,
+                isGitignored: false,
               });
             }
           : undefined
