@@ -326,13 +326,7 @@ export function MainLayout() {
             )}
             {panelMode === 'browse' && browseOpenFiles.length > 0 && <PanelResizeHandle />}
             {panelMode === 'browse' && (
-              <Panel
-                id="browse-file-list"
-                order={3}
-                defaultSize={20}
-                minSize={10}
-                maxSize={40}
-              >
+              <Panel id="browse-file-list" order={3} defaultSize={20} minSize={10} maxSize={40}>
                 <BrowseFileListPanel />
               </Panel>
             )}

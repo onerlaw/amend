@@ -1,4 +1,4 @@
-use notify::{Config, RecommendedWatcher, RecursiveMode, Watcher, Event};
+use notify::{Config, Event, RecommendedWatcher, RecursiveMode, Watcher};
 use std::sync::mpsc;
 use std::sync::Mutex;
 use std::thread;
@@ -66,7 +66,8 @@ impl FileWatcher {
                         // Got an event, start debounce: drain events for 500ms
                         let deadline = std::time::Instant::now() + Duration::from_millis(500);
                         loop {
-                            let remaining = deadline.saturating_duration_since(std::time::Instant::now());
+                            let remaining =
+                                deadline.saturating_duration_since(std::time::Instant::now());
                             if remaining.is_zero() {
                                 break;
                             }
