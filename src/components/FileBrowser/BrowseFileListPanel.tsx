@@ -1,9 +1,12 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { useFileBrowserState } from '@/hooks/useFileBrowserState';
 import { readDirectory, FileEntry } from '@/lib/tauri';
 import { useContextMenuStore } from '@/stores/contextMenuStore';
-import { getFileIconColor, sortDirectoriesFirst, toggleSetItem } from '@/lib/fileUtils';
+import { useUIStore } from '@/stores/uiStore';
+import { getFileIconColor, sortDirectoriesFirst } from '@/lib/fileUtils';
 import { ChevronIcon, FolderIcon, FileIcon, RefreshIcon } from '@/components/Icons';
+
+const dirContentsCache = new Map<string, FileEntry[]>();
 
 interface BrowseFileListProps {
   entries: FileEntry[];
@@ -22,24 +25,26 @@ function BrowseFileList({
 }: BrowseFileListProps) {
   const { openMenu, isOpen: contextMenuOpen, targetEntry } = useContextMenuStore();
   const contextTargetPath = targetEntry?.path ?? null;
-  const [expandedDirs, setExpandedDirs] = useState<Set<string>>(new Set());
-  const [dirContents, setDirContents] = useState<Map<string, FileEntry[]>>(new Map());
+  const expandedDirs = useUIStore((s) => s.browseExpandedDirs);
+  const toggleBrowseExpandedDir = useUIStore((s) => s.toggleBrowseExpandedDir);
+  const [, setCacheVersion] = useState(0);
 
-  const toggleDir = async (path: string) => {
-    if (!expandedDirs.has(path) && !dirContents.has(path)) {
+  const toggleDir = useCallback(async (path: string) => {
+    if (!expandedDirs.has(path) && !dirContentsCache.has(path)) {
       try {
         const contents = await readDirectory(path);
-        setDirContents(new Map(dirContents).set(path, contents));
+        dirContentsCache.set(path, contents);
+        setCacheVersion((v) => v + 1);
       } catch (err) {
         console.error('Failed to read directory:', err);
       }
     }
-    setExpandedDirs(toggleSetItem(expandedDirs, path));
-  };
+    toggleBrowseExpandedDir(path);
+  }, [expandedDirs, toggleBrowseExpandedDir]);
 
   const renderEntry = (entry: FileEntry, depth: number) => {
     const isExpanded = expandedDirs.has(entry.path);
-    const children = dirContents.get(entry.path) || [];
+    const children = dirContentsCache.get(entry.path) || [];
 
     const getFileIcon = () => {
       if (entry.isDirectory) {

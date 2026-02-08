@@ -14,6 +14,8 @@ interface UIState {
   themeMode: ThemeMode;
   focusedPanel: FocusedPanel;
   diffFileListVisible: boolean;
+  browseExpandedDirs: Set<string>;
+  collapsedDiffTreePaths: Set<string>;
 
   setPanelMode: (mode: PanelMode) => void;
   toggleDiffFileCollapse: (path: string) => void;
@@ -22,6 +24,8 @@ interface UIState {
   setThemeMode: (mode: ThemeMode) => void;
   setFocusedPanel: (panel: FocusedPanel) => void;
   toggleDiffFileList: () => void;
+  toggleBrowseExpandedDir: (path: string) => void;
+  toggleDiffTreePath: (path: string) => void;
 }
 
 export const useUIStore = create<UIState>()(
@@ -34,6 +38,8 @@ export const useUIStore = create<UIState>()(
       themeMode: 'system',
       focusedPanel: 'terminal',
       diffFileListVisible: false,
+      browseExpandedDirs: new Set(),
+      collapsedDiffTreePaths: new Set(),
 
       setPanelMode: (mode: PanelMode) => set({ panelMode: mode }),
       setFocusedPanel: (panel: FocusedPanel) =>
@@ -43,6 +49,14 @@ export const useUIStore = create<UIState>()(
       toggleDiffFileCollapse: (path: string) =>
         set((state) => ({
           collapsedDiffFiles: toggleSetItem(state.collapsedDiffFiles, path),
+        })),
+      toggleBrowseExpandedDir: (path: string) =>
+        set((state) => ({
+          browseExpandedDirs: toggleSetItem(state.browseExpandedDirs, path),
+        })),
+      toggleDiffTreePath: (path: string) =>
+        set((state) => ({
+          collapsedDiffTreePaths: toggleSetItem(state.collapsedDiffTreePaths, path),
         })),
       setScrollTargetFile: (path: string | null) => set({ scrollTargetFile: path }),
       setSelectedDiffFile: (path: string | null) => set({ selectedDiffFile: path }),

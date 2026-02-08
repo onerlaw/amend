@@ -1,6 +1,7 @@
 import { useState, useMemo, useCallback } from 'react';
 import { GitStatus, FileEntry, restoreFile, unstageFile } from '@/lib/tauri';
 import { sortDirectoriesFirst, getFileName } from '@/lib/fileUtils';
+import { useUIStore } from '@/stores/uiStore';
 import { ContextMenu } from '@/components/ContextMenu/ContextMenu';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { ChevronIcon, FolderIcon, DiscardIcon } from '@/components/Icons';
@@ -83,7 +84,6 @@ interface FileTreeItemProps {
   depth: number;
   onScrollToFile: (path: string) => void;
   onContextMenuEntry?: (e: React.MouseEvent, entry: FileEntry) => void;
-  defaultExpanded?: boolean;
   onDiscardClick?: (e: React.MouseEvent, filePath: string) => void;
   selectedFile?: string | null;
 }
@@ -93,11 +93,12 @@ function FileTreeItem({
   depth,
   onScrollToFile,
   onContextMenuEntry,
-  defaultExpanded = true,
   onDiscardClick,
   selectedFile,
 }: FileTreeItemProps) {
-  const [isExpanded, setIsExpanded] = useState(defaultExpanded);
+  const collapsedDiffTreePaths = useUIStore((s) => s.collapsedDiffTreePaths);
+  const toggleDiffTreePath = useUIStore((s) => s.toggleDiffTreePath);
+  const isExpanded = !collapsedDiffTreePaths.has(node.path);
 
   if (node.isDirectory) {
     const children = sortDirectoriesFirst(Array.from(node.children.values()));
@@ -106,7 +107,7 @@ function FileTreeItem({
       <div>
         {node.name && (
           <button
-            onClick={() => setIsExpanded(!isExpanded)}
+            onClick={() => toggleDiffTreePath(node.path)}
             className="flex w-full select-none items-center gap-1 px-2 py-0.5 text-sm hover:bg-surface-3/50"
             style={{ paddingLeft: `${depth * 12 + 8}px` }}
           >
@@ -126,7 +127,6 @@ function FileTreeItem({
                 depth={node.name ? depth + 1 : depth}
                 onScrollToFile={onScrollToFile}
                 onContextMenuEntry={onContextMenuEntry}
-                defaultExpanded={defaultExpanded}
                 onDiscardClick={onDiscardClick}
                 selectedFile={selectedFile}
               />
