@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useFileBrowserState } from '@/hooks/useFileBrowserState';
 import { readDirectory, FileEntry } from '@/lib/tauri';
 import { useContextMenuStore } from '@/stores/contextMenuStore';
@@ -28,6 +28,35 @@ function BrowseFileList({
   const expandedDirs = useUIStore((s) => s.browseExpandedDirs);
   const toggleBrowseExpandedDir = useUIStore((s) => s.toggleBrowseExpandedDir);
   const [, setCacheVersion] = useState(0);
+
+  // Re-fetch expanded directory contents when file tree refreshes
+  useEffect(() => {
+    const handleRefresh = async () => {
+      const expandedPaths = Array.from(expandedDirs);
+      if (expandedPaths.length === 0) return;
+
+      dirContentsCache.clear();
+      const results = await Promise.all(
+        expandedPaths.map(async (path) => {
+          try {
+            const contents = await readDirectory(path);
+            return [path, contents] as const;
+          } catch {
+            return null;
+          }
+        })
+      );
+      for (const result of results) {
+        if (result) {
+          dirContentsCache.set(result[0], result[1]);
+        }
+      }
+      setCacheVersion((v) => v + 1);
+    };
+
+    window.addEventListener('file-tree-refresh', handleRefresh);
+    return () => window.removeEventListener('file-tree-refresh', handleRefresh);
+  }, [expandedDirs]);
 
   const toggleDir = useCallback(async (path: string) => {
     if (!expandedDirs.has(path) && !dirContentsCache.has(path)) {
@@ -119,6 +148,7 @@ export function BrowseFileListPanel() {
     handleSelectFile,
     handleRefresh,
   } = useFileBrowserState();
+  const setFocusedPanel = useUIStore((s) => s.setFocusedPanel);
 
   const openFilePaths = useMemo(
     () => new Set(browseOpenFiles.map((f) => f.path)),
@@ -126,7 +156,7 @@ export function BrowseFileListPanel() {
   );
 
   return (
-    <div className="h-full bg-surface-2 flex flex-col">
+    <div className="h-full bg-surface-2 flex flex-col" onMouseDown={() => setFocusedPanel('file-list')}>
       <div className="flex items-center justify-between px-3 py-2">
         <div className="flex items-center gap-2">
           <span className="text-xs font-semibold uppercase tracking-wide text-primary">Files</span>

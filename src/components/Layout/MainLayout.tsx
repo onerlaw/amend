@@ -18,7 +18,9 @@ import {
 import { BrowseFileListPanel } from '@/components/FileBrowser/BrowseFileListPanel';
 import { GlobalSearch } from '@/components/GlobalSearch/GlobalSearch';
 import { ModalOverlay } from '@/components/ModalOverlay';
-import { indexProject } from '@/lib/tauri';
+import { indexProject, copyEntry, moveEntry, getClipboardFilePaths } from '@/lib/tauri';
+import { useContextMenuStore } from '@/stores/contextMenuStore';
+import { dispatchFileTreeRefresh } from '@/stores/contextMenuStore';
 import { PlusIcon, CloseIcon, InfoIcon, SunIcon, MoonIcon, MonitorIcon } from '@/components/Icons';
 
 function ThemeToggle() {
@@ -122,6 +124,71 @@ export function MainLayout() {
         if (panelMode === 'browse' && browseActiveFilePath) {
           e.preventDefault();
           browseEditorTabsRef.current?.openSearch();
+        }
+      }
+
+      // Cmd/Ctrl + V: Paste files into file browser
+      if ((e.metaKey || e.ctrlKey) && e.key === 'v') {
+        const { focusedPanel } = useUIStore.getState();
+        if (panelMode === 'browse' && focusedPanel === 'file-list' && contextPath) {
+          e.preventDefault();
+
+          const { clipboard, clearClipboard } = useContextMenuStore.getState();
+
+          // Priority 1: internal clipboard (cut/copy from context menu)
+          if (clipboard.entry && clipboard.operation) {
+            const destPath = `${contextPath}/${clipboard.entry.name}`;
+            (async () => {
+              try {
+                if (clipboard.operation === 'cut') {
+                  await moveEntry(clipboard.entry!.path, destPath);
+                } else {
+                  await copyEntry(clipboard.entry!.path, destPath);
+                }
+                clearClipboard();
+                dispatchFileTreeRefresh();
+              } catch (err) {
+                console.error('Failed to paste file:', err);
+              }
+            })();
+            return;
+          }
+
+          // Priority 2: OS clipboard file paths
+          (async () => {
+            try {
+              const paths = await getClipboardFilePaths();
+              if (paths.length === 0) return;
+
+              for (const srcPath of paths) {
+                const fileName = srcPath.split('/').pop() || 'file';
+                let destPath = `${contextPath}/${fileName}`;
+
+                // Collision handling: name (1).ext, name (2).ext, etc.
+                let counter = 1;
+                const dot = fileName.lastIndexOf('.');
+                const baseName = dot > 0 ? fileName.slice(0, dot) : fileName;
+                const ext = dot > 0 ? fileName.slice(dot) : '';
+
+                while (true) {
+                  try {
+                    // Check if file exists by trying to get metadata via a readDirectory of parent
+                    // Use a simpler approach: try the copy and handle error
+                    await copyEntry(srcPath, destPath);
+                    break;
+                  } catch {
+                    // Likely collision, try next name
+                    destPath = `${contextPath}/${baseName} (${counter})${ext}`;
+                    counter++;
+                    if (counter > 100) break;
+                  }
+                }
+              }
+              dispatchFileTreeRefresh();
+            } catch (err) {
+              console.error('Failed to paste files from clipboard:', err);
+            }
+          })();
         }
       }
 
@@ -320,6 +387,12 @@ export function MainLayout() {
                 <span className="text-primary">Find in File</span>
                 <kbd className="rounded-md bg-surface-1 px-2 py-0.5 font-mono text-secondary">
                   Cmd+F
+                </kbd>
+              </div>
+              <div className="flex items-center justify-between py-1">
+                <span className="text-primary">Paste Files</span>
+                <kbd className="rounded-md bg-surface-1 px-2 py-0.5 font-mono text-secondary">
+                  Cmd+V
                 </kbd>
               </div>
             </div>

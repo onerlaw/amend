@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useFileStore } from '@/stores/fileStore';
-import { readDirectory, writeFile, FileEntry } from '@/lib/tauri';
+import { readDirectory, writeFile, startWatchingDirectory, stopWatchingDirectory, onFsChanged, FileEntry } from '@/lib/tauri';
 import { openFileInBrowseMode } from '@/lib/fileUtils';
 
 const AUTO_SAVE_DELAY = 1000;
@@ -45,6 +45,29 @@ export function useFileBrowserState() {
     window.addEventListener('file-tree-refresh', loadDirectory);
     return () => window.removeEventListener('file-tree-refresh', loadDirectory);
   }, [loadDirectory]);
+
+  // File system watcher: auto-refresh on external changes
+  useEffect(() => {
+    if (!contextPath) return;
+
+    startWatchingDirectory(contextPath).catch((err) => {
+      console.error('[FileWatcher] Failed to start watching:', err);
+    });
+
+    let unlisten: (() => void) | undefined;
+    onFsChanged(() => {
+      window.dispatchEvent(new Event('file-tree-refresh'));
+    }).then((fn) => {
+      unlisten = fn;
+    });
+
+    return () => {
+      stopWatchingDirectory().catch((err) => {
+        console.error('[FileWatcher] Failed to stop watching:', err);
+      });
+      unlisten?.();
+    };
+  }, [contextPath]);
 
   // Cleanup timers on unmount
   useEffect(() => {

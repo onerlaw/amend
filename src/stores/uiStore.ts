@@ -4,7 +4,7 @@ import { toggleSetItem } from '@/lib/fileUtils';
 
 export type PanelMode = 'diff' | 'browse' | null;
 export type ThemeMode = 'light' | 'dark' | 'system';
-export type FocusedPanel = 'terminal' | 'editor';
+export type FocusedPanel = 'terminal' | 'editor' | 'file-list';
 
 interface UIState {
   panelMode: PanelMode;

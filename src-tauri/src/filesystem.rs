@@ -426,3 +426,44 @@ pub fn move_entry(
 ) -> Result<(), FileSystemError> {
     state.move_entry(&src, &dest)
 }
+
+#[tauri::command]
+pub fn get_clipboard_file_paths() -> Vec<String> {
+    #[cfg(target_os = "macos")]
+    {
+        let script = r#"
+use framework "AppKit"
+set pb to current application's NSPasteboard's generalPasteboard()
+set urls to pb's readObjectsForClasses:{current application's NSURL} options:(missing value)
+if urls is missing value then return ""
+set paths to {}
+repeat with u in urls
+    if (u's isFileURL() as boolean) then
+        set end of paths to (u's |path|() as text)
+    end if
+end repeat
+set AppleScript's text item delimiters to linefeed
+return paths as text
+"#;
+        match std::process::Command::new("osascript")
+            .args(["-l", "AppleScript", "-e", script])
+            .output()
+        {
+            Ok(output) => {
+                let stdout = String::from_utf8_lossy(&output.stdout);
+                stdout
+                    .trim()
+                    .lines()
+                    .filter(|l| !l.is_empty())
+                    .map(|l| l.to_string())
+                    .collect()
+            }
+            Err(_) => Vec::new(),
+        }
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        Vec::new()
+    }
+}

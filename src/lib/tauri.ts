@@ -100,6 +100,25 @@ export async function moveEntry(src: string, dest: string): Promise<void> {
   return invoke('move_entry', { src, dest });
 }
 
+export async function getClipboardFilePaths(): Promise<string[]> {
+  return invoke('get_clipboard_file_paths');
+}
+
+// File watcher commands
+export async function startWatchingDirectory(path: string): Promise<void> {
+  return invoke('start_watching_directory', { path });
+}
+
+export async function stopWatchingDirectory(): Promise<void> {
+  return invoke('stop_watching_directory');
+}
+
+export async function onFsChanged(callback: () => void): Promise<UnlistenFn> {
+  return listen('fs-changed', () => {
+    callback();
+  });
+}
+
 // Git types
 export interface GitStatus {
   staged: GitFileStatus[];

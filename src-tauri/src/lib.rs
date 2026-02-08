@@ -3,11 +3,13 @@ mod filesystem;
 mod git;
 mod symbols;
 mod terminal;
+mod watcher;
 
 use filesystem::FileSystemManager;
 use symbols::{SymbolDefinition, SymbolManager};
 use tauri::State;
 use terminal::TerminalManager;
+use watcher::FileWatcher;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -19,6 +21,7 @@ pub fn run() {
         .manage(TerminalManager::new())
         .manage(FileSystemManager::new())
         .manage(SymbolManager::new())
+        .manage(FileWatcher::new())
         .invoke_handler(tauri::generate_handler![
             // Terminal commands
             terminal::create_terminal,
@@ -37,6 +40,7 @@ pub fn run() {
             filesystem::reveal_in_file_manager,
             filesystem::copy_entry,
             filesystem::move_entry,
+            filesystem::get_clipboard_file_paths,
             // Git commands
             git::is_git_repository,
             git::get_git_status,
@@ -48,6 +52,9 @@ pub fn run() {
             git::restore_file,
             git::unstage_file,
             git::get_diff_stats,
+            // Watcher commands
+            watcher::start_watching_directory,
+            watcher::stop_watching_directory,
             // Symbol navigation commands
             index_project,
             find_definition,
