@@ -397,4 +397,3 @@ export function extractImportSource(docText: string, symbolName: string): string
 
   return null;
 }
-
