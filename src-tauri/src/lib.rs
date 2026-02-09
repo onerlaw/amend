@@ -6,7 +6,7 @@ mod terminal;
 mod watcher;
 
 use filesystem::FileSystemManager;
-use symbols::{SymbolDefinition, SymbolManager};
+use symbols::{SymbolDefinition, SymbolManager, SymbolReference};
 use tauri::State;
 use terminal::TerminalManager;
 use watcher::FileWatcher;
@@ -58,6 +58,7 @@ pub fn run() {
             // Symbol navigation commands
             index_project,
             find_definition,
+            find_references,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -77,4 +78,13 @@ fn find_definition(
     manager: State<SymbolManager>,
 ) -> Vec<SymbolDefinition> {
     manager.find_definition(&symbol, &current_file)
+}
+
+#[tauri::command]
+fn find_references(
+    symbol: String,
+    root_path: String,
+    manager: State<SymbolManager>,
+) -> Vec<SymbolReference> {
+    manager.find_references(&symbol, &root_path)
 }

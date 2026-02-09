@@ -6,7 +6,7 @@ import {
   highlightActiveLine,
   tooltips,
 } from '@codemirror/view';
-import { HighlightStyle, syntaxHighlighting } from '@codemirror/language';
+import { HighlightStyle, StreamLanguage, syntaxHighlighting } from '@codemirror/language';
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
 import { search, searchKeymap, highlightSelectionMatches } from '@codemirror/search';
 import { tags } from '@lezer/highlight';
@@ -17,6 +17,8 @@ import { json } from '@codemirror/lang-json';
 import { html } from '@codemirror/lang-html';
 import { css } from '@codemirror/lang-css';
 import { markdown } from '@codemirror/lang-markdown';
+import { java } from '@codemirror/lang-java';
+import { scala } from '@codemirror/legacy-modes/mode/clike';
 import { Extension } from '@codemirror/state';
 
 // Custom syntax highlighting theme - colors stay consistent across light/dark
@@ -108,6 +110,11 @@ const darkTheme = EditorView.theme(
     },
     // Go-to-definition cursor style
     '&.cm-go-to-definition-active': {
+      cursor: 'pointer',
+    },
+    '.cm-go-to-definition-link': {
+      textDecoration: 'underline',
+      textDecorationColor: 'var(--accent)',
       cursor: 'pointer',
     },
     // Hover tooltip styles
@@ -374,12 +381,15 @@ function getLanguageExtension(language: string | undefined): Extension {
       return css();
     case 'markdown':
       return markdown();
+    case 'java':
+      return java();
+    case 'scala':
+      return StreamLanguage.define(scala);
     // Languages without CodeMirror support fall through to plain text
     case 'yaml':
     case 'bash':
     case 'sql':
     case 'go':
-    case 'java':
     case 'c':
     case 'cpp':
     default:

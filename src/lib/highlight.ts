@@ -16,6 +16,7 @@ import go from 'highlight.js/lib/languages/go';
 import java from 'highlight.js/lib/languages/java';
 import c from 'highlight.js/lib/languages/c';
 import cpp from 'highlight.js/lib/languages/cpp';
+import scala from 'highlight.js/lib/languages/scala';
 
 // Register languages
 hljs.registerLanguage('javascript', javascript);
@@ -34,6 +35,7 @@ hljs.registerLanguage('go', go);
 hljs.registerLanguage('java', java);
 hljs.registerLanguage('c', c);
 hljs.registerLanguage('cpp', cpp);
+hljs.registerLanguage('scala', scala);
 
 // Map file extensions to highlight.js language names
 const extensionMap: Record<string, string> = {
@@ -82,7 +84,8 @@ const extensionMap: Record<string, string> = {
   // JVM
   java: 'java',
   kt: 'java', // Kotlin
-  scala: 'java',
+  scala: 'scala',
+  sc: 'scala',
 
   // Database
   sql: 'sql',

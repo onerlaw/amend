@@ -39,6 +39,11 @@ const IDENTIFIER_TYPES = new Set([
   'identifier',
   'type_identifier',
   'property_identifier',
+  // Rust Lezer node types
+  'TypeIdentifier',
+  'BoundIdentifier',
+  'FieldIdentifier',
+  'ScopeIdentifier',
 ]);
 
 // Node types that represent definitions
@@ -70,6 +75,16 @@ const DEFINITION_CONTEXT_TYPES = new Set([
   'TypeAliasDeclaration',
   'InterfaceDeclaration',
   'EnumDeclaration',
+  // Rust Lezer grammar definition contexts
+  'FunctionItem',
+  'StructItem',
+  'EnumItem',
+  'TraitItem',
+  'ImplItem',
+  'TypeItem',
+  'ConstItem',
+  'StaticItem',
+  'ModItem',
 ]);
 
 /**
@@ -271,8 +286,81 @@ function inferDefinitionKind(nodeType: string): string {
 /**
  * Check if the click position has the modifier key held (Cmd on Mac, Ctrl otherwise)
  */
-export function hasGoToDefinitionModifier(event: MouseEvent): boolean {
+export function hasGoToDefinitionModifier(event: MouseEvent | KeyboardEvent): boolean {
   return isMac ? event.metaKey : event.ctrlKey;
+}
+
+/**
+ * Get the import path string at a given position in the editor.
+ * Returns the string content (without quotes) if the cursor is inside a string
+ * that is part of an import/require statement, or null otherwise.
+ */
+export function getImportPathAtPosition(
+  view: EditorView,
+  pos: number
+): { path: string; from: number; to: number } | null {
+  const tree = syntaxTree(view.state);
+  let node: SyntaxNode | null = tree.resolveInner(pos, 0);
+
+  // Walk up to find a String node
+  let stringNode: SyntaxNode | null = null;
+  let current: SyntaxNode | null = node;
+  while (current) {
+    if (current.name === 'String') {
+      stringNode = current;
+      break;
+    }
+    current = current.parent;
+  }
+
+  if (stringNode) {
+    // Check if this string is inside an ImportDeclaration
+    let parent: SyntaxNode | null = stringNode.parent;
+    let isImport = false;
+    while (parent) {
+      if (parent.name === 'ImportDeclaration' || parent.name === 'ExportDeclaration') {
+        isImport = true;
+        break;
+      }
+      parent = parent.parent;
+    }
+
+    if (isImport) {
+      // Strip quotes
+      const raw = view.state.doc.sliceString(stringNode.from + 1, stringNode.to - 1);
+      if (raw.length > 0) {
+        return { path: raw, from: stringNode.from, to: stringNode.to };
+      }
+    }
+  }
+
+  // Regex fallback: check if the line has an import/require and cursor is in the quoted path
+  const line = view.state.doc.lineAt(pos);
+  const lineText = line.text;
+  const linePos = pos - line.from;
+
+  const importMatch = lineText.match(
+    /(?:import\s.*?from\s+|import\s+|require\s*\(\s*)(['"])([^'"]+)\1/
+  );
+  if (importMatch && importMatch.index !== undefined) {
+    const quoteChar = importMatch[1];
+    const pathValue = importMatch[2];
+    // Find the position of the path within the line
+    const fullMatch = importMatch[0];
+    const pathStartInMatch = fullMatch.lastIndexOf(quoteChar + pathValue);
+    const pathStart = importMatch.index + pathStartInMatch + 1; // +1 for the quote
+    const pathEnd = pathStart + pathValue.length;
+
+    if (linePos >= pathStart && linePos <= pathEnd) {
+      return {
+        path: pathValue,
+        from: line.from + pathStart,
+        to: line.from + pathEnd,
+      };
+    }
+  }
+
+  return null;
 }
 
 /**
@@ -310,43 +398,3 @@ export function extractImportSource(docText: string, symbolName: string): string
   return null;
 }
 
-/**
- * Check if the position is inside an import path string.
- * Uses the Lezer syntax tree to detect String nodes inside ImportDeclaration.
- * Returns the cleaned path string (quotes stripped), or null.
- */
-export function getImportPathAtPosition(view: EditorView, pos: number): string | null {
-  const tree = syntaxTree(view.state);
-  let node: SyntaxNode | null = tree.resolveInner(pos, 0);
-
-  // Walk up to find a String node
-  let stringNode: SyntaxNode | null = null;
-  let current: SyntaxNode | null = node;
-  while (current) {
-    if (current.name === 'String') {
-      stringNode = current;
-      break;
-    }
-    current = current.parent;
-  }
-
-  if (!stringNode) return null;
-
-  // Check if the string is inside an ImportDeclaration
-  let parent: SyntaxNode | null = stringNode.parent;
-  let isImport = false;
-  while (parent) {
-    if (parent.name === 'ImportDeclaration') {
-      isImport = true;
-      break;
-    }
-    parent = parent.parent;
-  }
-
-  if (!isImport) return null;
-
-  // Extract the path string, stripping quotes
-  const raw = view.state.doc.sliceString(stringNode.from, stringNode.to);
-  const path = raw.replace(/^['"]|['"]$/g, '');
-  return path || null;
-}

@@ -96,6 +96,10 @@ interface FileState {
   clearPendingScrollToLine: () => void;
   openBrowseFileAtLine: (file: OpenFile, line: number) => void;
   reorderBrowseFiles: (fromIndex: number, toIndex: number) => void;
+  // Find references panel
+  referencesSymbol: string | null;
+  showReferencesPanel: (symbol: string) => void;
+  hideReferencesPanel: () => void;
 }
 
 export const useFileStore = create<FileState>()(
@@ -183,6 +187,10 @@ export const useFileStore = create<FileState>()(
       reorderBrowseFiles: (fromIndex: number, toIndex: number) => {
         set({ browseOpenFiles: tabReorder(get().browseOpenFiles, fromIndex, toIndex) });
       },
+      // Find references panel
+      referencesSymbol: null,
+      showReferencesPanel: (symbol: string) => set({ referencesSymbol: symbol }),
+      hideReferencesPanel: () => set({ referencesSymbol: null }),
     }),
     {
       name: 'amend-files',

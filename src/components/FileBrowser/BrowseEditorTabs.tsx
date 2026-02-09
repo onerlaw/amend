@@ -13,6 +13,7 @@ import {
   scrollToLine,
 } from '@/extensions';
 import { useDraggableTabs } from '@/hooks/useDraggableTabs';
+import { ReferencesPanel } from './ReferencesPanel';
 
 export interface BrowseEditorTabsHandle {
   openSearch: () => void;
@@ -48,6 +49,10 @@ export const BrowseEditorTabs = forwardRef<BrowseEditorTabsHandle>(
       pendingScrollToFile,
       clearPendingScrollToLine,
       reorderBrowseFiles,
+      currentDirectory,
+      contextPath,
+      referencesSymbol,
+      showReferencesPanel,
     } = useFileStore();
     const editorViewRef = useRef<EditorView | null>(null);
     const { getTabDragProps, containerRef, dropIndicatorIndex, dragFromIndex } = useDraggableTabs({
@@ -60,20 +65,23 @@ export const BrowseEditorTabs = forwardRef<BrowseEditorTabsHandle>(
       if (!activeFile?.path) return [];
 
       const currentFilePath = activeFile.path;
+      const projectRoot = currentDirectory || '';
 
       return [
         goToDefinitionExtension({
           currentFilePath,
+          projectRoot,
           onNavigate: (file, line) => openBrowseFileAtLine(file, line),
           onLocalNavigate: (line) => {
             const view = editorViewRef.current;
             if (view) scrollToLine(view, line);
           },
+          onShowReferences: (symbolName) => showReferencesPanel(symbolName),
         }),
         symbolHoverTooltip({ currentFilePath }),
         cmdHeldCursorExtension(),
       ];
-    }, [activeFile?.path, openBrowseFileAtLine]);
+    }, [activeFile?.path, openBrowseFileAtLine, currentDirectory, showReferencesPanel]);
 
     // Consume pending scroll-to-line state
     useEffect(() => {
@@ -181,6 +189,9 @@ export const BrowseEditorTabs = forwardRef<BrowseEditorTabsHandle>(
           )}
         </div>
 
+        {/* References panel */}
+        {referencesSymbol && <ReferencesPanel />}
+
         {/* Editor content */}
         <div className="flex-1 min-h-0">
           {activeFile && (
@@ -192,6 +203,15 @@ export const BrowseEditorTabs = forwardRef<BrowseEditorTabsHandle>(
             />
           )}
         </div>
+
+        {/* File path bar */}
+        {activeFile && (
+          <div className="flex items-center px-2 py-0.5 bg-surface-2 text-tertiary text-xs border-t border-border truncate select-text">
+            {contextPath && activeFile.path.startsWith(contextPath)
+              ? activeFile.path.slice(contextPath.length + 1)
+              : activeFile.path}
+          </div>
+        )}
       </div>
     );
   }

@@ -217,6 +217,13 @@ export interface SymbolDefinition {
   signature?: string;
 }
 
+export interface SymbolReference {
+  filePath: string;
+  line: number;
+  column: number;
+  lineContent: string;
+}
+
 // Symbol navigation commands
 export async function indexProject(rootPath: string): Promise<void> {
   return invoke('index_project', { rootPath });
@@ -227,4 +234,8 @@ export async function findDefinition(
   currentFile: string
 ): Promise<SymbolDefinition[]> {
   return invoke('find_definition', { symbol, currentFile });
+}
+
+export async function findReferences(symbol: string, rootPath: string): Promise<SymbolReference[]> {
+  return invoke('find_references', { symbol, rootPath });
 }
