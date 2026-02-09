@@ -225,8 +225,7 @@ impl SymbolIndex {
                     let max_lines = 8;
                     let max_chars = 500;
                     let mut sig = String::new();
-                    let mut line_count = 0;
-                    for line in text.lines() {
+                    for (line_count, line) in text.lines().enumerate() {
                         if line_count >= max_lines || sig.len() + line.len() > max_chars {
                             sig.push_str("...");
                             break;
@@ -235,7 +234,6 @@ impl SymbolIndex {
                             sig.push('\n');
                         }
                         sig.push_str(line);
-                        line_count += 1;
                     }
                     if sig.is_empty() {
                         None
