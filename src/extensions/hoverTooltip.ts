@@ -133,10 +133,7 @@ function createTooltipContent(symbolName: string, localDefs: LocalDefinition[]):
 /**
  * Create tooltip content for a cross-file definition with multi-line code preview
  */
-function createCrossFileTooltipContent(
-  symbolName: string,
-  def: SymbolDefinition
-): HTMLElement {
+function createCrossFileTooltipContent(symbolName: string, def: SymbolDefinition): HTMLElement {
   const container = document.createElement('div');
   container.className = 'cm-tooltip-signature';
 
