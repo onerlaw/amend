@@ -147,6 +147,14 @@ impl SymbolIndex {
                 ; Type alias declarations
                 (type_alias_declaration
                     name: (type_identifier) @type.name) @type.def
+
+                ; Class declarations
+                (class_declaration
+                    name: (type_identifier) @class.name) @class.def
+
+                ; Enum declarations
+                (enum_declaration
+                    name: (identifier) @enum.name) @enum.def
             "#
         } else {
             r#"
@@ -165,6 +173,10 @@ impl SymbolIndex {
                     (variable_declarator
                         name: (identifier) @variable.name
                         value: (call_expression))) @variable.def
+
+                ; Class declarations
+                (class_declaration
+                    name: (identifier) @class.name) @class.def
             "#
         };
 
@@ -209,13 +221,26 @@ impl SymbolIndex {
 
                 let signature = def_node.and_then(|node: Node| {
                     let text = node.utf8_text(content.as_bytes()).ok()?;
-                    // Get first line and truncate
-                    let first_line = text.lines().next()?;
-                    let sig = first_line.trim();
-                    if sig.len() > 100 {
-                        Some(format!("{}...", &sig[..100]))
+                    // Take up to 8 lines / 500 chars of the definition
+                    let max_lines = 8;
+                    let max_chars = 500;
+                    let mut sig = String::new();
+                    let mut line_count = 0;
+                    for line in text.lines() {
+                        if line_count >= max_lines || sig.len() + line.len() > max_chars {
+                            sig.push_str("...");
+                            break;
+                        }
+                        if line_count > 0 {
+                            sig.push('\n');
+                        }
+                        sig.push_str(line);
+                        line_count += 1;
+                    }
+                    if sig.is_empty() {
+                        None
                     } else {
-                        Some(sig.to_string())
+                        Some(sig)
                     }
                 });
 

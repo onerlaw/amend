@@ -221,26 +221,33 @@ export function findDefinitionInFile(view: EditorView, symbolName: string): Loca
 }
 
 /**
- * Extract a signature string from a definition node
+ * Extract a multi-line signature string from a definition node.
+ * Takes up to 8 lines / 500 chars of the definition, adds `...` if truncated.
  */
 function extractSignature(
   doc: { sliceString: (from: number, to: number) => string },
   node: SyntaxNode
 ): string | undefined {
-  // Get the first line of the definition
-  const text = doc.sliceString(node.from, Math.min(node.to, node.from + 200));
-  const firstLine = text.split('\n')[0];
+  const maxLines = 8;
+  const maxChars = 500;
+  const text = doc.sliceString(node.from, Math.min(node.to, node.from + maxChars + 100));
+  const lines = text.split('\n');
 
-  // Clean up and truncate if needed
-  let signature = firstLine.trim();
-  if (signature.length > 100) {
-    signature = signature.slice(0, 100) + '...';
+  let result = '';
+  let lineCount = 0;
+  for (const line of lines) {
+    if (lineCount >= maxLines || result.length + line.length > maxChars) {
+      result += '...';
+      break;
+    }
+    if (lineCount > 0) {
+      result += '\n';
+    }
+    result += line;
+    lineCount++;
   }
 
-  // Remove body start for functions/classes
-  signature = signature.replace(/\s*\{.*$/, '');
-
-  return signature || undefined;
+  return result || undefined;
 }
 
 /**
@@ -301,4 +308,45 @@ export function extractImportSource(docText: string, symbolName: string): string
   }
 
   return null;
+}
+
+/**
+ * Check if the position is inside an import path string.
+ * Uses the Lezer syntax tree to detect String nodes inside ImportDeclaration.
+ * Returns the cleaned path string (quotes stripped), or null.
+ */
+export function getImportPathAtPosition(view: EditorView, pos: number): string | null {
+  const tree = syntaxTree(view.state);
+  let node: SyntaxNode | null = tree.resolveInner(pos, 0);
+
+  // Walk up to find a String node
+  let stringNode: SyntaxNode | null = null;
+  let current: SyntaxNode | null = node;
+  while (current) {
+    if (current.name === 'String') {
+      stringNode = current;
+      break;
+    }
+    current = current.parent;
+  }
+
+  if (!stringNode) return null;
+
+  // Check if the string is inside an ImportDeclaration
+  let parent: SyntaxNode | null = stringNode.parent;
+  let isImport = false;
+  while (parent) {
+    if (parent.name === 'ImportDeclaration') {
+      isImport = true;
+      break;
+    }
+    parent = parent.parent;
+  }
+
+  if (!isImport) return null;
+
+  // Extract the path string, stripping quotes
+  const raw = view.state.doc.sliceString(stringNode.from, stringNode.to);
+  const path = raw.replace(/^['"]|['"]$/g, '');
+  return path || null;
 }
