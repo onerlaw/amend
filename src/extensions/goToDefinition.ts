@@ -2,6 +2,7 @@ import { EditorView, ViewPlugin } from '@codemirror/view';
 import { Extension } from '@codemirror/state';
 import {
   getSymbolAtPosition,
+  getImportPathAtPosition,
   findDefinitionInFile,
   extractImportSource,
   hasGoToDefinitionModifier,
@@ -30,6 +31,14 @@ export function goToDefinitionExtension(config: GoToDefinitionConfig): Extension
 
       const pos = view.posAtCoords({ x: event.clientX, y: event.clientY });
       if (pos === null) return false;
+
+      // Check if clicking on an import path string first
+      const importPath = getImportPathAtPosition(view, pos);
+      if (importPath) {
+        event.preventDefault();
+        handleImportPathNavigation(importPath, currentFilePath, onNavigate);
+        return true;
+      }
 
       const symbol = getSymbolAtPosition(view, pos);
       if (!symbol) return false;
@@ -101,19 +110,35 @@ async function handleNavigation(
     }
 
     // Fall back: try to resolve import path and navigate to the source file
-    const importDefs = localDefs.filter((d) => d.line !== cursorLine && d.kind === 'import');
+    const importDefs = localDefs.filter((d) => d.kind === 'import');
     if (importDefs.length > 0) {
       const docText = view.state.doc.toString();
       const importSource = extractImportSource(docText, symbolName);
 
-      if (importSource && (importSource.startsWith('./') || importSource.startsWith('../'))) {
-        const resolved = await resolveImportPath(currentFilePath, importSource);
+      if (importSource) {
+        const resolved = await resolveImportSource(currentFilePath, importSource);
         if (resolved) {
           try {
             const content = await readFile(resolved);
             const fileName = getFileName(resolved);
             const language = getLanguageFromPath(resolved) || 'plaintext';
-            onNavigate({ path: resolved, name: fileName, content, isDirty: false, language }, 1);
+
+            // Try to find the specific symbol's line in the target file
+            let targetLine = 1;
+            try {
+              const symbolDefs = await findDefinition(symbolName, resolved);
+              const match = symbolDefs.find((d) => d.filePath === resolved);
+              if (match) {
+                targetLine = match.line;
+              }
+            } catch {
+              // Backend lookup failed, navigate to line 1
+            }
+
+            onNavigate(
+              { path: resolved, name: fileName, content, isDirty: false, language },
+              targetLine
+            );
             return;
           } catch {
             // File read failed, fall through to local jump
@@ -132,38 +157,15 @@ async function handleNavigation(
 const RESOLVE_EXTENSIONS = ['.ts', '.tsx', '.js', '.jsx'];
 
 /**
- * Resolve a relative import path to an absolute file path by trying common extensions and /index.* variants.
+ * Try resolving a base path by appending common extensions and /index.* variants.
  */
-async function resolveImportPath(
-  currentFilePath: string,
-  importSource: string
-): Promise<string | null> {
-  // Get directory of the current file
-  const lastSlash = currentFilePath.lastIndexOf('/');
-  const currentDir = lastSlash >= 0 ? currentFilePath.slice(0, lastSlash) : '';
-
-  // Resolve the relative path
-  const segments = `${currentDir}/${importSource}`.split('/');
-  const resolved: string[] = [];
-  for (const seg of segments) {
-    if (seg === '' || seg === '.') continue;
-    if (seg === '..') {
-      resolved.pop();
-    } else {
-      resolved.push(seg);
-    }
-  }
-  const basePath = '/' + resolved.join('/');
-
-  // Try the exact path first (in case the import already has an extension)
+async function tryResolveWithExtensions(basePath: string): Promise<string | null> {
   const candidates = [basePath];
 
-  // Try with extensions
   for (const ext of RESOLVE_EXTENSIONS) {
     candidates.push(basePath + ext);
   }
 
-  // Try index variants
   for (const ext of RESOLVE_EXTENSIONS) {
     candidates.push(basePath + '/index' + ext);
   }
@@ -178,6 +180,87 @@ async function resolveImportPath(
   }
 
   return null;
+}
+
+/**
+ * Resolve a relative import path to an absolute file path.
+ */
+async function resolveRelativeImportPath(
+  currentFilePath: string,
+  importSource: string
+): Promise<string | null> {
+  const lastSlash = currentFilePath.lastIndexOf('/');
+  const currentDir = lastSlash >= 0 ? currentFilePath.slice(0, lastSlash) : '';
+
+  const segments = `${currentDir}/${importSource}`.split('/');
+  const resolved: string[] = [];
+  for (const seg of segments) {
+    if (seg === '' || seg === '.') continue;
+    if (seg === '..') {
+      resolved.pop();
+    } else {
+      resolved.push(seg);
+    }
+  }
+  const basePath = '/' + resolved.join('/');
+
+  return tryResolveWithExtensions(basePath);
+}
+
+/**
+ * Resolve a `@/` aliased import path to an absolute file path.
+ * `@/foo/bar` → `<projectRoot>/src/foo/bar`
+ */
+async function resolveAliasedImportPath(
+  currentFilePath: string,
+  importSource: string
+): Promise<string | null> {
+  // Derive project root by finding `/src/` in the current file path
+  const srcIdx = currentFilePath.indexOf('/src/');
+  if (srcIdx === -1) return null;
+
+  const projectRoot = currentFilePath.slice(0, srcIdx);
+  const aliasedPath = importSource.slice(2); // strip `@/`
+  const basePath = `${projectRoot}/src/${aliasedPath}`;
+
+  return tryResolveWithExtensions(basePath);
+}
+
+/**
+ * Resolve any import source (relative, @/ alias, or bare) to an absolute file path.
+ */
+async function resolveImportSource(
+  currentFilePath: string,
+  importSource: string
+): Promise<string | null> {
+  if (importSource.startsWith('./') || importSource.startsWith('../')) {
+    return resolveRelativeImportPath(currentFilePath, importSource);
+  }
+  if (importSource.startsWith('@/')) {
+    return resolveAliasedImportPath(currentFilePath, importSource);
+  }
+  return null;
+}
+
+/**
+ * Handle cmd+click on an import path string — resolve and open the file.
+ */
+async function handleImportPathNavigation(
+  importPath: string,
+  currentFilePath: string,
+  onNavigate: (file: OpenFile, line: number) => void
+) {
+  try {
+    const resolved = await resolveImportSource(currentFilePath, importPath);
+    if (!resolved) return;
+
+    const content = await readFile(resolved);
+    const fileName = getFileName(resolved);
+    const language = getLanguageFromPath(resolved) || 'plaintext';
+    onNavigate({ path: resolved, name: fileName, content, isDirty: false, language }, 1);
+  } catch (err) {
+    console.error('Import path navigation error:', err);
+  }
 }
 
 /**

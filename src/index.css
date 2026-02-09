@@ -139,7 +139,7 @@ body,
   border: 1px solid var(--surface-3);
   border-radius: 6px;
   padding: 8px 12px;
-  max-width: 400px;
+  max-width: 550px;
   font-size: 12px;
   line-height: 1.4;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
@@ -207,9 +207,21 @@ body,
   padding: 4px 8px;
   border-radius: 4px;
   margin-top: 4px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow: auto;
+  white-space: pre;
+  max-height: 200px;
+  line-height: 1.4;
+  tab-size: 2;
+}
+
+.cm-tooltip-signature-code pre {
+  margin: 0;
+  padding: 0;
+}
+
+.cm-tooltip-signature-code code {
+  font-family: inherit;
+  font-size: inherit;
 }
 
 .cm-tooltip-signature-location {
