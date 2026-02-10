@@ -8,12 +8,14 @@ import '@/styles/highlight-theme.css';
 export function DiffContentPanel() {
   const {
     currentDirectory,
+    contextPath,
     allFiles,
     diffs,
     collapsedDiffFiles,
     virtuosoRef,
     toggleDiffFileCollapse,
     handleEditFile,
+    handleRefresh,
   } = useDiffViewer();
   const { diffFileListVisible, toggleDiffFileList, setFocusedPanel } = useUIStore();
 
@@ -85,6 +87,8 @@ export function DiffContentPanel() {
                 error={diffData?.error ?? null}
                 onToggleCollapse={() => toggleDiffFileCollapse(file.path)}
                 onEditFile={handleEditFile}
+                repoPath={contextPath || ''}
+                onRefresh={handleRefresh}
               />
             );
           }}

@@ -30,6 +30,14 @@ export default {
           bg: 'var(--diff-remove-bg)',
           text: 'var(--diff-remove-text)',
         },
+        'conflict-ours': {
+          bg: 'var(--conflict-ours-bg)',
+          text: 'var(--conflict-ours-text)',
+        },
+        'conflict-theirs': {
+          bg: 'var(--conflict-theirs-bg)',
+          text: 'var(--conflict-theirs-text)',
+        },
       },
       fontFamily: {
         'mono': ['Menlo', 'Monaco', 'Consolas', 'Liberation Mono', 'Courier New', 'monospace'],

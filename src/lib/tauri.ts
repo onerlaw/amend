@@ -124,6 +124,7 @@ export interface GitStatus {
   staged: GitFileStatus[];
   unstaged: GitFileStatus[];
   untracked: string[];
+  conflicted: string[];
 }
 
 export interface GitFileStatus {
@@ -195,6 +196,10 @@ export async function restoreFile(repoPath: string, filePath: string): Promise<v
 
 export async function unstageFile(repoPath: string, filePath: string): Promise<void> {
   return invoke('unstage_file', { repoPath, filePath });
+}
+
+export async function stageFile(repoPath: string, filePath: string): Promise<void> {
+  return invoke('stage_file', { repoPath, filePath });
 }
 
 export interface DiffStats {

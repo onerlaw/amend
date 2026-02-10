@@ -29,6 +29,12 @@
   --diff-remove-bg: #ffebe9;
   --diff-remove-text: #cf222e;
 
+  /* Conflict colors - light */
+  --conflict-ours-bg: #dbeafe;
+  --conflict-ours-text: #1d4ed8;
+  --conflict-theirs-bg: #fce7f3;
+  --conflict-theirs-text: #be185d;
+
   color-scheme: light;
   color: var(--text-primary);
   background-color: var(--surface-0);
@@ -51,6 +57,12 @@
   --diff-add-text: #7ee787;
   --diff-remove-bg: rgba(248, 81, 73, 0.15);
   --diff-remove-text: #ff7b72;
+
+  /* Conflict colors - dark */
+  --conflict-ours-bg: rgba(59, 130, 246, 0.15);
+  --conflict-ours-text: #93c5fd;
+  --conflict-theirs-bg: rgba(236, 72, 153, 0.15);
+  --conflict-theirs-text: #f9a8d4;
 
   color-scheme: dark;
   color: var(--text-primary);

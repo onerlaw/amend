@@ -3,10 +3,17 @@ import * as Diff from 'diff';
 import { highlightCode, getLanguageFromPath } from '@/lib/highlight';
 import { getFileName, toggleSetItem, buildImageDataUrl } from '@/lib/fileUtils';
 import { ChevronIcon } from '@/components/Icons';
+import {
+  parseConflicts,
+  resolveConflict,
+  hasConflictMarkers,
+  FileSegment,
+} from '@/lib/conflictParser';
+import { writeFile, stageFile } from '@/lib/tauri';
 
 interface DiffFileSectionProps {
   filePath: string;
-  category: 'staged' | 'unstaged' | 'untracked';
+  category: 'staged' | 'unstaged' | 'untracked' | 'conflicted';
   oldContent: string;
   newContent: string;
   isBinary: boolean;
@@ -15,6 +22,8 @@ interface DiffFileSectionProps {
   error: string | null;
   onToggleCollapse: () => void;
   onEditFile: (filePath: string) => void;
+  repoPath?: string;
+  onRefresh?: () => void;
 }
 
 interface DiffLineProps {
@@ -120,9 +129,14 @@ const BADGE_CONFIG: Record<string, { bg: string; text: string; label: string }> 
     label: 'Changed',
   },
   untracked: { bg: 'bg-gray-200 dark:bg-gray-600/30', text: 'text-tertiary', label: 'Untracked' },
+  conflicted: {
+    bg: 'bg-red-100 dark:bg-red-600/20',
+    text: 'text-red-600 dark:text-red-400',
+    label: 'Conflict',
+  },
 };
 
-function getStatusBadge(category: 'staged' | 'unstaged' | 'untracked') {
+function getStatusBadge(category: 'staged' | 'unstaged' | 'untracked' | 'conflicted') {
   const config = BADGE_CONFIG[category];
   return (
     <span className={`rounded-md ${config.bg} px-1.5 py-0.5 text-xs font-medium ${config.text}`}>
@@ -289,6 +303,148 @@ const ImageDiffContent = memo(function ImageDiffContent({
   );
 });
 
+// Conflict resolution content component
+const ConflictContent = memo(function ConflictContent({
+  filePath,
+  newContent,
+  repoPath,
+  onRefresh,
+}: {
+  filePath: string;
+  newContent: string;
+  repoPath: string;
+  onRefresh: () => void;
+}) {
+  const [segments, setSegments] = useState<FileSegment[] | null>(null);
+  const [allResolved, setAllResolved] = useState(false);
+  const language = getLanguageFromPath(filePath);
+
+  useEffect(() => {
+    const parsed = parseConflicts(newContent);
+    setSegments(parsed);
+    setAllResolved(!hasConflictMarkers(newContent));
+  }, [newContent]);
+
+  const handleResolve = useCallback(
+    async (conflictIndex: number, resolution: 'ours' | 'theirs' | 'both') => {
+      if (!segments) return;
+      const resolved = resolveConflict(segments, conflictIndex, resolution);
+      const fullPath = `${repoPath}/${filePath}`;
+      await writeFile(fullPath, resolved);
+      onRefresh();
+    },
+    [segments, repoPath, filePath, onRefresh]
+  );
+
+  const handleMarkResolved = useCallback(async () => {
+    await stageFile(repoPath, filePath);
+    onRefresh();
+  }, [repoPath, filePath, onRefresh]);
+
+  if (!segments) {
+    return (
+      <div className="flex items-center justify-center py-4 text-tertiary text-sm">
+        No conflict markers found
+      </div>
+    );
+  }
+
+  let conflictIndex = 0;
+
+  return (
+    <div>
+      {segments.map((segment, i) => {
+        if (segment.kind === 'normal') {
+          return (
+            <div key={i}>
+              {segment.lines.map((line, li) => (
+                <div key={li} className="font-mono text-sm whitespace-nowrap">
+                  <span
+                    className="px-2 whitespace-pre hljs"
+                    dangerouslySetInnerHTML={{ __html: highlightCode(line, language) }}
+                  />
+                </div>
+              ))}
+            </div>
+          );
+        }
+
+        const idx = conflictIndex++;
+        return (
+          <div key={i} className="border-y border-surface-3">
+            {/* Resolution buttons */}
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-surface-2">
+              <span className="text-xs font-medium text-secondary mr-auto">
+                Conflict #{idx + 1}
+              </span>
+              <button
+                onClick={() => handleResolve(idx, 'ours')}
+                className="rounded-md px-2 py-0.5 text-xs font-medium text-conflict-ours-text bg-conflict-ours-bg hover:opacity-80"
+              >
+                Accept Current
+              </button>
+              <button
+                onClick={() => handleResolve(idx, 'theirs')}
+                className="rounded-md px-2 py-0.5 text-xs font-medium text-conflict-theirs-text bg-conflict-theirs-bg hover:opacity-80"
+              >
+                Accept Incoming
+              </button>
+              <button
+                onClick={() => handleResolve(idx, 'both')}
+                className="rounded-md px-2 py-0.5 text-xs font-medium text-secondary bg-surface-3 hover:opacity-80"
+              >
+                Accept Both
+              </button>
+            </div>
+
+            {/* Ours section */}
+            <div className="bg-conflict-ours-bg">
+              <div className="px-3 py-0.5 text-xs text-conflict-ours-text font-medium border-b border-conflict-ours-text/20">
+                Current ({segment.oursLabel})
+              </div>
+              {segment.oursLines.map((line, li) => (
+                <div key={li} className="font-mono text-sm whitespace-nowrap">
+                  <span
+                    className="px-2 whitespace-pre hljs"
+                    dangerouslySetInnerHTML={{ __html: highlightCode(line, language) }}
+                  />
+                </div>
+              ))}
+            </div>
+
+            {/* Theirs section */}
+            <div className="bg-conflict-theirs-bg">
+              <div className="px-3 py-0.5 text-xs text-conflict-theirs-text font-medium border-b border-conflict-theirs-text/20">
+                Incoming ({segment.theirsLabel})
+              </div>
+              {segment.theirsLines.map((line, li) => (
+                <div key={li} className="font-mono text-sm whitespace-nowrap">
+                  <span
+                    className="px-2 whitespace-pre hljs"
+                    dangerouslySetInnerHTML={{ __html: highlightCode(line, language) }}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })}
+
+      {/* Mark as Resolved button when all conflicts are resolved */}
+      {allResolved && (
+        <div className="flex items-center justify-center py-3 bg-surface-1">
+          <button
+            onClick={handleMarkResolved}
+            className="rounded-md px-3 py-1.5 text-xs font-medium text-white bg-green-600 hover:bg-green-700"
+          >
+            Mark as Resolved
+          </button>
+        </div>
+      )}
+    </div>
+  );
+});
+
 export const DiffFileSection = memo(function DiffFileSection({
   filePath,
   category,
@@ -300,6 +456,8 @@ export const DiffFileSection = memo(function DiffFileSection({
   error,
   onToggleCollapse,
   onEditFile,
+  repoPath,
+  onRefresh,
 }: DiffFileSectionProps) {
   // Expand state for collapsed sections
   const [expandedSections, setExpandedSections] = useState<Set<number>>(new Set());
@@ -497,7 +655,16 @@ export const DiffFileSection = memo(function DiffFileSection({
             <ImageDiffContent filePath={filePath} oldContent={oldContent} newContent={newContent} />
           )}
 
-          {hasContent && !isBinary && (
+          {hasContent && !isBinary && category === 'conflicted' && repoPath && onRefresh && (
+            <ConflictContent
+              filePath={filePath}
+              newContent={newContent}
+              repoPath={repoPath}
+              onRefresh={onRefresh}
+            />
+          )}
+
+          {hasContent && !isBinary && category !== 'conflicted' && (
             <DiffContent
               sections={sections}
               expandedSections={expandedSections}
