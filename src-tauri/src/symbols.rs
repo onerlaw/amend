@@ -329,11 +329,6 @@ fn get_kind_from_capture(capture_name: &str) -> &str {
         "annotation"
     } else if capture_name.contains("const") || capture_name.contains("static") {
         "constant"
-    } else if capture_name.contains("val")
-        || capture_name.contains("var")
-        || capture_name.contains("field")
-    {
-        "variable"
     } else {
         "variable"
     }

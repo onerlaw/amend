@@ -10,7 +10,7 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "lint": "eslint src --ext .ts,.tsx",
-    "format": "prettier --write \"src/**/*.{ts,tsx,css}\" && cargo fmt --manifest-path src-tauri/Cargo.toml",
+    "format": "prettier --write \"src/**/*.{ts,tsx,css}\" && cargo fmt --manifest-path src-tauri/Cargo.toml && cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings",
     "release:major": "./scripts/release.sh major",
     "release:minor": "./scripts/release.sh minor",
     "release:patch": "./scripts/release.sh patch"
