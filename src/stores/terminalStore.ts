@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { reorderArray } from '@/lib/fileUtils';
 
 export interface TerminalTab {
   id: string;
@@ -64,9 +65,6 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
   },
 
   reorderTabs: (fromIndex: number, toIndex: number) => {
-    const tabs = [...get().tabs];
-    const [moved] = tabs.splice(fromIndex, 1);
-    tabs.splice(toIndex, 0, moved);
-    set({ tabs });
+    set({ tabs: reorderArray(get().tabs, fromIndex, toIndex) });
   },
 }));

@@ -6,12 +6,8 @@ import { useFileStore } from '@/stores/fileStore';
 import { useUIStore } from '@/stores/uiStore';
 import { FileContentPanel } from './FileContentPanel';
 import { CloseIcon, DocumentIcon } from '@/components/Icons';
-import {
-  goToDefinitionExtension,
-  symbolHoverTooltip,
-  cmdHeldCursorExtension,
-  scrollToLine,
-} from '@/extensions';
+import { goToDefinitionExtension, scrollToLine, cmdHeldCursorExtension } from '@/extensions/goToDefinition';
+import { symbolHoverTooltip } from '@/extensions/hoverTooltip';
 import { useDraggableTabs } from '@/hooks/useDraggableTabs';
 import { ReferencesPanel } from './ReferencesPanel';
 

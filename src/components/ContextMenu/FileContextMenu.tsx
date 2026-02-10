@@ -4,7 +4,7 @@ import { useContextMenuStore, dispatchFileTreeRefresh } from '@/stores/contextMe
 import { useFileStore } from '@/stores/fileStore';
 import { ModalOverlay } from '@/components/ModalOverlay';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
-import { revealLabel } from '@/lib/platform';
+import { revealLabel } from '@/lib/fileUtils';
 import {
   renameEntry,
   deleteFile,

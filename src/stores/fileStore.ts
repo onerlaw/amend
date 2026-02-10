@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { reorderArray } from '@/lib/fileUtils';
 
 export interface OpenFile {
   path: string;
@@ -40,13 +41,6 @@ function tabUpdateContent(files: OpenFile[], path: string, content: string): Ope
 
 function tabMarkSaved(files: OpenFile[], path: string): OpenFile[] {
   return files.map((f) => (f.path === path ? { ...f, isDirty: false } : f));
-}
-
-function tabReorder<T>(items: T[], fromIndex: number, toIndex: number): T[] {
-  const result = [...items];
-  const [moved] = result.splice(fromIndex, 1);
-  result.splice(toIndex, 0, moved);
-  return result;
 }
 
 function tabOpenAtLine(
@@ -185,7 +179,7 @@ export const useFileStore = create<FileState>()(
         });
       },
       reorderBrowseFiles: (fromIndex: number, toIndex: number) => {
-        set({ browseOpenFiles: tabReorder(get().browseOpenFiles, fromIndex, toIndex) });
+        set({ browseOpenFiles: reorderArray(get().browseOpenFiles, fromIndex, toIndex) });
       },
       // Find references panel
       referencesSymbol: null,

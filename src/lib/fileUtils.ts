@@ -2,6 +2,16 @@ import { readFile, readFileBase64 } from '@/lib/tauri';
 import { getLanguageFromPath } from '@/lib/highlight';
 import { useFileStore, OpenFile } from '@/stores/fileStore';
 
+// Platform detection
+export const isMac = navigator.platform.toUpperCase().includes('MAC');
+export const isWindows = navigator.platform.toUpperCase().includes('WIN');
+export const modifierKey = isMac ? '\u2318' : 'Ctrl';
+export const revealLabel = isMac
+  ? 'Reveal in Finder'
+  : isWindows
+    ? 'Reveal in File Explorer'
+    : 'Open Containing Folder';
+
 const IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'bmp', 'ico']);
 
 const MIME_TYPES: Record<string, string> = {
@@ -108,6 +118,16 @@ export function toggleSetItem<T>(set: Set<T>, item: T): Set<T> {
   if (newSet.has(item)) newSet.delete(item);
   else newSet.add(item);
   return newSet;
+}
+
+/**
+ * Reorder an array by moving an item from one index to another.
+ */
+export function reorderArray<T>(items: T[], fromIndex: number, toIndex: number): T[] {
+  const result = [...items];
+  const [moved] = result.splice(fromIndex, 1);
+  result.splice(toIndex, 0, moved);
+  return result;
 }
 
 /**

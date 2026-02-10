@@ -3,7 +3,7 @@ import { Extension } from '@codemirror/state';
 import { getSymbolAtPosition, findDefinitionInFile, LocalDefinition } from '@/lib/symbolNavigation';
 import { findDefinition, SymbolDefinition } from '@/lib/tauri';
 import { getFileName } from '@/lib/fileUtils';
-import { isMac } from '@/lib/platform';
+import { isMac } from '@/lib/fileUtils';
 
 export interface HoverTooltipConfig {
   currentFilePath: string;
@@ -44,7 +44,7 @@ export function symbolHoverTooltip(config: HoverTooltipConfig): Extension {
       // Only imports found locally — try cross-file lookup
       let crossFileDef: SymbolDefinition | null = null;
       try {
-        const defs = await findDefinition(symbol.name, currentFilePath);
+        const defs = await findDefinition(symbol.name);
         const external = defs.find((d) => d.filePath !== currentFilePath);
         if (external) {
           crossFileDef = external;
@@ -81,47 +81,48 @@ export function symbolHoverTooltip(config: HoverTooltipConfig): Extension {
 }
 
 /**
- * Create the DOM content for a local definition tooltip with multi-line code
+ * Build the common tooltip DOM structure.
  */
-function createTooltipContent(symbolName: string, localDefs: LocalDefinition[]): HTMLElement {
+function buildTooltipDom(opts: {
+  kind: string;
+  name: string;
+  signature?: string;
+  location: string;
+}): HTMLElement {
   const container = document.createElement('div');
   container.className = 'cm-tooltip-signature';
 
-  if (localDefs.length > 0) {
-    const localDef = localDefs[0];
-    const header = document.createElement('div');
-    header.className = 'cm-tooltip-signature-header';
+  const header = document.createElement('div');
+  header.className = 'cm-tooltip-signature-header';
 
-    const kindBadge = document.createElement('span');
-    kindBadge.className = `cm-tooltip-signature-kind cm-tooltip-kind-${localDef.kind}`;
-    kindBadge.textContent = localDef.kind;
-    header.appendChild(kindBadge);
+  const kindBadge = document.createElement('span');
+  kindBadge.className = `cm-tooltip-signature-kind cm-tooltip-kind-${opts.kind}`;
+  kindBadge.textContent = opts.kind;
+  header.appendChild(kindBadge);
 
-    const nameSpan = document.createElement('span');
-    nameSpan.className = 'cm-tooltip-signature-name';
-    nameSpan.textContent = symbolName;
-    header.appendChild(nameSpan);
+  const nameSpan = document.createElement('span');
+  nameSpan.className = 'cm-tooltip-signature-name';
+  nameSpan.textContent = opts.name;
+  header.appendChild(nameSpan);
 
-    container.appendChild(header);
+  container.appendChild(header);
 
-    if (localDef.signature) {
-      const sig = document.createElement('div');
-      sig.className = 'cm-tooltip-signature-code';
-      const pre = document.createElement('pre');
-      const code = document.createElement('code');
-      code.textContent = localDef.signature;
-      pre.appendChild(code);
-      sig.appendChild(pre);
-      container.appendChild(sig);
-    }
-
-    const location = document.createElement('div');
-    location.className = 'cm-tooltip-signature-location';
-    location.textContent = `Line ${localDef.line}`;
-    container.appendChild(location);
+  if (opts.signature) {
+    const sig = document.createElement('div');
+    sig.className = 'cm-tooltip-signature-code';
+    const pre = document.createElement('pre');
+    const code = document.createElement('code');
+    code.textContent = opts.signature;
+    pre.appendChild(code);
+    sig.appendChild(pre);
+    container.appendChild(sig);
   }
 
-  // Add hint for go-to-definition
+  const location = document.createElement('div');
+  location.className = 'cm-tooltip-signature-location';
+  location.textContent = opts.location;
+  container.appendChild(location);
+
   const hint = document.createElement('div');
   hint.className = 'cm-tooltip-signature-hint';
   hint.textContent = `${isMac ? 'Cmd' : 'Ctrl'}+Click to go to definition`;
@@ -130,49 +131,24 @@ function createTooltipContent(symbolName: string, localDefs: LocalDefinition[]):
   return container;
 }
 
-/**
- * Create tooltip content for a cross-file definition with multi-line code preview
- */
-function createCrossFileTooltipContent(symbolName: string, def: SymbolDefinition): HTMLElement {
-  const container = document.createElement('div');
-  container.className = 'cm-tooltip-signature';
-
-  const header = document.createElement('div');
-  header.className = 'cm-tooltip-signature-header';
-
-  const kindBadge = document.createElement('span');
-  kindBadge.className = `cm-tooltip-signature-kind cm-tooltip-kind-${def.kind}`;
-  kindBadge.textContent = def.kind;
-  header.appendChild(kindBadge);
-
-  const nameSpan = document.createElement('span');
-  nameSpan.className = 'cm-tooltip-signature-name';
-  nameSpan.textContent = symbolName;
-  header.appendChild(nameSpan);
-
-  container.appendChild(header);
-
-  if (def.signature) {
-    const sig = document.createElement('div');
-    sig.className = 'cm-tooltip-signature-code';
-    const pre = document.createElement('pre');
-    const code = document.createElement('code');
-    code.textContent = def.signature;
-    pre.appendChild(code);
-    sig.appendChild(pre);
-    container.appendChild(sig);
+function createTooltipContent(symbolName: string, localDefs: LocalDefinition[]): HTMLElement {
+  if (localDefs.length > 0) {
+    const def = localDefs[0];
+    return buildTooltipDom({
+      kind: def.kind,
+      name: symbolName,
+      signature: def.signature,
+      location: `Line ${def.line}`,
+    });
   }
+  return buildTooltipDom({ kind: 'unknown', name: symbolName, location: '' });
+}
 
-  const location = document.createElement('div');
-  location.className = 'cm-tooltip-signature-location';
-  location.textContent = `${getFileName(def.filePath)}:${def.line}`;
-  container.appendChild(location);
-
-  // Add hint for go-to-definition
-  const hint = document.createElement('div');
-  hint.className = 'cm-tooltip-signature-hint';
-  hint.textContent = `${isMac ? 'Cmd' : 'Ctrl'}+Click to go to definition`;
-  container.appendChild(hint);
-
-  return container;
+function createCrossFileTooltipContent(symbolName: string, def: SymbolDefinition): HTMLElement {
+  return buildTooltipDom({
+    kind: def.kind,
+    name: symbolName,
+    signature: def.signature,
+    location: `${getFileName(def.filePath)}:${def.line}`,
+  });
 }

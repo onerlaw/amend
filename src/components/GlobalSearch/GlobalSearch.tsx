@@ -4,7 +4,7 @@ import { searchFiles, SearchResult } from '@/lib/tauri';
 import { useFileStore } from '@/stores/fileStore';
 import { useUIStore } from '@/stores/uiStore';
 import { getFileIconColor, openFileInBrowseMode } from '@/lib/fileUtils';
-import { modifierKey } from '@/lib/platform';
+import { modifierKey } from '@/lib/fileUtils';
 import { SearchIcon, FileIcon, SpinnerIcon } from '@/components/Icons';
 
 export function GlobalSearch() {

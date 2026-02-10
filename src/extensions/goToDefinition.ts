@@ -100,7 +100,7 @@ async function handleNavigation(
     // Try cross-file definitions from backend
     let crossFileDefs: SymbolDefinition[] = [];
     try {
-      crossFileDefs = await findDefinition(symbolName, currentFilePath);
+      crossFileDefs = await findDefinition(symbolName);
     } catch {
       // Backend not available
     }
@@ -155,7 +155,7 @@ async function handleNavigation(
             let targetLine = 1;
             if (!isNodeModules) {
               try {
-                const defs = await findDefinition(symbolName, targetFile);
+                const defs = await findDefinition(symbolName);
                 const defInFile = defs.find((d) => d.filePath === targetFile);
                 if (defInFile) targetLine = defInFile.line;
               } catch {

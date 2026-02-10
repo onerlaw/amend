@@ -2,7 +2,6 @@ use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::Path;
-use std::sync::Arc;
 use streaming_iterator::StreamingIterator;
 use tree_sitter::{Node, Parser, Query, QueryCursor};
 
@@ -334,6 +333,23 @@ fn get_kind_from_capture(capture_name: &str) -> &str {
     }
 }
 
+/// Check if a path is in a common build/dependency directory that should be skipped
+fn is_skippable_path(path: &str) -> bool {
+    const SKIP_DIRS: &[&str] = &[
+        "/node_modules/",
+        "/dist/",
+        "/build/",
+        "/.git/",
+        "/target/",
+        "/__pycache__/",
+        "/venv/",
+        "/.venv/",
+        "/.metals/",
+        "/.bloop/",
+    ];
+    SKIP_DIRS.iter().any(|dir| path.contains(dir))
+}
+
 /// Check if a name is too common to index
 fn is_common_name(name: &str) -> bool {
     matches!(
@@ -405,24 +421,7 @@ pub struct SymbolReference {
     pub line_content: String,
 }
 
-/// Manager for symbol indexing operations
-pub struct SymbolManager {
-    index: Arc<SymbolIndex>,
-}
-
-impl Default for SymbolManager {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl SymbolManager {
-    pub fn new() -> Self {
-        Self {
-            index: Arc::new(SymbolIndex::new()),
-        }
-    }
-
+impl SymbolIndex {
     /// Index all supported files in a project directory
     pub fn index_project(&self, root_path: &str) -> Result<(), String> {
         use ignore::WalkBuilder;
@@ -451,18 +450,7 @@ impl SymbolManager {
                 None => continue,
             };
 
-            // Skip common build/dependency directories
-            if path_str.contains("/node_modules/")
-                || path_str.contains("/dist/")
-                || path_str.contains("/build/")
-                || path_str.contains("/.git/")
-                || path_str.contains("/target/")
-                || path_str.contains("/__pycache__/")
-                || path_str.contains("/venv/")
-                || path_str.contains("/.venv/")
-                || path_str.contains("/.metals/")
-                || path_str.contains("/.bloop/")
-            {
+            if is_skippable_path(&path_str) {
                 continue;
             }
 
@@ -471,17 +459,10 @@ impl SymbolManager {
                 Err(_) => continue,
             };
 
-            self.index.index_file(&path_str, &content, lang);
+            self.index_file(&path_str, &content, lang);
         }
 
         Ok(())
-    }
-
-    /// Find definitions for a symbol.
-    /// `_current_file` is accepted for future use (e.g., ranking results by proximity)
-    /// but is not currently used for filtering.
-    pub fn find_definition(&self, symbol: &str, _current_file: &str) -> Vec<SymbolDefinition> {
-        self.index.find_definition(symbol)
     }
 
     /// Find all references to a symbol across the project by scanning files for whole-word matches.
@@ -519,17 +500,7 @@ impl SymbolManager {
             if get_language_from_path(&path_str).is_none() {
                 continue;
             }
-            if path_str.contains("/node_modules/")
-                || path_str.contains("/dist/")
-                || path_str.contains("/build/")
-                || path_str.contains("/.git/")
-                || path_str.contains("/target/")
-                || path_str.contains("/__pycache__/")
-                || path_str.contains("/venv/")
-                || path_str.contains("/.venv/")
-                || path_str.contains("/.metals/")
-                || path_str.contains("/.bloop/")
-            {
+            if is_skippable_path(&path_str) {
                 continue;
             }
 

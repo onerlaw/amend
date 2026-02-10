@@ -234,11 +234,8 @@ export async function indexProject(rootPath: string): Promise<void> {
   return invoke('index_project', { rootPath });
 }
 
-export async function findDefinition(
-  symbol: string,
-  currentFile: string
-): Promise<SymbolDefinition[]> {
-  return invoke('find_definition', { symbol, currentFile });
+export async function findDefinition(symbol: string): Promise<SymbolDefinition[]> {
+  return invoke('find_definition', { symbol });
 }
 
 export async function findReferences(symbol: string, rootPath: string): Promise<SymbolReference[]> {

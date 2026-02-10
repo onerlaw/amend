@@ -1,7 +1,7 @@
 import { EditorView } from '@codemirror/view';
 import { syntaxTree } from '@codemirror/language';
 import { SyntaxNode } from '@lezer/common';
-import { isMac } from '@/lib/platform';
+import { isMac } from '@/lib/fileUtils';
 
 /**
  * Information about a symbol at a position
