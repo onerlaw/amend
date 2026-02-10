@@ -37,6 +37,7 @@ export function GlobalSearch() {
         console.error('Failed to open file:', err);
       }
       setPanelMode('browse');
+      inputRef.current?.blur();
       closeSearch();
     },
     [setPanelMode, closeSearch]
