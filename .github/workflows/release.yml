@@ -27,6 +27,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.bump.outputs.version }}
+      changelog: ${{ steps.changelog.outputs.changelog }}
     steps:
       - name: Determine bump type
         id: bump-type
@@ -77,6 +78,70 @@ jobs:
           git push origin main --tags
 
           echo "version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          NEW_VERSION="${{ steps.bump.outputs.version }}"
+
+          # Find the previous release tag (the one before the tag we just created)
+          PREV_TAG=$(git tag --sort=-v:refname | grep '^v' | grep -v "v$NEW_VERSION" | head -1)
+
+          if [ -z "$PREV_TAG" ]; then
+            # No previous tag, use all commits up to the new tag
+            RANGE="v$NEW_VERSION"
+          else
+            RANGE="$PREV_TAG..v$NEW_VERSION"
+          fi
+
+          echo "Generating changelog for $RANGE"
+
+          # Collect commits, skip version bump commits
+          FEATURES=""
+          FIXES=""
+          OTHER=""
+
+          while IFS= read -r line; do
+            # Skip empty lines and version bump commits
+            [ -z "$line" ] && continue
+            echo "$line" | grep -qi "^bump version" && continue
+
+            if echo "$line" | grep -qi "^feat"; then
+              # Strip conventional commit prefix
+              MSG=$(echo "$line" | sed 's/^feat[^:]*: *//')
+              FEATURES="${FEATURES}- ${MSG}\n"
+            elif echo "$line" | grep -qi "^fix"; then
+              MSG=$(echo "$line" | sed 's/^fix[^:]*: *//')
+              FIXES="${FIXES}- ${MSG}\n"
+            else
+              # Strip any conventional commit prefix (chore:, docs:, refactor:, etc.)
+              MSG=$(echo "$line" | sed 's/^[a-z]*[^:]*: *//')
+              OTHER="${OTHER}- ${MSG}\n"
+            fi
+          done <<< "$(git log "$RANGE" --pretty=format:'%s' --no-merges)"
+
+          # Build changelog
+          CHANGELOG=""
+          if [ -n "$FEATURES" ]; then
+            CHANGELOG="${CHANGELOG}### Features\n${FEATURES}\n"
+          fi
+          if [ -n "$FIXES" ]; then
+            CHANGELOG="${CHANGELOG}### Bug Fixes\n${FIXES}\n"
+          fi
+          if [ -n "$OTHER" ]; then
+            CHANGELOG="${CHANGELOG}### Other Changes\n${OTHER}\n"
+          fi
+
+          if [ -z "$CHANGELOG" ]; then
+            CHANGELOG="No notable changes."
+          fi
+
+          # Write to output using heredoc delimiter for multiline
+          {
+            echo "changelog<<CHANGELOG_EOF"
+            echo -e "$CHANGELOG"
+            echo "CHANGELOG_EOF"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Delete trigger tag
         if: startsWith(github.ref, 'refs/tags/release/')
@@ -145,6 +210,6 @@ jobs:
         with:
           tagName: v${{ needs.prepare.outputs.version }}
           releaseName: 'Amend v__VERSION__'
-          releaseBody: ''
+          releaseBody: ${{ needs.prepare.outputs.changelog }}
           releaseDraft: false
           args: ${{ matrix.args }}
