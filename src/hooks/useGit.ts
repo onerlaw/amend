@@ -41,7 +41,9 @@ export function useGitPolling(repoPath: string | null) {
           '||' +
           gitStatus.unstaged.map((f) => `${f.path}:${f.status}`).join('|') +
           '||' +
-          gitStatus.untracked.join('|');
+          gitStatus.untracked.join('|') +
+          '||' +
+          gitStatus.conflicted.join('|');
         if (statusKey !== lastStatusRef.current) {
           lastStatusRef.current = statusKey;
           setStatus(gitStatus);

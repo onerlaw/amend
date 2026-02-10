@@ -70,6 +70,7 @@ const STATUS_DISPLAY: Record<string, { color: string; letter: string }> = {
   modified: { color: 'text-amber-500 dark:text-yellow-400', letter: 'M' },
   deleted: { color: 'text-diff-remove-text', letter: 'D' },
   renamed: { color: 'text-blue-600 dark:text-blue-400', letter: 'R' },
+  conflicted: { color: 'text-red-500 dark:text-red-400', letter: 'C' },
 };
 
 function getStatusIcon(statusType: string) {
@@ -254,6 +255,14 @@ export function DiffFileList({
     return buildTree(status.untracked, { getPath: (p) => p });
   }, [status]);
 
+  const conflictedTree = useMemo(() => {
+    if (!status || (status.conflicted?.length ?? 0) === 0) return null;
+    return buildTree(status.conflicted, {
+      getPath: (p) => p,
+      getLeafData: () => ({ status: 'conflicted' }),
+    });
+  }, [status]);
+
   if (isLoading) {
     return <div className="flex items-center justify-center h-full text-tertiary">Loading...</div>;
   }
@@ -267,7 +276,10 @@ export function DiffFileList({
   }
 
   const hasChanges =
-    status.staged.length > 0 || status.unstaged.length > 0 || status.untracked.length > 0;
+    (status.conflicted?.length ?? 0) > 0 ||
+    status.staged.length > 0 ||
+    status.unstaged.length > 0 ||
+    status.untracked.length > 0;
 
   if (!hasChanges) {
     return (
@@ -281,6 +293,21 @@ export function DiffFileList({
 
   return (
     <div className="h-full overflow-y-auto">
+      {/* Conflicted files */}
+      {conflictedTree && (status.conflicted?.length ?? 0) > 0 && (
+        <div className="mb-2">
+          <div className="px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-red-500 dark:text-red-400">
+            Conflicts ({status.conflicted.length})
+          </div>
+          <FileTreeItem
+            node={conflictedTree}
+            depth={0}
+            onScrollToFile={handleScrollToFile}
+            selectedFile={selectedFile}
+          />
+        </div>
+      )}
+
       {/* Staged changes */}
       {stagedTree && status.staged.length > 0 && (
         <div className="mb-2">

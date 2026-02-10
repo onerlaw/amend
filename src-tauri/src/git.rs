@@ -41,6 +41,7 @@ pub struct GitStatus {
     pub staged: Vec<GitFileStatus>,
     pub unstaged: Vec<GitFileStatus>,
     pub untracked: Vec<String>,
+    pub conflicted: Vec<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -136,11 +137,17 @@ pub fn get_git_status(repo_path: String) -> Result<GitStatus, GitError> {
         staged: Vec::new(),
         unstaged: Vec::new(),
         untracked: Vec::new(),
+        conflicted: Vec::new(),
     };
 
     for entry in statuses.iter() {
         let path = entry.path().unwrap_or("").to_string();
         let status = entry.status();
+
+        if status.is_conflicted() {
+            result.conflicted.push(path);
+            continue;
+        }
 
         if status.is_wt_new() {
             result.untracked.push(path);
@@ -379,6 +386,13 @@ pub fn restore_file(repo_path: String, file_path: String) -> Result<(), GitError
 pub fn unstage_file(repo_path: String, file_path: String) -> Result<(), GitError> {
     validate_no_flag(&file_path, "file path")?;
     run_git_command(&repo_path, &["restore", "--staged", "--", &file_path])?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn stage_file(repo_path: String, file_path: String) -> Result<(), GitError> {
+    validate_no_flag(&file_path, "file path")?;
+    run_git_command(&repo_path, &["add", "--", &file_path])?;
     Ok(())
 }
 

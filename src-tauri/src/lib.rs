@@ -51,6 +51,7 @@ pub fn run() {
             git::list_branches,
             git::restore_file,
             git::unstage_file,
+            git::stage_file,
             git::get_diff_stats,
             // Watcher commands
             watcher::start_watching_directory,

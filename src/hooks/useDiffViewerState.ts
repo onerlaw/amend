@@ -8,7 +8,7 @@ import { GitPollingResult } from '@/hooks/useGit';
 
 export interface FileWithCategory {
   path: string;
-  category: 'staged' | 'unstaged' | 'untracked';
+  category: 'staged' | 'unstaged' | 'untracked' | 'conflicted';
 }
 
 export function useDiffViewerState(gitPolling: GitPollingResult, enabled: boolean = true) {
@@ -29,6 +29,7 @@ export function useDiffViewerState(gitPolling: GitPollingResult, enabled: boolea
   const allFiles = useMemo((): FileWithCategory[] => {
     if (!status) return [];
     return [
+      ...status.conflicted.map((path) => ({ path, category: 'conflicted' as const })),
       ...status.staged.map((f) => ({ path: f.path, category: 'staged' as const })),
       ...status.unstaged.map((f) => ({ path: f.path, category: 'unstaged' as const })),
       ...status.untracked.map((path) => ({ path, category: 'untracked' as const })),
