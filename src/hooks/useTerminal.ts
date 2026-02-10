@@ -13,7 +13,9 @@ import {
   onTerminalExit,
 } from '@/lib/tauri';
 import { useTerminalStore } from '@/stores/terminalStore';
+import { useFileStore } from '@/stores/fileStore';
 import { useUIStore } from '@/stores/uiStore';
+import { FileLinkProvider } from '@/lib/terminalLinks';
 import { isDarkMode } from '@/hooks/useTheme';
 
 let initializationCounter = 0;
@@ -177,6 +179,14 @@ export function useTerminal(containerId: string | null) {
         openUrl(uri).catch(console.error);
       });
       terminal.loadAddon(webLinksAddon);
+
+      // Register file link provider for Cmd+Click file opening
+      terminal.registerLinkProvider(
+        new FileLinkProvider(terminal, () => {
+          const tab = useTerminalStore.getState().tabs.find((t) => t.id === containerId);
+          return tab?.worktreePath ?? useFileStore.getState().contextPath;
+        })
+      );
 
       terminalRef.current = terminal;
       fitAddonRef.current = fitAddon;
