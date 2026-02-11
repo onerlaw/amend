@@ -77,7 +77,7 @@ export function useGitPolling(repoPath: string | null) {
       return;
     }
 
-    refresh();
+    refresh(true);
     const intervalId = setInterval(() => refresh(true), POLL_INTERVAL);
 
     // Pause polling when tab is hidden, refresh immediately on re-focus
