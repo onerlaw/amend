@@ -4,7 +4,8 @@ import { sortDirectoriesFirst, getFileName } from '@/lib/fileUtils';
 import { useUIStore } from '@/stores/uiStore';
 import { ContextMenu } from '@/components/ContextMenu/ContextMenu';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
-import { ChevronIcon, FolderIcon, DiscardIcon } from '@/components/Icons';
+import { DiscardIcon } from '@/components/Icons';
+import { TreeRow, DirectoryIndicator } from '@/components/FileTree/TreePrimitives';
 
 interface DiffFileListProps {
   status: GitStatus | null;
@@ -165,17 +166,10 @@ function FileTreeItem({
     return (
       <div>
         {node.name && (
-          <button
-            onClick={() => toggleDiffTreePath(node.path)}
-            className="flex w-full select-none items-center gap-1 px-2 py-0.5 text-sm hover:bg-surface-3/50"
-            style={{ paddingLeft: `${depth * 12 + 8}px` }}
-          >
-            <ChevronIcon
-              className={`h-3 w-3 text-tertiary transition-transform ${isExpanded ? 'rotate-90' : ''}`}
-            />
-            <FolderIcon className="h-4 w-4 text-yellow-500" />
+          <TreeRow depth={depth} onClick={() => toggleDiffTreePath(node.path)}>
+            <DirectoryIndicator isExpanded={isExpanded} />
             <span className="text-primary">{node.name}</span>
-          </button>
+          </TreeRow>
         )}
         {(isExpanded || !node.name) && (
           <div>
@@ -207,7 +201,10 @@ function FileTreeItem({
   const inlineAction: 'restore' | 'unstage' = hasUnstaged ? 'restore' : 'unstage';
 
   return (
-    <button
+    <TreeRow
+      depth={depth}
+      isSelected={isSelected}
+      className="group"
       onClick={() => onScrollToFile(node.path)}
       onContextMenu={
         onContextMenu
@@ -218,10 +215,6 @@ function FileTreeItem({
             }
           : undefined
       }
-      className={`group flex w-full select-none items-center gap-1 py-0.5 text-sm hover:bg-surface-3/50 ${
-        isSelected ? 'bg-surface-3' : ''
-      }`}
-      style={{ paddingLeft: `${depth * 12 + 8}px` }}
     >
       {getStatusIndicator(categories)}
       <span className="truncate text-primary flex-1 text-left">{node.name}</span>
@@ -239,7 +232,7 @@ function FileTreeItem({
           <DiscardIcon />
         </span>
       )}
-    </button>
+    </TreeRow>
   );
 }
 
