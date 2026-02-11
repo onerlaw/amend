@@ -293,7 +293,7 @@ const stickyGutters = ViewPlugin.fromClass(
 
       // Create a flex-row wrapper that sits where the scroller was
       const wrapper = document.createElement('div');
-      wrapper.style.cssText = 'display:flex;flex:1;min-height:0;';
+      wrapper.style.cssText = 'display:flex;flex-direction:row;flex:1;min-height:0;';
       this.wrapper = wrapper;
 
       // Gutter clip container — clips vertical overflow, never scrolls horizontally
@@ -326,6 +326,11 @@ const stickyGutters = ViewPlugin.fromClass(
     };
 
     update() {
+      // CodeMirror's gutter extension re-applies position:sticky on updates;
+      // clear it every time so the gutter stays in our flex wrapper column.
+      if (this.gutters) {
+        this.gutters.style.position = '';
+      }
       this.syncScroll();
     }
 
