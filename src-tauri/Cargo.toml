@@ -1,6 +1,6 @@
 [package]
 name = "amend"
-version = "0.1.16"
+version = "0.1.17"
 description = "An Agentic IDE for software development"
 authors = ["onerlaw"]
 edition = "2021"
