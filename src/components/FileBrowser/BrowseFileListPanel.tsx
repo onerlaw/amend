@@ -5,7 +5,8 @@ import { readDirectories, FileEntry } from '@/lib/tauri';
 import { useContextMenuStore } from '@/stores/contextMenuStore';
 import { useUIStore } from '@/stores/uiStore';
 import { getFileIconColor, sortDirectoriesFirst } from '@/lib/fileUtils';
-import { ChevronIcon, FolderIcon, FileIcon, RefreshIcon } from '@/components/Icons';
+import { FolderIcon, FileIcon } from '@/components/Icons';
+import { TreeRow, DirectoryIndicator, PanelHeader } from '@/components/FileTree/TreePrimitives';
 
 const dirContentsCache = new Map<string, FileEntry[]>();
 
@@ -113,34 +114,29 @@ function BrowseFileList({
         const isActive = activeFilePath === entry.path;
         const isContextTarget = contextMenuOpen && contextTargetPath === entry.path;
 
-        const iconEl = entry.isDirectory ? (
-          <FolderIcon className="h-4 w-4 text-yellow-500" />
-        ) : (
-          <FileIcon className={`h-4 w-4 ${getFileIconColor(entry.name)}`} />
-        );
-
         return (
-          <button
+          <TreeRow
+            depth={depth}
+            isSelected={isActive || isContextTarget}
+            isSubtle={isOpen && !isActive && !isContextTarget}
+            className={`pr-2 text-left ${entry.isGitignored ? 'opacity-50' : ''}`}
             onClick={() => (entry.isDirectory ? toggleDir(entry.path) : onSelectFile(entry.path))}
             onContextMenu={(e) => {
               e.preventDefault();
               e.stopPropagation();
               openMenu(entry, e.clientX, e.clientY);
             }}
-            className={`flex w-full select-none items-center gap-1 py-0.5 pr-2 text-left text-sm hover:bg-surface-3/50 ${
-              isActive || isContextTarget ? 'bg-surface-3' : isOpen ? 'bg-surface-3/30' : ''
-            } ${entry.isGitignored ? 'opacity-50' : ''}`}
-            style={{ paddingLeft: `${depth * 12 + 8}px` }}
           >
-            {entry.isDirectory && (
-              <ChevronIcon
-                className={`h-3 w-3 text-tertiary transition-transform ${isExpanded ? 'rotate-90' : ''}`}
-              />
+            {entry.isDirectory ? (
+              <DirectoryIndicator isExpanded={isExpanded} />
+            ) : (
+              <>
+                <span className="w-3" />
+                <FileIcon className={`h-4 w-4 ${getFileIconColor(entry.name)}`} />
+              </>
             )}
-            {!entry.isDirectory && <span className="w-3" />}
-            {iconEl}
             <span className="truncate text-primary">{entry.name}</span>
-          </button>
+          </TreeRow>
         );
       }}
     />
@@ -169,18 +165,7 @@ export function BrowseFileListPanel() {
       className="h-full bg-surface-2 flex flex-col"
       onMouseDown={() => setFocusedPanel('file-list')}
     >
-      <div className="flex items-center justify-between px-3 py-2">
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-semibold uppercase tracking-wide text-primary">Files</span>
-        </div>
-        <button
-          onClick={handleRefresh}
-          className="rounded-md p-1 text-secondary hover:bg-surface-3"
-          title="Refresh"
-        >
-          <RefreshIcon />
-        </button>
-      </div>
+      <PanelHeader title="Files" onRefresh={handleRefresh} />
       {!contextPath ? (
         <div className="flex h-full flex-col items-center justify-center px-6 text-center">
           <FolderIcon className="h-12 w-12 text-tertiary mb-4" />
