@@ -173,9 +173,13 @@ export const TerminalTabs = forwardRef<TerminalTabsHandle>(function TerminalTabs
     }
     try {
       await removeWorktree(worktree.path);
-    } catch (err) {
-      console.error('Failed to delete worktree:', err);
-      alert(`Failed to delete worktree: ${err}`);
+    } catch {
+      try {
+        await removeWorktree(worktree.path, true);
+      } catch (err) {
+        console.error('Failed to delete worktree:', err);
+        alert(`Failed to delete worktree: ${err}`);
+      }
     }
   };
 
