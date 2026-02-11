@@ -9,6 +9,7 @@ import {
   FileEntry,
 } from '@/lib/tauri';
 import { openFileInBrowseMode } from '@/lib/fileUtils';
+import { dispatchFileTreeRefresh } from '@/stores/contextMenuStore';
 
 const AUTO_SAVE_DELAY = 1000;
 
@@ -167,7 +168,7 @@ export function useFileBrowserState() {
     handleSelectFile,
     handleCloseFile,
     handleContentChange,
-    handleRefresh: loadDirectory,
+    handleRefresh: dispatchFileTreeRefresh,
     setBrowseActiveFile,
     getSaveStatus,
   };

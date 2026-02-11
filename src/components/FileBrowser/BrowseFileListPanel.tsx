@@ -50,10 +50,9 @@ function BrowseFileList({
   // Re-fetch expanded directory contents when file tree refreshes
   useEffect(() => {
     const handleRefresh = async () => {
+      dirContentsCache.clear();
       const expandedPaths = Array.from(expandedDirs);
       if (expandedPaths.length === 0) return;
-
-      dirContentsCache.clear();
       try {
         const results = await readDirectories(expandedPaths);
         for (let i = 0; i < expandedPaths.length; i++) {
@@ -73,7 +72,7 @@ function BrowseFileList({
 
   const toggleDir = useCallback(
     async (path: string) => {
-      if (!expandedDirs.has(path) && !dirContentsCache.has(path)) {
+      if (!expandedDirs.has(path)) {
         try {
           const results = await readDirectories([path]);
           dirContentsCache.set(path, results[0]);
