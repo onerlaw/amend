@@ -310,6 +310,10 @@ const stickyGutters = ViewPlugin.fromClass(
       wrapper.appendChild(gutterClip);
       wrapper.appendChild(scroller);
 
+      // Make the scroller fill the remaining width after the gutter
+      scroller.style.flex = '1';
+      scroller.style.minWidth = '0';
+
       // Sync vertical scroll
       scroller.addEventListener('scroll', this.syncScroll, { passive: true });
       this.syncScroll();

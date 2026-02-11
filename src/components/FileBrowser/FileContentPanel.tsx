@@ -99,5 +99,5 @@ export function FileContentPanel({
     );
   }
 
-  return <div ref={containerRef} className="h-full" />;
+  return <div ref={containerRef} className="h-full w-full" />;
 }
