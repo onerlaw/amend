@@ -326,9 +326,15 @@ const stickyGutters = ViewPlugin.fromClass(
     };
 
     update() {
-      // CodeMirror's gutter extension re-applies position:sticky on updates;
-      // clear it every time so the gutter stays in our flex wrapper column.
-      if (this.gutters) {
+      if (this.gutters && this.gutterClip) {
+        // CodeMirror's syncGutters(detach=true) can rip the gutters out of
+        // the gutterClip and re-append them to the scroller. Detect this
+        // and move them back.
+        if (this.gutters.parentElement !== this.gutterClip) {
+          this.gutterClip.appendChild(this.gutters);
+        }
+        // CodeMirror's gutter extension re-applies position:sticky on updates;
+        // clear it every time so the gutter stays in our flex wrapper column.
         this.gutters.style.position = '';
       }
       this.syncScroll();
