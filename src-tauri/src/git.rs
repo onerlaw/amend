@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use std::path::Path;
 use std::process::Command;
 use thiserror::Error;
+use tokio::task::spawn_blocking;
 
 #[derive(Error, Debug)]
 pub enum GitError {
@@ -118,13 +119,21 @@ fn wt_status_to_string(status: git2::Status) -> &'static str {
 }
 
 #[tauri::command]
-pub fn is_git_repository(path: String) -> bool {
-    Repository::discover(&path).is_ok()
+pub async fn is_git_repository(path: String) -> bool {
+    spawn_blocking(move || Repository::discover(&path).is_ok())
+        .await
+        .unwrap_or(false)
 }
 
 #[tauri::command]
-pub fn get_git_status(repo_path: String) -> Result<GitStatus, GitError> {
-    let repo = Repository::discover(&repo_path)?;
+pub async fn get_git_status(repo_path: String) -> Result<GitStatus, GitError> {
+    spawn_blocking(move || get_git_status_sync(&repo_path))
+        .await
+        .unwrap()
+}
+
+fn get_git_status_sync(repo_path: &str) -> Result<GitStatus, GitError> {
+    let repo = Repository::discover(repo_path)?;
 
     let mut opts = StatusOptions::new();
     opts.include_untracked(true)
@@ -178,16 +187,22 @@ pub fn get_git_status(repo_path: String) -> Result<GitStatus, GitError> {
 }
 
 #[tauri::command]
-pub fn get_file_diff(repo_path: String, file_path: String) -> Result<GitDiff, GitError> {
-    let repo = Repository::discover(&repo_path)?;
+pub async fn get_file_diff(repo_path: String, file_path: String) -> Result<GitDiff, GitError> {
+    spawn_blocking(move || get_file_diff_sync(&repo_path, &file_path))
+        .await
+        .unwrap()
+}
+
+fn get_file_diff_sync(repo_path: &str, file_path: &str) -> Result<GitDiff, GitError> {
+    let repo = Repository::discover(repo_path)?;
     let workdir = repo
         .workdir()
-        .ok_or_else(|| GitError::NotARepo(repo_path.clone()))?;
+        .ok_or_else(|| GitError::NotARepo(repo_path.to_string()))?;
 
-    let full_path = workdir.join(&file_path);
-    let relative_path = Path::new(&file_path);
+    let full_path = workdir.join(file_path);
+    let relative_path = Path::new(file_path);
 
-    if is_image_extension(&file_path) {
+    if is_image_extension(file_path) {
         // Read current file as base64
         let new_content = if full_path.exists() {
             let bytes = std::fs::read(&full_path).unwrap_or_default();
@@ -212,8 +227,8 @@ pub fn get_file_diff(repo_path: String, file_path: String) -> Result<GitDiff, Gi
         };
 
         return Ok(GitDiff {
-            old_path: file_path.clone(),
-            new_path: file_path,
+            old_path: file_path.to_string(),
+            new_path: file_path.to_string(),
             old_content,
             new_content,
             is_binary: true,
@@ -243,8 +258,8 @@ pub fn get_file_diff(repo_path: String, file_path: String) -> Result<GitDiff, Gi
     };
 
     Ok(GitDiff {
-        old_path: file_path.clone(),
-        new_path: file_path,
+        old_path: file_path.to_string(),
+        new_path: file_path.to_string(),
         old_content,
         new_content,
         is_binary: false,
@@ -405,8 +420,14 @@ pub struct DiffStats {
 }
 
 #[tauri::command]
-pub fn get_diff_stats(repo_path: String) -> Result<DiffStats, GitError> {
-    let repo = Repository::discover(&repo_path)?;
+pub async fn get_diff_stats(repo_path: String) -> Result<DiffStats, GitError> {
+    spawn_blocking(move || get_diff_stats_sync(&repo_path))
+        .await
+        .unwrap()
+}
+
+fn get_diff_stats_sync(repo_path: &str) -> Result<DiffStats, GitError> {
+    let repo = Repository::discover(repo_path)?;
 
     let mut total_additions = 0;
     let mut total_deletions = 0;
@@ -432,10 +453,7 @@ pub fn get_diff_stats(repo_path: String) -> Result<DiffStats, GitError> {
         }
     }
 
-    // Count untracked files
-    let workdir = repo
-        .workdir()
-        .ok_or_else(|| GitError::NotARepo(repo_path.clone()))?;
+    // Count untracked files (file count only — no line reading for performance)
     let mut status_opts = StatusOptions::new();
     status_opts
         .include_untracked(true)
@@ -444,20 +462,8 @@ pub fn get_diff_stats(repo_path: String) -> Result<DiffStats, GitError> {
 
     let statuses = repo.statuses(Some(&mut status_opts))?;
     for entry in statuses.iter() {
-        let status = entry.status();
-        if status.is_wt_new() {
-            // This is an untracked file
-            if let Some(path_str) = entry.path() {
-                let full_path = workdir.join(path_str);
-                if full_path.is_file() {
-                    // Count lines in the untracked file
-                    if let Ok(content) = std::fs::read_to_string(&full_path) {
-                        let line_count = content.lines().count();
-                        total_additions += line_count;
-                        total_files += 1;
-                    }
-                }
-            }
+        if entry.status().is_wt_new() {
+            total_files += 1;
         }
     }
 
@@ -466,6 +472,110 @@ pub fn get_diff_stats(repo_path: String) -> Result<DiffStats, GitError> {
         deletions: total_deletions,
         files_changed: total_files,
     })
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct GitPollData {
+    pub status: GitStatus,
+    pub diff_stats: DiffStats,
+}
+
+#[tauri::command]
+pub async fn git_poll_data(repo_path: String) -> Result<GitPollData, GitError> {
+    spawn_blocking(move || git_poll_data_sync(&repo_path))
+        .await
+        .unwrap()
+}
+
+fn git_poll_data_sync(repo_path: &str) -> Result<GitPollData, GitError> {
+    let repo = Repository::discover(repo_path)?;
+
+    // Single statuses() call to derive both GitStatus and DiffStats
+    let mut opts = StatusOptions::new();
+    opts.include_untracked(true)
+        .recurse_untracked_dirs(true)
+        .include_ignored(false);
+
+    let statuses = repo.statuses(Some(&mut opts))?;
+
+    let mut status = GitStatus {
+        staged: Vec::new(),
+        unstaged: Vec::new(),
+        untracked: Vec::new(),
+        conflicted: Vec::new(),
+    };
+
+    let mut untracked_file_count: usize = 0;
+
+    for entry in statuses.iter() {
+        let path = entry.path().unwrap_or("").to_string();
+        let st = entry.status();
+
+        if st.is_conflicted() {
+            status.conflicted.push(path);
+            continue;
+        }
+
+        if st.is_wt_new() {
+            status.untracked.push(path);
+            untracked_file_count += 1;
+        } else {
+            if st.is_index_new()
+                || st.is_index_modified()
+                || st.is_index_deleted()
+                || st.is_index_renamed()
+            {
+                status.staged.push(GitFileStatus {
+                    path: path.clone(),
+                    status: index_status_to_string(st).to_string(),
+                });
+            }
+
+            if st.is_wt_modified() || st.is_wt_deleted() || st.is_wt_renamed() {
+                status.unstaged.push(GitFileStatus {
+                    path,
+                    status: wt_status_to_string(st).to_string(),
+                });
+            }
+        }
+    }
+
+    // Compute diff stats from diffs (not statuses) for accurate line counts
+    let mut total_additions = 0;
+    let mut total_deletions = 0;
+    let mut total_files = 0;
+
+    // Unstaged changes: index → workdir
+    let mut diff_opts = DiffOptions::new();
+    let unstaged_diff = repo.diff_index_to_workdir(None, Some(&mut diff_opts))?;
+    let unstaged_stats = unstaged_diff.stats()?;
+    total_additions += unstaged_stats.insertions();
+    total_deletions += unstaged_stats.deletions();
+    total_files += unstaged_stats.files_changed();
+
+    // Staged changes: HEAD tree → index
+    if let Ok(head) = repo.head() {
+        if let Ok(tree) = head.peel_to_tree() {
+            let mut opts2 = DiffOptions::new();
+            let staged_diff = repo.diff_tree_to_index(Some(&tree), None, Some(&mut opts2))?;
+            let staged_stats = staged_diff.stats()?;
+            total_additions += staged_stats.insertions();
+            total_deletions += staged_stats.deletions();
+            total_files += staged_stats.files_changed();
+        }
+    }
+
+    // Count untracked files (just file count, no line reading)
+    total_files += untracked_file_count;
+
+    let diff_stats = DiffStats {
+        additions: total_additions,
+        deletions: total_deletions,
+        files_changed: total_files,
+    };
+
+    Ok(GitPollData { status, diff_stats })
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]

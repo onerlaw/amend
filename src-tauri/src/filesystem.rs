@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
 use thiserror::Error;
+use tokio::task::spawn_blocking;
 
 #[derive(Error, Debug)]
 pub enum FileSystemError {
@@ -61,7 +62,7 @@ pub struct SearchResult {
     pub line_content: Option<String>,
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct FileSystemManager;
 
 impl FileSystemManager {
@@ -307,11 +308,30 @@ impl FileSystemManager {
 
 // Tauri commands
 #[tauri::command]
-pub fn read_directory(
+pub async fn read_directory(
     state: tauri::State<'_, FileSystemManager>,
     path: String,
 ) -> Result<Vec<FileEntry>, FileSystemError> {
-    state.read_directory(&path)
+    let mgr = state.inner().clone();
+    spawn_blocking(move || mgr.read_directory(&path))
+        .await
+        .unwrap()
+}
+
+#[tauri::command]
+pub async fn read_directories(
+    state: tauri::State<'_, FileSystemManager>,
+    paths: Vec<String>,
+) -> Result<Vec<Vec<FileEntry>>, FileSystemError> {
+    let mgr = state.inner().clone();
+    spawn_blocking(move || {
+        paths
+            .iter()
+            .map(|p| mgr.read_directory(p))
+            .collect::<Result<Vec<_>, _>>()
+    })
+    .await
+    .unwrap()
 }
 
 #[tauri::command]
@@ -340,13 +360,16 @@ pub fn write_file(
 }
 
 #[tauri::command]
-pub fn search_files(
+pub async fn search_files(
     state: tauri::State<'_, FileSystemManager>,
     root_path: String,
     query: String,
     search_content: bool,
 ) -> Result<Vec<SearchResult>, FileSystemError> {
-    state.search_files(&root_path, &query, search_content)
+    let mgr = state.inner().clone();
+    spawn_blocking(move || mgr.search_files(&root_path, &query, search_content))
+        .await
+        .unwrap()
 }
 
 #[tauri::command]

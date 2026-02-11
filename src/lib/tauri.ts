@@ -56,6 +56,10 @@ export async function readDirectory(path: string): Promise<FileEntry[]> {
   return invoke('read_directory', { path });
 }
 
+export async function readDirectories(paths: string[]): Promise<FileEntry[][]> {
+  return invoke('read_directories', { paths });
+}
+
 export async function readFile(path: string): Promise<string> {
   return invoke('read_file', { path });
 }
@@ -210,6 +214,15 @@ export interface DiffStats {
 
 export async function getDiffStats(repoPath: string): Promise<DiffStats> {
   return invoke('get_diff_stats', { repoPath });
+}
+
+export interface GitPollData {
+  status: GitStatus;
+  diffStats: DiffStats;
+}
+
+export async function gitPollData(repoPath: string): Promise<GitPollData> {
+  return invoke('git_poll_data', { repoPath });
 }
 
 // Symbol navigation types

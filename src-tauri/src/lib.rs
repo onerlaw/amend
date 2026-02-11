@@ -30,6 +30,7 @@ pub fn run() {
             terminal::close_terminal,
             // File system commands
             filesystem::read_directory,
+            filesystem::read_directories,
             filesystem::read_file,
             filesystem::read_file_base64,
             filesystem::write_file,
@@ -45,6 +46,7 @@ pub fn run() {
             git::is_git_repository,
             git::get_git_status,
             git::get_file_diff,
+            git::git_poll_data,
             git::list_worktrees,
             git::add_worktree,
             git::remove_worktree,

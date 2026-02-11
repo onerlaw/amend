@@ -1,12 +1,30 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
+import { Virtuoso } from 'react-virtuoso';
 import { useFileBrowserState } from '@/hooks/useFileBrowserState';
-import { readDirectory, FileEntry } from '@/lib/tauri';
+import { readDirectories, FileEntry } from '@/lib/tauri';
 import { useContextMenuStore } from '@/stores/contextMenuStore';
 import { useUIStore } from '@/stores/uiStore';
 import { getFileIconColor, sortDirectoriesFirst } from '@/lib/fileUtils';
 import { ChevronIcon, FolderIcon, FileIcon, RefreshIcon } from '@/components/Icons';
 
 const dirContentsCache = new Map<string, FileEntry[]>();
+
+interface FlatRow {
+  entry: FileEntry;
+  depth: number;
+}
+
+function flattenTree(entries: FileEntry[], expandedDirs: Set<string>, depth: number): FlatRow[] {
+  const rows: FlatRow[] = [];
+  for (const entry of sortDirectoriesFirst(entries)) {
+    rows.push({ entry, depth });
+    if (entry.isDirectory && expandedDirs.has(entry.path)) {
+      const children = dirContentsCache.get(entry.path) || [];
+      rows.push(...flattenTree(children, expandedDirs, depth + 1));
+    }
+  }
+  return rows;
+}
 
 interface BrowseFileListProps {
   entries: FileEntry[];
@@ -27,7 +45,7 @@ function BrowseFileList({
   const contextTargetPath = targetEntry?.path ?? null;
   const expandedDirs = useUIStore((s) => s.browseExpandedDirs);
   const toggleBrowseExpandedDir = useUIStore((s) => s.toggleBrowseExpandedDir);
-  const [, setCacheVersion] = useState(0);
+  const [cacheVersion, setCacheVersion] = useState(0);
 
   // Re-fetch expanded directory contents when file tree refreshes
   useEffect(() => {
@@ -36,20 +54,15 @@ function BrowseFileList({
       if (expandedPaths.length === 0) return;
 
       dirContentsCache.clear();
-      const results = await Promise.all(
-        expandedPaths.map(async (path) => {
-          try {
-            const contents = await readDirectory(path);
-            return [path, contents] as const;
-          } catch {
-            return null;
+      try {
+        const results = await readDirectories(expandedPaths);
+        for (let i = 0; i < expandedPaths.length; i++) {
+          if (results[i]) {
+            dirContentsCache.set(expandedPaths[i], results[i]);
           }
-        })
-      );
-      for (const result of results) {
-        if (result) {
-          dirContentsCache.set(result[0], result[1]);
         }
+      } catch {
+        // Fallback silently on error
       }
       setCacheVersion((v) => v + 1);
     };
@@ -62,8 +75,8 @@ function BrowseFileList({
     async (path: string) => {
       if (!expandedDirs.has(path) && !dirContentsCache.has(path)) {
         try {
-          const contents = await readDirectory(path);
-          dirContentsCache.set(path, contents);
+          const results = await readDirectories([path]);
+          dirContentsCache.set(path, results[0]);
           setCacheVersion((v) => v + 1);
         } catch (err) {
           console.error('Failed to read directory:', err);
@@ -74,53 +87,11 @@ function BrowseFileList({
     [expandedDirs, toggleBrowseExpandedDir]
   );
 
-  const renderEntry = (entry: FileEntry, depth: number) => {
-    const isExpanded = expandedDirs.has(entry.path);
-    const children = dirContentsCache.get(entry.path) || [];
-
-    const getFileIcon = () => {
-      if (entry.isDirectory) {
-        return <FolderIcon className="h-4 w-4 text-yellow-500" />;
-      }
-
-      const color = getFileIconColor(entry.name);
-      return <FileIcon className={`h-4 w-4 ${color}`} />;
-    };
-
-    const isOpen = openFilePaths.has(entry.path);
-    const isActive = activeFilePath === entry.path;
-    const isContextTarget = contextMenuOpen && contextTargetPath === entry.path;
-
-    return (
-      <div key={entry.path}>
-        <button
-          onClick={() => (entry.isDirectory ? toggleDir(entry.path) : onSelectFile(entry.path))}
-          onContextMenu={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            openMenu(entry, e.clientX, e.clientY);
-          }}
-          className={`flex w-full select-none items-center gap-1 py-0.5 pr-2 text-left text-sm hover:bg-surface-3/50 ${
-            isActive || isContextTarget ? 'bg-surface-3' : isOpen ? 'bg-surface-3/30' : ''
-          } ${entry.isGitignored ? 'opacity-50' : ''}`}
-          style={{ paddingLeft: `${depth * 12 + 8}px` }}
-        >
-          {entry.isDirectory && (
-            <ChevronIcon
-              className={`h-3 w-3 text-tertiary transition-transform ${isExpanded ? 'rotate-90' : ''}`}
-            />
-          )}
-          {!entry.isDirectory && <span className="w-3" />}
-          {getFileIcon()}
-          <span className="truncate text-primary">{entry.name}</span>
-        </button>
-
-        {entry.isDirectory && isExpanded && (
-          <div>{sortDirectoriesFirst(children).map((child) => renderEntry(child, depth + 1))}</div>
-        )}
-      </div>
-    );
-  };
+  const flatRows = useMemo(
+    () => flattenTree(entries, expandedDirs, 0),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [entries, expandedDirs, cacheVersion]
+  );
 
   if (isLoading) {
     return <div className="flex items-center justify-center h-full text-tertiary">Loading...</div>;
@@ -132,12 +103,48 @@ function BrowseFileList({
     );
   }
 
-  const sortedEntries = sortDirectoriesFirst(entries);
-
   return (
-    <div className="h-full overflow-y-auto py-1">
-      {sortedEntries.map((entry) => renderEntry(entry, 0))}
-    </div>
+    <Virtuoso
+      className="h-full"
+      data={flatRows}
+      overscan={200}
+      itemContent={(_index, { entry, depth }) => {
+        const isExpanded = expandedDirs.has(entry.path);
+        const isOpen = openFilePaths.has(entry.path);
+        const isActive = activeFilePath === entry.path;
+        const isContextTarget = contextMenuOpen && contextTargetPath === entry.path;
+
+        const iconEl = entry.isDirectory ? (
+          <FolderIcon className="h-4 w-4 text-yellow-500" />
+        ) : (
+          <FileIcon className={`h-4 w-4 ${getFileIconColor(entry.name)}`} />
+        );
+
+        return (
+          <button
+            onClick={() => (entry.isDirectory ? toggleDir(entry.path) : onSelectFile(entry.path))}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              openMenu(entry, e.clientX, e.clientY);
+            }}
+            className={`flex w-full select-none items-center gap-1 py-0.5 pr-2 text-left text-sm hover:bg-surface-3/50 ${
+              isActive || isContextTarget ? 'bg-surface-3' : isOpen ? 'bg-surface-3/30' : ''
+            } ${entry.isGitignored ? 'opacity-50' : ''}`}
+            style={{ paddingLeft: `${depth * 12 + 8}px` }}
+          >
+            {entry.isDirectory && (
+              <ChevronIcon
+                className={`h-3 w-3 text-tertiary transition-transform ${isExpanded ? 'rotate-90' : ''}`}
+              />
+            )}
+            {!entry.isDirectory && <span className="w-3" />}
+            {iconEl}
+            <span className="truncate text-primary">{entry.name}</span>
+          </button>
+        );
+      }}
+    />
   );
 }
 

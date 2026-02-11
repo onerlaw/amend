@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { getGitStatus, getDiffStats, isGitRepository, GitStatus, DiffStats } from '@/lib/tauri';
+import { gitPollData, GitStatus, DiffStats } from '@/lib/tauri';
 
-const POLL_INTERVAL = 2000;
+const POLL_INTERVAL = 5000;
 
 /** Combined polling hook for git status and diff stats. Single interval, single source of truth. */
 export function useGitPolling(repoPath: string | null) {
@@ -11,10 +11,15 @@ export function useGitPolling(repoPath: string | null) {
   const [error, setError] = useState<string | null>(null);
   const lastStatusRef = useRef<string>('');
   const lastStatsRef = useRef<string>('');
+  const pollingRef = useRef(false);
 
   const refresh = useCallback(
     async (silent = false) => {
       if (!repoPath) return;
+
+      // Overlap guard: skip if previous poll is still running
+      if (silent && pollingRef.current) return;
+      pollingRef.current = true;
 
       if (!silent) {
         setIsLoading(true);
@@ -22,41 +27,39 @@ export function useGitPolling(repoPath: string | null) {
       setError(null);
 
       try {
-        const isRepo = await isGitRepository(repoPath);
-        if (!isRepo) {
-          setStatus(null);
-          setDiffStats(null);
-          setError('Not a git repository');
-          return;
-        }
-
-        const [gitStatus, stats] = await Promise.all([
-          getGitStatus(repoPath),
-          getDiffStats(repoPath).catch(() => null),
-        ]);
+        const data = await gitPollData(repoPath);
 
         // Only update status if actually changed (avoid unnecessary re-renders)
         const statusKey =
-          gitStatus.staged.map((f) => `${f.path}:${f.status}`).join('|') +
+          data.status.staged.map((f) => `${f.path}:${f.status}`).join('|') +
           '||' +
-          gitStatus.unstaged.map((f) => `${f.path}:${f.status}`).join('|') +
+          data.status.unstaged.map((f) => `${f.path}:${f.status}`).join('|') +
           '||' +
-          gitStatus.untracked.join('|') +
+          data.status.untracked.join('|') +
           '||' +
-          gitStatus.conflicted.join('|');
+          data.status.conflicted.join('|');
         if (statusKey !== lastStatusRef.current) {
           lastStatusRef.current = statusKey;
-          setStatus(gitStatus);
+          setStatus(data.status);
         }
 
-        const statsKey = JSON.stringify(stats);
+        const statsKey = JSON.stringify(data.diffStats);
         if (statsKey !== lastStatsRef.current) {
           lastStatsRef.current = statsKey;
-          setDiffStats(stats);
+          setDiffStats(data.diffStats);
         }
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to get git status');
+        // Repository::discover error means not a git repo
+        const msg = err instanceof Error ? err.message : String(err);
+        if (msg.includes('could not find repository')) {
+          setStatus(null);
+          setDiffStats(null);
+          setError('Not a git repository');
+        } else {
+          setError(msg || 'Failed to get git status');
+        }
       } finally {
+        pollingRef.current = false;
         if (!silent) {
           setIsLoading(false);
         }
@@ -76,7 +79,19 @@ export function useGitPolling(repoPath: string | null) {
 
     refresh();
     const intervalId = setInterval(() => refresh(true), POLL_INTERVAL);
-    return () => clearInterval(intervalId);
+
+    // Pause polling when tab is hidden, refresh immediately on re-focus
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        refresh(true);
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
   }, [repoPath, refresh]);
 
   const manualRefresh = useCallback(() => refresh(false), [refresh]);
