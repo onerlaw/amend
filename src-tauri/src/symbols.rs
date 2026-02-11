@@ -2,6 +2,7 @@ use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::Path;
+use std::sync::Arc;
 use streaming_iterator::StreamingIterator;
 use tree_sitter::{Node, Parser, Query, QueryCursor};
 
@@ -18,11 +19,12 @@ pub struct SymbolDefinition {
 }
 
 /// Index of all symbols in the project
+#[derive(Clone)]
 pub struct SymbolIndex {
     /// Map from symbol name to list of definitions
-    symbols: RwLock<HashMap<String, Vec<SymbolDefinition>>>,
+    symbols: Arc<RwLock<HashMap<String, Vec<SymbolDefinition>>>>,
     /// Map from file path to list of symbol names defined in that file
-    file_symbols: RwLock<HashMap<String, Vec<String>>>,
+    file_symbols: Arc<RwLock<HashMap<String, Vec<String>>>>,
 }
 
 impl Default for SymbolIndex {
@@ -34,8 +36,8 @@ impl Default for SymbolIndex {
 impl SymbolIndex {
     pub fn new() -> Self {
         Self {
-            symbols: RwLock::new(HashMap::new()),
-            file_symbols: RwLock::new(HashMap::new()),
+            symbols: Arc::new(RwLock::new(HashMap::new())),
+            file_symbols: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 

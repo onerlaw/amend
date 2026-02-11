@@ -70,8 +70,11 @@ pub fn run() {
 // Symbol navigation commands
 
 #[tauri::command]
-fn index_project(root_path: String, index: State<SymbolIndex>) -> Result<(), String> {
-    index.index_project(&root_path)
+async fn index_project(root_path: String, index: State<'_, SymbolIndex>) -> Result<(), String> {
+    let idx = index.inner().clone();
+    tokio::task::spawn_blocking(move || idx.index_project(&root_path))
+        .await
+        .unwrap()
 }
 
 #[tauri::command]

@@ -69,13 +69,15 @@ export function MainLayout() {
     }
   }, [currentDirectory, projects.length, addProject]);
 
-  // Index project for symbol navigation when directory changes
+  // Index project for symbol navigation when directory changes (deferred to avoid blocking startup)
   useEffect(() => {
-    if (currentDirectory) {
+    if (!currentDirectory) return;
+    const timer = setTimeout(() => {
       indexProject(currentDirectory).catch((err) => {
         console.error('[MainLayout] Failed to index project for symbol navigation:', err);
       });
-    }
+    }, 2000);
+    return () => clearTimeout(timer);
   }, [currentDirectory]);
 
   // Sync active terminal's worktree and project to global state
