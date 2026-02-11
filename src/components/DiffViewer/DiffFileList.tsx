@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback } from 'react';
-import { GitStatus, FileEntry, restoreFile, unstageFile } from '@/lib/tauri';
+import { GitStatus, restoreFile, unstageFile } from '@/lib/tauri';
 import { sortDirectoriesFirst, getFileName } from '@/lib/fileUtils';
 import { useUIStore } from '@/stores/uiStore';
 import { ContextMenu } from '@/components/ContextMenu/ContextMenu';
@@ -16,20 +16,22 @@ interface DiffFileListProps {
   onSelectFile?: (path: string) => void;
 }
 
+interface FileCategories {
+  staged?: string;
+  unstaged?: string;
+  untracked?: boolean;
+  conflicted?: boolean;
+}
+
 interface FileTreeNode {
   name: string;
   path: string;
   isDirectory: boolean;
   children: Map<string, FileTreeNode>;
-  status?: string;
+  categories?: FileCategories;
 }
 
-interface BuildTreeOptions<T> {
-  getPath: (item: T) => string;
-  getLeafData?: (item: T) => { status: string };
-}
-
-function buildTree<T>(items: T[], options: BuildTreeOptions<T>): FileTreeNode {
+function buildUnifiedTree(status: GitStatus): FileTreeNode {
   const root: FileTreeNode = {
     name: '',
     path: '',
@@ -37,8 +39,7 @@ function buildTree<T>(items: T[], options: BuildTreeOptions<T>): FileTreeNode {
     children: new Map(),
   };
 
-  for (const item of items) {
-    const filePath = options.getPath(item);
+  function ensurePath(filePath: string): FileTreeNode {
     const parts = filePath.split('/');
     let current = root;
 
@@ -48,35 +49,90 @@ function buildTree<T>(items: T[], options: BuildTreeOptions<T>): FileTreeNode {
       const currentPath = parts.slice(0, i + 1).join('/');
 
       if (!current.children.has(part)) {
-        const leafData = isLast && options.getLeafData ? options.getLeafData(item) : undefined;
         current.children.set(part, {
           name: part,
           path: currentPath,
           isDirectory: !isLast,
           children: new Map(),
-          status: leafData?.status,
         });
       }
 
       current = current.children.get(part)!;
+    }
+
+    if (!current.categories) {
+      current.categories = {};
+    }
+
+    return current;
+  }
+
+  for (const file of status.staged) {
+    const node = ensurePath(file.path);
+    node.categories!.staged = file.status;
+  }
+
+  for (const file of status.unstaged) {
+    const node = ensurePath(file.path);
+    node.categories!.unstaged = file.status;
+  }
+
+  for (const path of status.untracked) {
+    const node = ensurePath(path);
+    node.categories!.untracked = true;
+  }
+
+  if (status.conflicted) {
+    for (const path of status.conflicted) {
+      const node = ensurePath(path);
+      node.categories!.conflicted = true;
     }
   }
 
   return root;
 }
 
-const STATUS_DISPLAY: Record<string, { color: string; letter: string }> = {
-  added: { color: 'text-diff-add-text', letter: 'A' },
-  modified: { color: 'text-amber-500 dark:text-yellow-400', letter: 'M' },
-  deleted: { color: 'text-diff-remove-text', letter: 'D' },
-  renamed: { color: 'text-blue-600 dark:text-blue-400', letter: 'R' },
-  conflicted: { color: 'text-red-500 dark:text-red-400', letter: 'C' },
+const STATUS_LETTERS: Record<string, string> = {
+  added: 'A',
+  modified: 'M',
+  deleted: 'D',
+  renamed: 'R',
+  copied: 'C',
 };
 
-function getStatusIcon(statusType: string) {
-  const display = STATUS_DISPLAY[statusType] ?? { color: 'text-tertiary', letter: 'U' };
+function getStatusIndicator(categories: FileCategories) {
+  if (categories.conflicted) {
+    return (
+      <span className="font-mono text-xs w-5 text-center flex-shrink-0">
+        <span className="text-red-500 dark:text-red-400">U</span>
+        <span className="text-red-500 dark:text-red-400">U</span>
+      </span>
+    );
+  }
+
+  if (categories.untracked) {
+    return (
+      <span className="font-mono text-xs w-5 text-center flex-shrink-0">
+        <span className="text-tertiary">?</span>
+        <span className="text-tertiary">?</span>
+      </span>
+    );
+  }
+
+  const indexLetter = categories.staged ? (STATUS_LETTERS[categories.staged] ?? '?') : '\u00B7';
+  const workLetter = categories.unstaged ? (STATUS_LETTERS[categories.unstaged] ?? '?') : '\u00B7';
+
   return (
-    <span className={`${display.color} font-mono text-xs w-4 text-center`}>{display.letter}</span>
+    <span className="font-mono text-xs w-5 text-center flex-shrink-0">
+      <span className={categories.staged ? 'text-diff-add-text' : 'text-tertiary'}>
+        {indexLetter}
+      </span>
+      <span
+        className={categories.unstaged ? 'text-amber-500 dark:text-yellow-400' : 'text-tertiary'}
+      >
+        {workLetter}
+      </span>
+    </span>
   );
 }
 
@@ -84,18 +140,20 @@ interface FileTreeItemProps {
   node: FileTreeNode;
   depth: number;
   onScrollToFile: (path: string) => void;
-  onContextMenuEntry?: (e: React.MouseEvent, entry: FileEntry) => void;
-  onDiscardClick?: (e: React.MouseEvent, filePath: string) => void;
+  onAction?: (path: string, action: 'restore' | 'unstage') => void;
+  onContextMenu?: (e: React.MouseEvent, path: string, categories: FileCategories) => void;
   selectedFile?: string | null;
+  repoPath?: string | null;
 }
 
 function FileTreeItem({
   node,
   depth,
   onScrollToFile,
-  onContextMenuEntry,
-  onDiscardClick,
+  onAction,
+  onContextMenu,
   selectedFile,
+  repoPath,
 }: FileTreeItemProps) {
   const collapsedDiffTreePaths = useUIStore((s) => s.collapsedDiffTreePaths);
   const toggleDiffTreePath = useUIStore((s) => s.toggleDiffTreePath);
@@ -127,9 +185,10 @@ function FileTreeItem({
                 node={child}
                 depth={node.name ? depth + 1 : depth}
                 onScrollToFile={onScrollToFile}
-                onContextMenuEntry={onContextMenuEntry}
-                onDiscardClick={onDiscardClick}
+                onAction={onAction}
+                onContextMenu={onContextMenu}
                 selectedFile={selectedFile}
+                repoPath={repoPath}
               />
             ))}
           </div>
@@ -138,23 +197,24 @@ function FileTreeItem({
     );
   }
 
+  const categories = node.categories ?? {};
   const isSelected = selectedFile === node.path;
+
+  const hasUnstaged = !!categories.unstaged;
+  const hasStaged = !!categories.staged;
+  const hasInlineAction =
+    repoPath && (hasUnstaged || hasStaged) && !categories.untracked && !categories.conflicted;
+  const inlineAction: 'restore' | 'unstage' = hasUnstaged ? 'restore' : 'unstage';
 
   return (
     <button
       onClick={() => onScrollToFile(node.path)}
       onContextMenu={
-        onContextMenuEntry
+        onContextMenu
           ? (e) => {
               e.preventDefault();
               e.stopPropagation();
-              onContextMenuEntry(e, {
-                name: node.name,
-                path: node.path,
-                isDirectory: false,
-                isSymlink: false,
-                isGitignored: false,
-              });
+              onContextMenu(e, node.path, categories);
             }
           : undefined
       }
@@ -163,15 +223,18 @@ function FileTreeItem({
       }`}
       style={{ paddingLeft: `${depth * 12 + 8}px` }}
     >
-      {getStatusIcon(node.status || '')}
+      {getStatusIndicator(categories)}
       <span className="truncate text-primary flex-1 text-left">{node.name}</span>
-      {onDiscardClick && (
+      {hasInlineAction && onAction && (
         <span
           role="button"
           tabIndex={-1}
-          title={node.status === 'staged' ? 'Unstage file' : 'Discard changes'}
+          title={inlineAction === 'restore' ? 'Discard changes' : 'Unstage file'}
           className="mr-2 flex-shrink-0 rounded p-0.5 opacity-0 group-hover:opacity-100 hover:bg-surface-3 text-secondary hover:text-primary transition-opacity"
-          onClick={(e) => onDiscardClick(e, node.path)}
+          onClick={(e) => {
+            e.stopPropagation();
+            onAction(node.path, inlineAction);
+          }}
         >
           <DiscardIcon />
         </span>
@@ -197,7 +260,7 @@ export function DiffFileList({
     x: number;
     y: number;
     path: string;
-    action: 'restore' | 'unstage';
+    items: { label: string; action: 'restore' | 'unstage' }[];
   } | null>(null);
 
   const handleScrollToFile = useCallback(
@@ -208,12 +271,29 @@ export function DiffFileList({
     [onSelectFile, onScrollToFile]
   );
 
-  const makeContextMenuHandler = useCallback(
-    (action: 'unstage' | 'restore') => (e: React.MouseEvent, entry: FileEntry) => {
+  const handleAction = useCallback(
+    (path: string, action: 'restore' | 'unstage') => {
+      setRestoreTarget({ path, action });
+    },
+    []
+  );
+
+  const handleContextMenu = useCallback(
+    (e: React.MouseEvent, path: string, categories: FileCategories) => {
       e.preventDefault();
       e.stopPropagation();
-      onSelectFile?.(entry.path);
-      setContextMenu({ x: e.clientX, y: e.clientY, path: entry.path, action });
+      onSelectFile?.(path);
+
+      const items: { label: string; action: 'restore' | 'unstage' }[] = [];
+      if (categories.staged) {
+        items.push({ label: 'Unstage File', action: 'unstage' });
+      }
+      if (categories.unstaged) {
+        items.push({ label: 'Discard Changes', action: 'restore' });
+      }
+      if (items.length > 0) {
+        setContextMenu({ x: e.clientX, y: e.clientY, path, items });
+      }
     },
     [onSelectFile]
   );
@@ -234,33 +314,9 @@ export function DiffFileList({
     setRestoreTarget(null);
   };
 
-  const stagedTree = useMemo(() => {
-    if (!status || status.staged.length === 0) return null;
-    return buildTree(status.staged, {
-      getPath: (f) => f.path,
-      getLeafData: (f) => ({ status: f.status }),
-    });
-  }, [status]);
-
-  const unstagedTree = useMemo(() => {
-    if (!status || status.unstaged.length === 0) return null;
-    return buildTree(status.unstaged, {
-      getPath: (f) => f.path,
-      getLeafData: (f) => ({ status: f.status }),
-    });
-  }, [status]);
-
-  const untrackedTree = useMemo(() => {
-    if (!status || status.untracked.length === 0) return null;
-    return buildTree(status.untracked, { getPath: (p) => p });
-  }, [status]);
-
-  const conflictedTree = useMemo(() => {
-    if (!status || (status.conflicted?.length ?? 0) === 0) return null;
-    return buildTree(status.conflicted, {
-      getPath: (p) => p,
-      getLeafData: () => ({ status: 'conflicted' }),
-    });
+  const unifiedTree = useMemo(() => {
+    if (!status) return null;
+    return buildUnifiedTree(status);
   }, [status]);
 
   if (isLoading) {
@@ -293,82 +349,16 @@ export function DiffFileList({
 
   return (
     <div className="h-full overflow-y-auto">
-      {/* Conflicted files */}
-      {conflictedTree && (status.conflicted?.length ?? 0) > 0 && (
-        <div className="mb-2">
-          <div className="px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-red-500 dark:text-red-400">
-            Conflicts ({status.conflicted.length})
-          </div>
-          <FileTreeItem
-            node={conflictedTree}
-            depth={0}
-            onScrollToFile={handleScrollToFile}
-            selectedFile={selectedFile}
-          />
-        </div>
-      )}
-
-      {/* Staged changes */}
-      {stagedTree && status.staged.length > 0 && (
-        <div className="mb-2">
-          <div className="px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-diff-add-text">
-            Staged ({status.staged.length})
-          </div>
-          <FileTreeItem
-            node={stagedTree}
-            depth={0}
-            onScrollToFile={handleScrollToFile}
-            onContextMenuEntry={makeContextMenuHandler('unstage')}
-            onDiscardClick={
-              repoPath
-                ? (e, path) => {
-                    e.stopPropagation();
-                    setRestoreTarget({ path, action: 'unstage' });
-                  }
-                : undefined
-            }
-            selectedFile={selectedFile}
-          />
-        </div>
-      )}
-
-      {/* Unstaged changes */}
-      {unstagedTree && status.unstaged.length > 0 && (
-        <div className="mb-2">
-          <div className="px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-amber-500 dark:text-yellow-400">
-            Changed ({status.unstaged.length})
-          </div>
-          <FileTreeItem
-            node={unstagedTree}
-            depth={0}
-            onScrollToFile={handleScrollToFile}
-            onContextMenuEntry={makeContextMenuHandler('restore')}
-            onDiscardClick={
-              repoPath
-                ? (e, path) => {
-                    e.stopPropagation();
-                    setRestoreTarget({ path, action: 'restore' });
-                  }
-                : undefined
-            }
-            selectedFile={selectedFile}
-          />
-        </div>
-      )}
-
-      {/* Untracked files - tree view */}
-      {untrackedTree && status.untracked.length > 0 && (
-        <div className="mb-2">
-          <div className="px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-tertiary">
-            Untracked ({status.untracked.length})
-          </div>
-          <FileTreeItem
-            node={untrackedTree}
-            depth={0}
-            onScrollToFile={handleScrollToFile}
-            selectedFile={selectedFile}
-          />
-        </div>
+      {unifiedTree && (
+        <FileTreeItem
+          node={unifiedTree}
+          depth={0}
+          onScrollToFile={handleScrollToFile}
+          onAction={handleAction}
+          onContextMenu={handleContextMenu}
+          selectedFile={selectedFile}
+          repoPath={repoPath}
+        />
       )}
 
       <ContextMenu
@@ -377,13 +367,11 @@ export function DiffFileList({
         onClose={() => setContextMenu(null)}
         items={
           contextMenu
-            ? [
-                {
-                  label: contextMenu.action === 'unstage' ? 'Unstage File' : 'Discard Changes',
-                  onClick: () =>
-                    setRestoreTarget({ path: contextMenu.path, action: contextMenu.action }),
-                },
-              ]
+            ? contextMenu.items.map((item) => ({
+                label: item.label,
+                onClick: () =>
+                  setRestoreTarget({ path: contextMenu.path, action: item.action }),
+              }))
             : []
         }
       />
