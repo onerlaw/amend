@@ -82,6 +82,7 @@ export function useTerminal(containerId: string | null) {
   const isInitializedRef = useRef(false);
 
   const themeMode = useUIStore((state) => state.themeMode);
+  const fontSize = useUIStore((state) => state.fontSize);
 
   const fit = useCallback(() => {
     if (fitAddonRef.current && terminalRef.current && containerId && isInitializedRef.current) {
@@ -114,6 +115,13 @@ export function useTerminal(containerId: string | null) {
 
     terminalRef.current.options.theme = getTerminalTheme(isDarkMode(themeMode));
   }, [themeMode]);
+
+  // Update terminal font size when it changes
+  useEffect(() => {
+    if (!terminalRef.current || !isInitializedRef.current) return;
+    terminalRef.current.options.fontSize = fontSize;
+    fit();
+  }, [fontSize, fit]);
 
   // Also listen for system preference changes when in system mode
   useEffect(() => {
@@ -152,7 +160,7 @@ export function useTerminal(containerId: string | null) {
 
       const terminal = new Terminal({
         cursorBlink: true,
-        fontSize: 13,
+        fontSize: useUIStore.getState().fontSize,
         fontFamily: 'Menlo, Monaco, "Courier New", monospace',
         theme: getTerminalTheme(isDark),
         scrollback: 10000,

@@ -17,6 +17,7 @@ interface UIState {
   diffFileListVisible: boolean;
   browseExpandedDirs: Set<string>;
   collapsedDiffTreePaths: Set<string>;
+  fontSize: number;
   diffMode: DiffMode;
   diffBaseBranch: string | null;
 
@@ -29,6 +30,9 @@ interface UIState {
   toggleDiffFileList: () => void;
   toggleBrowseExpandedDir: (path: string) => void;
   toggleDiffTreePath: (path: string) => void;
+  increaseFontSize: () => void;
+  decreaseFontSize: () => void;
+  resetFontSize: () => void;
   setDiffMode: (mode: DiffMode) => void;
   setDiffBaseBranch: (branch: string | null) => void;
 }
@@ -45,6 +49,7 @@ export const useUIStore = create<UIState>()(
       diffFileListVisible: false,
       browseExpandedDirs: new Set(),
       collapsedDiffTreePaths: new Set(),
+      fontSize: 13,
       diffMode: 'working',
       diffBaseBranch: null,
 
@@ -68,6 +73,11 @@ export const useUIStore = create<UIState>()(
       setScrollTargetFile: (path: string | null) => set({ scrollTargetFile: path }),
       setSelectedDiffFile: (path: string | null) => set({ selectedDiffFile: path }),
       setThemeMode: (mode: ThemeMode) => set({ themeMode: mode }),
+      increaseFontSize: () =>
+        set((state) => ({ fontSize: Math.min(32, state.fontSize + 1) })),
+      decreaseFontSize: () =>
+        set((state) => ({ fontSize: Math.max(8, state.fontSize - 1) })),
+      resetFontSize: () => set({ fontSize: 13 }),
       setDiffMode: (mode: DiffMode) => set({ diffMode: mode }),
       setDiffBaseBranch: (branch: string | null) => set({ diffBaseBranch: branch }),
     }),
@@ -77,6 +87,7 @@ export const useUIStore = create<UIState>()(
         panelMode: state.panelMode,
         themeMode: state.themeMode,
         diffFileListVisible: state.diffFileListVisible,
+        fontSize: state.fontSize,
         diffMode: state.diffMode,
         diffBaseBranch: state.diffBaseBranch,
       }),

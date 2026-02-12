@@ -82,7 +82,7 @@ const darkTheme = EditorView.theme(
     '.cm-content': {
       caretColor: 'var(--text-primary)',
       fontFamily: 'Menlo, Monaco, "Courier New", monospace',
-      fontSize: '13px',
+      fontSize: 'var(--editor-font-size, 13px)',
     },
     '.cm-cursor': {
       borderLeftColor: 'var(--text-primary)',
@@ -99,7 +99,7 @@ const darkTheme = EditorView.theme(
       color: 'var(--text-tertiary)',
       border: 'none',
       fontFamily: 'Menlo, Monaco, "Courier New", monospace',
-      fontSize: '13px',
+      fontSize: 'var(--editor-font-size, 13px)',
     },
     '.cm-activeLineGutter': {
       backgroundColor: 'var(--surface-2)',
