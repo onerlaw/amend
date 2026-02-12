@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { Virtuoso } from 'react-virtuoso';
 import { useDiffViewer } from './DiffViewerContext';
 import { useUIStore } from '@/stores/uiStore';
 import { DiffFileSection } from './DiffFileSection';
@@ -113,7 +112,7 @@ export function DiffContentPanel() {
     allFiles,
     diffs,
     collapsedDiffFiles,
-    virtuosoRef,
+    scrollContainerRef,
     toggleDiffFileCollapse,
     handleEditFile,
     handleRefresh,
@@ -239,11 +238,8 @@ export function DiffContentPanel() {
       )}
 
       {changedFilesCount > 0 && (
-        <Virtuoso
-          ref={virtuosoRef}
-          className="flex-1"
-          data={allFiles}
-          itemContent={(_index, file) => {
+        <div ref={scrollContainerRef} className="flex-1 overflow-y-auto">
+          {allFiles.map((file) => {
             const diffData = diffs.get(file.path);
             return (
               <DiffFileSection
@@ -262,8 +258,8 @@ export function DiffContentPanel() {
                 onRefresh={handleRefresh}
               />
             );
-          }}
-        />
+          })}
+        </div>
       )}
     </div>
   );
