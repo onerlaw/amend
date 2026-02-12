@@ -216,6 +216,27 @@ export async function getDiffStats(repoPath: string): Promise<DiffStats> {
   return invoke('get_diff_stats', { repoPath });
 }
 
+export interface BranchDiffSummary {
+  files: GitFileStatus[];
+  diffStats: DiffStats;
+  mergeBase: string;
+}
+
+export async function getBranchDiffFiles(
+  repoPath: string,
+  baseRef: string
+): Promise<BranchDiffSummary> {
+  return invoke('get_branch_diff_files', { repoPath, baseRef });
+}
+
+export async function getBranchFileDiff(
+  repoPath: string,
+  baseRef: string,
+  filePath: string
+): Promise<GitDiff> {
+  return invoke('get_branch_file_diff', { repoPath, baseRef, filePath });
+}
+
 export interface GitPollData {
   status: GitStatus;
   diffStats: DiffStats;
