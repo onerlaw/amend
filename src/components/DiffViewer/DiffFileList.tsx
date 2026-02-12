@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback } from 'react';
-import { GitStatus, restoreFile, unstageFile } from '@/lib/tauri';
+import { GitStatus, GitFileStatus, restoreFile, unstageFile } from '@/lib/tauri';
 import { sortDirectoriesFirst, getFileName } from '@/lib/fileUtils';
-import { useUIStore } from '@/stores/uiStore';
+import { useUIStore, DiffMode } from '@/stores/uiStore';
 import { ContextMenu } from '@/components/ContextMenu/ContextMenu';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { DiscardIcon } from '@/components/Icons';
@@ -15,6 +15,8 @@ interface DiffFileListProps {
   repoPath?: string | null;
   selectedFile?: string | null;
   onSelectFile?: (path: string) => void;
+  branchFiles?: GitFileStatus[];
+  mode?: DiffMode;
 }
 
 interface FileCategories {
@@ -22,6 +24,7 @@ interface FileCategories {
   unstaged?: string;
   untracked?: boolean;
   conflicted?: boolean;
+  branch?: string;
 }
 
 interface FileTreeNode {
@@ -93,6 +96,50 @@ function buildUnifiedTree(status: GitStatus): FileTreeNode {
   return root;
 }
 
+function buildBranchTree(files: GitFileStatus[]): FileTreeNode {
+  const root: FileTreeNode = {
+    name: '',
+    path: '',
+    isDirectory: true,
+    children: new Map(),
+  };
+
+  function ensurePath(filePath: string): FileTreeNode {
+    const parts = filePath.split('/');
+    let current = root;
+
+    for (let i = 0; i < parts.length; i++) {
+      const part = parts[i];
+      const isLast = i === parts.length - 1;
+      const currentPath = parts.slice(0, i + 1).join('/');
+
+      if (!current.children.has(part)) {
+        current.children.set(part, {
+          name: part,
+          path: currentPath,
+          isDirectory: !isLast,
+          children: new Map(),
+        });
+      }
+
+      current = current.children.get(part)!;
+    }
+
+    if (!current.categories) {
+      current.categories = {};
+    }
+
+    return current;
+  }
+
+  for (const file of files) {
+    const node = ensurePath(file.path);
+    node.categories!.branch = file.status;
+  }
+
+  return root;
+}
+
 const STATUS_LETTERS: Record<string, string> = {
   added: 'A',
   modified: 'M',
@@ -102,6 +149,15 @@ const STATUS_LETTERS: Record<string, string> = {
 };
 
 function getStatusIndicator(categories: FileCategories) {
+  if (categories.branch) {
+    const letter = STATUS_LETTERS[categories.branch] ?? '?';
+    return (
+      <span className="font-mono text-xs w-5 text-center flex-shrink-0">
+        <span className="text-blue-500 dark:text-blue-400">{letter}</span>
+      </span>
+    );
+  }
+
   if (categories.conflicted) {
     return (
       <span className="font-mono text-xs w-5 text-center flex-shrink-0">
@@ -196,8 +252,9 @@ function FileTreeItem({
 
   const hasUnstaged = !!categories.unstaged;
   const hasStaged = !!categories.staged;
+  const isBranch = !!categories.branch;
   const hasInlineAction =
-    repoPath && (hasUnstaged || hasStaged) && !categories.untracked && !categories.conflicted;
+    repoPath && (hasUnstaged || hasStaged) && !categories.untracked && !categories.conflicted && !isBranch;
   const inlineAction: 'restore' | 'unstage' = hasUnstaged ? 'restore' : 'unstage';
 
   return (
@@ -244,6 +301,8 @@ export function DiffFileList({
   repoPath,
   selectedFile,
   onSelectFile,
+  branchFiles,
+  mode = 'working',
 }: DiffFileListProps) {
   const [restoreTarget, setRestoreTarget] = useState<{
     path: string;
@@ -277,6 +336,9 @@ export function DiffFileList({
       e.stopPropagation();
       onSelectFile?.(path);
 
+      // No restore/unstage actions for branch files
+      if (categories.branch) return;
+
       const items: { label: string; action: 'restore' | 'unstage' }[] = [];
       if (categories.staged) {
         items.push({ label: 'Unstage File', action: 'unstage' });
@@ -308,34 +370,47 @@ export function DiffFileList({
   };
 
   const unifiedTree = useMemo(() => {
+    if (mode === 'branch' && branchFiles && branchFiles.length > 0) {
+      return buildBranchTree(branchFiles);
+    }
     if (!status) return null;
     return buildUnifiedTree(status);
-  }, [status]);
+  }, [status, branchFiles, mode]);
 
   if (isLoading) {
     return <div className="flex items-center justify-center h-full text-tertiary">Loading...</div>;
   }
 
-  if (!status) {
-    return (
-      <div className="flex items-center justify-center h-full text-tertiary text-sm">
-        No git repository
-      </div>
-    );
-  }
+  if (mode === 'branch') {
+    if (!branchFiles || branchFiles.length === 0) {
+      return (
+        <div className="flex items-center justify-center h-full text-tertiary text-sm">
+          No branch changes
+        </div>
+      );
+    }
+  } else {
+    if (!status) {
+      return (
+        <div className="flex items-center justify-center h-full text-tertiary text-sm">
+          No git repository
+        </div>
+      );
+    }
 
-  const hasChanges =
-    (status.conflicted?.length ?? 0) > 0 ||
-    status.staged.length > 0 ||
-    status.unstaged.length > 0 ||
-    status.untracked.length > 0;
+    const hasChanges =
+      (status.conflicted?.length ?? 0) > 0 ||
+      status.staged.length > 0 ||
+      status.unstaged.length > 0 ||
+      status.untracked.length > 0;
 
-  if (!hasChanges) {
-    return (
-      <div className="flex items-center justify-center h-full text-tertiary text-sm">
-        No changes
-      </div>
-    );
+    if (!hasChanges) {
+      return (
+        <div className="flex items-center justify-center h-full text-tertiary text-sm">
+          No changes
+        </div>
+      );
+    }
   }
 
   const isRestore = restoreTarget?.action === 'restore';

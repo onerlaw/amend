@@ -3,12 +3,13 @@ import { VirtuosoHandle } from 'react-virtuoso';
 import { useFileStore } from '@/stores/fileStore';
 import { useUIStore } from '@/stores/uiStore';
 import { useMultiFileDiff } from '@/hooks/useMultiFileDiff';
+import { useBranchDiff } from '@/hooks/useBranchDiff';
 import { openFileInBrowseMode, getFileName } from '@/lib/fileUtils';
 import { GitPollingResult } from '@/hooks/useGit';
 
 export interface FileWithCategory {
   path: string;
-  category: 'staged' | 'unstaged' | 'untracked' | 'conflicted';
+  category: 'staged' | 'unstaged' | 'untracked' | 'conflicted' | 'branch';
 }
 
 export function useDiffViewerState(gitPolling: GitPollingResult, enabled: boolean = true) {
@@ -19,14 +20,22 @@ export function useDiffViewerState(gitPolling: GitPollingResult, enabled: boolea
     scrollTargetFile,
     setScrollTargetFile,
     setPanelMode,
+    diffMode,
+    diffBaseBranch,
   } = useUIStore();
   const { status, isLoading: statusLoading, refresh } = gitPolling;
-  const { diffs, loadDiff, clearDiffs } = useMultiFileDiff(contextPath);
+  const { diffs: workingDiffs, loadDiff, clearDiffs: clearWorkingDiffs } = useMultiFileDiff(contextPath);
+
+  // Branch diff hook — always called but only active when in branch mode with a base branch
+  const branchDiff = useBranchDiff(
+    diffMode === 'branch' ? contextPath : null,
+    diffMode === 'branch' ? diffBaseBranch : null
+  );
 
   const virtuosoRef = useRef<VirtuosoHandle>(null);
 
   // Build ordered list of all changed files with their categories
-  const allFiles = useMemo((): FileWithCategory[] => {
+  const workingFiles = useMemo((): FileWithCategory[] => {
     if (!status) return [];
     return [
       ...status.conflicted.map((path) => ({ path, category: 'conflicted' as const })),
@@ -36,21 +45,28 @@ export function useDiffViewerState(gitPolling: GitPollingResult, enabled: boolea
     ];
   }, [status]);
 
+  const branchFiles = useMemo((): FileWithCategory[] => {
+    return branchDiff.files.map((f) => ({ path: f.path, category: 'branch' as const }));
+  }, [branchDiff.files]);
+
+  const allFiles = diffMode === 'branch' ? branchFiles : workingFiles;
+  const diffs = diffMode === 'branch' ? branchDiff.diffs : workingDiffs;
+
   // Reset when context path changes (must run before loadDiff to avoid race)
   useEffect(() => {
     if (!enabled) return;
-    clearDiffs();
-  }, [contextPath, clearDiffs, enabled]);
+    clearWorkingDiffs();
+  }, [contextPath, clearWorkingDiffs, enabled]);
 
-  // Load all diffs when files change (runs into clean state after clearDiffs)
+  // Load all working diffs when files change (runs into clean state after clearWorkingDiffs)
   useEffect(() => {
-    if (!enabled) return;
-    if (allFiles.length > 0) {
-      allFiles.forEach((file) => {
+    if (!enabled || diffMode !== 'working') return;
+    if (workingFiles.length > 0) {
+      workingFiles.forEach((file) => {
         loadDiff(file.path);
       });
     }
-  }, [allFiles, loadDiff, enabled]);
+  }, [workingFiles, loadDiff, enabled, diffMode]);
 
   useEffect(() => {
     if (!enabled) return;
@@ -75,9 +91,13 @@ export function useDiffViewerState(gitPolling: GitPollingResult, enabled: boolea
   }, [scrollTargetFile, setScrollTargetFile, allFiles]);
 
   const handleRefresh = useCallback(() => {
-    refresh();
-    clearDiffs();
-  }, [refresh, clearDiffs]);
+    if (diffMode === 'branch') {
+      branchDiff.refresh();
+    } else {
+      refresh();
+      clearWorkingDiffs();
+    }
+  }, [diffMode, refresh, clearWorkingDiffs, branchDiff.refresh]);
 
   const handleEditFile = useCallback(
     async (filePath: string) => {
@@ -119,5 +139,10 @@ export function useDiffViewerState(gitPolling: GitPollingResult, enabled: boolea
     handleRefresh,
     handleEditFile,
     handleScrollToFile,
+    diffMode,
+    branchFiles: branchDiff.files,
+    branchDiffStats: branchDiff.diffStats,
+    branchIsLoading: branchDiff.isLoading,
+    branchError: branchDiff.error,
   };
 }

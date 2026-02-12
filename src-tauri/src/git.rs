@@ -586,6 +586,167 @@ pub struct GitBranch {
     pub is_current: bool,
 }
 
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct BranchDiffSummary {
+    pub files: Vec<GitFileStatus>,
+    pub diff_stats: DiffStats,
+    pub merge_base: String,
+}
+
+#[tauri::command]
+pub async fn get_branch_diff_files(
+    repo_path: String,
+    base_ref: String,
+) -> Result<BranchDiffSummary, GitError> {
+    validate_no_flag(&base_ref, "base ref")?;
+    let rp = repo_path.clone();
+    let br = base_ref.clone();
+    spawn_blocking(move || get_branch_diff_files_sync(&rp, &br))
+        .await
+        .unwrap()
+}
+
+fn get_branch_diff_files_sync(
+    repo_path: &str,
+    base_ref: &str,
+) -> Result<BranchDiffSummary, GitError> {
+    // Find the merge-base between base_ref and HEAD
+    let merge_base_output = run_git_command(repo_path, &["merge-base", base_ref, "HEAD"])?;
+    let merge_base = merge_base_output.trim().to_string();
+
+    // Get changed files with name-status
+    let name_status_output =
+        run_git_command(repo_path, &["diff", "--name-status", &merge_base])?;
+
+    let mut files = Vec::new();
+    for line in name_status_output.lines() {
+        if line.is_empty() {
+            continue;
+        }
+        let mut parts = line.splitn(2, '\t');
+        let status_code = parts.next().unwrap_or("").trim();
+        let path = parts.next().unwrap_or("").trim();
+        if path.is_empty() {
+            continue;
+        }
+
+        let status = match status_code.chars().next() {
+            Some('A') => "added",
+            Some('M') => "modified",
+            Some('D') => "deleted",
+            Some('R') => "renamed",
+            Some('C') => "copied",
+            _ => "modified",
+        };
+
+        files.push(GitFileStatus {
+            path: path.to_string(),
+            status: status.to_string(),
+        });
+    }
+
+    // Get numstat for aggregate counts
+    let numstat_output = run_git_command(repo_path, &["diff", "--numstat", &merge_base])?;
+
+    let mut additions: usize = 0;
+    let mut deletions: usize = 0;
+    for line in numstat_output.lines() {
+        if line.is_empty() {
+            continue;
+        }
+        let cols: Vec<&str> = line.split('\t').collect();
+        if cols.len() >= 2 {
+            // Binary files show "-" for additions/deletions
+            additions += cols[0].parse::<usize>().unwrap_or(0);
+            deletions += cols[1].parse::<usize>().unwrap_or(0);
+        }
+    }
+
+    Ok(BranchDiffSummary {
+        diff_stats: DiffStats {
+            additions,
+            deletions,
+            files_changed: files.len(),
+        },
+        files,
+        merge_base,
+    })
+}
+
+#[tauri::command]
+pub async fn get_branch_file_diff(
+    repo_path: String,
+    base_ref: String,
+    file_path: String,
+) -> Result<GitDiff, GitError> {
+    validate_no_flag(&base_ref, "base ref")?;
+    validate_no_flag(&file_path, "file path")?;
+    spawn_blocking(move || get_branch_file_diff_sync(&repo_path, &base_ref, &file_path))
+        .await
+        .unwrap()
+}
+
+fn get_branch_file_diff_sync(
+    repo_path: &str,
+    base_ref: &str,
+    file_path: &str,
+) -> Result<GitDiff, GitError> {
+    let repo = Repository::discover(repo_path)?;
+    let workdir = repo
+        .workdir()
+        .ok_or_else(|| GitError::NotARepo(repo_path.to_string()))?;
+
+    let full_path = workdir.join(file_path);
+
+    if is_image_extension(file_path) {
+        // Read current file as base64
+        let new_content = if full_path.exists() {
+            let bytes = std::fs::read(&full_path).unwrap_or_default();
+            STANDARD.encode(&bytes)
+        } else {
+            String::new()
+        };
+
+        // Read base ref blob as base64
+        let old_content =
+            match run_git_command(repo_path, &["show", &format!("{}:{}", base_ref, file_path)]) {
+                Ok(raw) => STANDARD.encode(raw.as_bytes()),
+                Err(_) => String::new(),
+            };
+
+        return Ok(GitDiff {
+            old_path: file_path.to_string(),
+            new_path: file_path.to_string(),
+            old_content,
+            new_content,
+            is_binary: true,
+        });
+    }
+
+    // Read current working tree file
+    let new_content = if full_path.exists() {
+        std::fs::read_to_string(&full_path).unwrap_or_default()
+    } else {
+        String::new()
+    };
+
+    // Read old content from base ref
+    let old_content =
+        match run_git_command(repo_path, &["show", &format!("{}:{}", base_ref, file_path)]) {
+            Ok(content) => content,
+            Err(_) => String::new(),
+        };
+
+    Ok(GitDiff {
+        old_path: file_path.to_string(),
+        new_path: file_path.to_string(),
+        old_content,
+        new_content,
+        is_binary: false,
+    })
+}
+
 #[tauri::command]
 pub fn list_branches(repo_path: String) -> Result<Vec<GitBranch>, GitError> {
     // Get local branches

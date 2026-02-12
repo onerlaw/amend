@@ -5,6 +5,7 @@ import { toggleSetItem } from '@/lib/fileUtils';
 export type PanelMode = 'diff' | 'browse' | null;
 export type ThemeMode = 'light' | 'dark' | 'system';
 export type FocusedPanel = 'terminal' | 'editor' | 'file-list';
+export type DiffMode = 'working' | 'branch';
 
 interface UIState {
   panelMode: PanelMode;
@@ -17,6 +18,8 @@ interface UIState {
   browseExpandedDirs: Set<string>;
   collapsedDiffTreePaths: Set<string>;
   fontSize: number;
+  diffMode: DiffMode;
+  diffBaseBranch: string | null;
 
   setPanelMode: (mode: PanelMode) => void;
   toggleDiffFileCollapse: (path: string) => void;
@@ -30,6 +33,8 @@ interface UIState {
   increaseFontSize: () => void;
   decreaseFontSize: () => void;
   resetFontSize: () => void;
+  setDiffMode: (mode: DiffMode) => void;
+  setDiffBaseBranch: (branch: string | null) => void;
 }
 
 export const useUIStore = create<UIState>()(
@@ -45,6 +50,8 @@ export const useUIStore = create<UIState>()(
       browseExpandedDirs: new Set(),
       collapsedDiffTreePaths: new Set(),
       fontSize: 13,
+      diffMode: 'working',
+      diffBaseBranch: null,
 
       setPanelMode: (mode: PanelMode) => set({ panelMode: mode }),
       setFocusedPanel: (panel: FocusedPanel) =>
@@ -71,6 +78,8 @@ export const useUIStore = create<UIState>()(
       decreaseFontSize: () =>
         set((state) => ({ fontSize: Math.max(8, state.fontSize - 1) })),
       resetFontSize: () => set({ fontSize: 13 }),
+      setDiffMode: (mode: DiffMode) => set({ diffMode: mode }),
+      setDiffBaseBranch: (branch: string | null) => set({ diffBaseBranch: branch }),
     }),
     {
       name: 'amend-ui',
@@ -79,6 +88,8 @@ export const useUIStore = create<UIState>()(
         themeMode: state.themeMode,
         diffFileListVisible: state.diffFileListVisible,
         fontSize: state.fontSize,
+        diffMode: state.diffMode,
+        diffBaseBranch: state.diffBaseBranch,
       }),
     }
   )
