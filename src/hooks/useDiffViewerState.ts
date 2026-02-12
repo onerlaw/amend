@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useCallback, useRef } from 'react';
-import { VirtuosoHandle } from 'react-virtuoso';
 import { useFileStore } from '@/stores/fileStore';
 import { useUIStore } from '@/stores/uiStore';
 import { useMultiFileDiff } from '@/hooks/useMultiFileDiff';
@@ -23,7 +22,7 @@ export function useDiffViewerState(gitPolling: GitPollingResult, enabled: boolea
   const { status, isLoading: statusLoading, refresh } = gitPolling;
   const { diffs, loadDiff, clearDiffs } = useMultiFileDiff(contextPath);
 
-  const virtuosoRef = useRef<VirtuosoHandle>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   // Build ordered list of all changed files with their categories
   const allFiles = useMemo((): FileWithCategory[] => {
@@ -59,20 +58,18 @@ export function useDiffViewerState(gitPolling: GitPollingResult, enabled: boolea
     }
   }, [contextPath, refresh, enabled]);
 
-  // Handle scroll-to-file using Virtuoso
+  // Handle scroll-to-file using data attributes
   useEffect(() => {
-    if (scrollTargetFile && virtuosoRef.current) {
-      const index = allFiles.findIndex((f) => f.path === scrollTargetFile);
-      if (index !== -1) {
-        virtuosoRef.current.scrollToIndex({
-          index,
-          behavior: 'smooth',
-          align: 'start',
-        });
+    if (scrollTargetFile && scrollContainerRef.current) {
+      const el = scrollContainerRef.current.querySelector(
+        `[data-file-path="${CSS.escape(scrollTargetFile)}"]`
+      );
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }
       setScrollTargetFile(null);
     }
-  }, [scrollTargetFile, setScrollTargetFile, allFiles]);
+  }, [scrollTargetFile, setScrollTargetFile]);
 
   const handleRefresh = useCallback(() => {
     refresh();
@@ -114,7 +111,7 @@ export function useDiffViewerState(gitPolling: GitPollingResult, enabled: boolea
     allFiles,
     diffs,
     collapsedDiffFiles,
-    virtuosoRef,
+    scrollContainerRef,
     toggleDiffFileCollapse,
     handleRefresh,
     handleEditFile,

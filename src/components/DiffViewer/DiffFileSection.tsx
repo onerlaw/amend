@@ -584,7 +584,7 @@ export const DiffFileSection = memo(function DiffFileSection({
   const hasContent = !isLoading && !error && (oldContent || newContent);
 
   return (
-    <div className="m-2">
+    <div className="m-2" data-file-path={filePath}>
       {/* Header */}
       <div
         className={`flex items-center justify-between bg-surface-2 px-3 py-2 rounded-t-md ${isCollapsed ? 'rounded-b-md' : ''}`}
