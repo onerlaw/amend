@@ -196,6 +196,24 @@ export function MainLayout() {
         }
       }
 
+      // Cmd/Ctrl + = or +: Increase font size
+      if ((e.metaKey || e.ctrlKey) && (e.key === '=' || e.key === '+')) {
+        e.preventDefault();
+        useUIStore.getState().increaseFontSize();
+      }
+
+      // Cmd/Ctrl + -: Decrease font size
+      if ((e.metaKey || e.ctrlKey) && e.key === '-') {
+        e.preventDefault();
+        useUIStore.getState().decreaseFontSize();
+      }
+
+      // Cmd/Ctrl + 0: Reset font size
+      if ((e.metaKey || e.ctrlKey) && e.key === '0') {
+        e.preventDefault();
+        useUIStore.getState().resetFontSize();
+      }
+
       // Cmd/Ctrl + W: Close current tab
       if ((e.metaKey || e.ctrlKey) && e.key === 'w') {
         e.preventDefault();
@@ -391,6 +409,24 @@ export function MainLayout() {
                 <span className="text-primary">Paste Files</span>
                 <kbd className="rounded-md bg-surface-1 px-2 py-0.5 font-mono text-secondary">
                   Cmd+V
+                </kbd>
+              </div>
+              <div className="flex items-center justify-between py-1">
+                <span className="text-primary">Increase Font Size</span>
+                <kbd className="rounded-md bg-surface-1 px-2 py-0.5 font-mono text-secondary">
+                  Cmd+=
+                </kbd>
+              </div>
+              <div className="flex items-center justify-between py-1">
+                <span className="text-primary">Decrease Font Size</span>
+                <kbd className="rounded-md bg-surface-1 px-2 py-0.5 font-mono text-secondary">
+                  Cmd+-
+                </kbd>
+              </div>
+              <div className="flex items-center justify-between py-1">
+                <span className="text-primary">Reset Font Size</span>
+                <kbd className="rounded-md bg-surface-1 px-2 py-0.5 font-mono text-secondary">
+                  Cmd+0
                 </kbd>
               </div>
             </div>

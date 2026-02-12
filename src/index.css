@@ -127,7 +127,7 @@ body,
 
 .cm-scroller {
   font-family: 'Menlo', 'Monaco', 'Consolas', 'Liberation Mono', 'Courier New', monospace;
-  font-size: 13px;
+  font-size: var(--editor-font-size, 13px);
   overflow: auto !important;
 }
 

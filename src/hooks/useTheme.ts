@@ -10,6 +10,7 @@ export function isDarkMode(themeMode: ThemeMode): boolean {
 
 export function useTheme() {
   const { themeMode, setThemeMode } = useUIStore();
+  const fontSize = useUIStore((state) => state.fontSize);
 
   // Apply theme class to document
   useEffect(() => {
@@ -34,6 +35,11 @@ export function useTheme() {
     mediaQuery.addEventListener('change', handleChange);
     return () => mediaQuery.removeEventListener('change', handleChange);
   }, [themeMode]);
+
+  // Sync editor font size CSS variable
+  useEffect(() => {
+    document.documentElement.style.setProperty('--editor-font-size', fontSize + 'px');
+  }, [fontSize]);
 
   const cycleTheme = () => {
     const modes: ThemeMode[] = ['light', 'dark', 'system'];
