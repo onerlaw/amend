@@ -51,6 +51,8 @@ pub fn run() {
             git::add_worktree,
             git::remove_worktree,
             git::list_branches,
+            git::get_branch_diff_files,
+            git::get_branch_file_diff,
             git::restore_file,
             git::unstage_file,
             git::stage_file,

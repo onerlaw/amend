@@ -13,7 +13,7 @@ import { writeFile, stageFile } from '@/lib/tauri';
 
 interface DiffFileSectionProps {
   filePath: string;
-  category: 'staged' | 'unstaged' | 'untracked' | 'conflicted';
+  category: 'staged' | 'unstaged' | 'untracked' | 'conflicted' | 'branch';
   oldContent: string;
   newContent: string;
   isBinary: boolean;
@@ -134,9 +134,14 @@ const BADGE_CONFIG: Record<string, { bg: string; text: string; label: string }> 
     text: 'text-red-600 dark:text-red-400',
     label: 'Conflict',
   },
+  branch: {
+    bg: 'bg-blue-100 dark:bg-blue-600/20',
+    text: 'text-blue-600 dark:text-blue-400',
+    label: 'Branch',
+  },
 };
 
-function getStatusBadge(category: 'staged' | 'unstaged' | 'untracked' | 'conflicted') {
+function getStatusBadge(category: 'staged' | 'unstaged' | 'untracked' | 'conflicted' | 'branch') {
   const config = BADGE_CONFIG[category];
   return (
     <span className={`rounded-md ${config.bg} px-1.5 py-0.5 text-xs font-medium ${config.text}`}>

@@ -5,6 +5,7 @@ import { toggleSetItem } from '@/lib/fileUtils';
 export type PanelMode = 'diff' | 'browse' | null;
 export type ThemeMode = 'light' | 'dark' | 'system';
 export type FocusedPanel = 'terminal' | 'editor' | 'file-list';
+export type DiffMode = 'working' | 'branch';
 
 interface UIState {
   panelMode: PanelMode;
@@ -16,6 +17,8 @@ interface UIState {
   diffFileListVisible: boolean;
   browseExpandedDirs: Set<string>;
   collapsedDiffTreePaths: Set<string>;
+  diffMode: DiffMode;
+  diffBaseBranch: string | null;
 
   setPanelMode: (mode: PanelMode) => void;
   toggleDiffFileCollapse: (path: string) => void;
@@ -26,6 +29,8 @@ interface UIState {
   toggleDiffFileList: () => void;
   toggleBrowseExpandedDir: (path: string) => void;
   toggleDiffTreePath: (path: string) => void;
+  setDiffMode: (mode: DiffMode) => void;
+  setDiffBaseBranch: (branch: string | null) => void;
 }
 
 export const useUIStore = create<UIState>()(
@@ -40,6 +45,8 @@ export const useUIStore = create<UIState>()(
       diffFileListVisible: false,
       browseExpandedDirs: new Set(),
       collapsedDiffTreePaths: new Set(),
+      diffMode: 'working',
+      diffBaseBranch: null,
 
       setPanelMode: (mode: PanelMode) => set({ panelMode: mode }),
       setFocusedPanel: (panel: FocusedPanel) =>
@@ -61,6 +68,8 @@ export const useUIStore = create<UIState>()(
       setScrollTargetFile: (path: string | null) => set({ scrollTargetFile: path }),
       setSelectedDiffFile: (path: string | null) => set({ selectedDiffFile: path }),
       setThemeMode: (mode: ThemeMode) => set({ themeMode: mode }),
+      setDiffMode: (mode: DiffMode) => set({ diffMode: mode }),
+      setDiffBaseBranch: (branch: string | null) => set({ diffBaseBranch: branch }),
     }),
     {
       name: 'amend-ui',
@@ -68,6 +77,8 @@ export const useUIStore = create<UIState>()(
         panelMode: state.panelMode,
         themeMode: state.themeMode,
         diffFileListVisible: state.diffFileListVisible,
+        diffMode: state.diffMode,
+        diffBaseBranch: state.diffBaseBranch,
       }),
     }
   )
