@@ -63,7 +63,9 @@ function BranchSelector({ repoPath }: { repoPath: string }) {
         title={diffBaseBranch ?? 'Select base branch'}
       >
         <span className="truncate">{diffBaseBranch ?? 'Select branch...'}</span>
-        <ChevronIcon className={`h-3 w-3 flex-shrink-0 transition-transform ${isOpen ? 'rotate-90' : ''}`} />
+        <ChevronIcon
+          className={`h-3 w-3 flex-shrink-0 transition-transform ${isOpen ? 'rotate-90' : ''}`}
+        />
       </button>
 
       {isOpen && (
@@ -92,9 +94,7 @@ function BranchSelector({ repoPath }: { repoPath: string }) {
                   branch.name === diffBaseBranch ? 'text-accent' : 'text-primary'
                 }`}
               >
-                {branch.isRemote && (
-                  <span className="text-tertiary flex-shrink-0">remote</span>
-                )}
+                {branch.isRemote && <span className="text-tertiary flex-shrink-0">remote</span>}
                 <span className="truncate">{branch.name}</span>
               </button>
             ))}
@@ -164,9 +164,7 @@ export function DiffContentPanel() {
           <button
             onClick={() => setDiffMode('working')}
             className={`px-2 py-0.5 text-xs font-medium ${
-              !isBranchMode
-                ? 'bg-accent text-white'
-                : 'text-secondary hover:bg-surface-3'
+              !isBranchMode ? 'bg-accent text-white' : 'text-secondary hover:bg-surface-3'
             }`}
           >
             Working
@@ -174,9 +172,7 @@ export function DiffContentPanel() {
           <button
             onClick={() => setDiffMode('branch')}
             className={`px-2 py-0.5 text-xs font-medium ${
-              isBranchMode
-                ? 'bg-accent text-white'
-                : 'text-secondary hover:bg-surface-3'
+              isBranchMode ? 'bg-accent text-white' : 'text-secondary hover:bg-surface-3'
             }`}
           >
             Branch
@@ -227,15 +223,18 @@ export function DiffContentPanel() {
       )}
 
       {/* Empty state */}
-      {!showNoBranchSelected && !showBranchLoading && !showBranchError && changedFilesCount === 0 && (
-        <div className="flex h-full flex-col items-center justify-center px-6 text-center">
-          <CheckCircleIcon className="h-12 w-12 text-green-500 mb-3" />
-          <h3 className="text-sm font-medium text-primary mb-1">No Changes</h3>
-          <p className="text-xs text-tertiary">
-            {isBranchMode ? `No differences from ${diffBaseBranch}` : 'Working tree is clean'}
-          </p>
-        </div>
-      )}
+      {!showNoBranchSelected &&
+        !showBranchLoading &&
+        !showBranchError &&
+        changedFilesCount === 0 && (
+          <div className="flex h-full flex-col items-center justify-center px-6 text-center">
+            <CheckCircleIcon className="h-12 w-12 text-green-500 mb-3" />
+            <h3 className="text-sm font-medium text-primary mb-1">No Changes</h3>
+            <p className="text-xs text-tertiary">
+              {isBranchMode ? `No differences from ${diffBaseBranch}` : 'Working tree is clean'}
+            </p>
+          </div>
+        )}
 
       {changedFilesCount > 0 && (
         <div ref={scrollContainerRef} className="flex-1 overflow-y-auto">

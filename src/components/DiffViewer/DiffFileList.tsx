@@ -254,7 +254,11 @@ function FileTreeItem({
   const hasStaged = !!categories.staged;
   const isBranch = !!categories.branch;
   const hasInlineAction =
-    repoPath && (hasUnstaged || hasStaged) && !categories.untracked && !categories.conflicted && !isBranch;
+    repoPath &&
+    (hasUnstaged || hasStaged) &&
+    !categories.untracked &&
+    !categories.conflicted &&
+    !isBranch;
   const inlineAction: 'restore' | 'unstage' = hasUnstaged ? 'restore' : 'unstage';
 
   return (
@@ -323,12 +327,9 @@ export function DiffFileList({
     [onSelectFile, onScrollToFile]
   );
 
-  const handleAction = useCallback(
-    (path: string, action: 'restore' | 'unstage') => {
-      setRestoreTarget({ path, action });
-    },
-    []
-  );
+  const handleAction = useCallback((path: string, action: 'restore' | 'unstage') => {
+    setRestoreTarget({ path, action });
+  }, []);
 
   const handleContextMenu = useCallback(
     (e: React.MouseEvent, path: string, categories: FileCategories) => {
@@ -437,8 +438,7 @@ export function DiffFileList({
           contextMenu
             ? contextMenu.items.map((item) => ({
                 label: item.label,
-                onClick: () =>
-                  setRestoreTarget({ path: contextMenu.path, action: item.action }),
+                onClick: () => setRestoreTarget({ path: contextMenu.path, action: item.action }),
               }))
             : []
         }

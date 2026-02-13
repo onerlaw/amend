@@ -61,7 +61,10 @@ const DiffLineGutter = memo(function DiffLineGutter({
   const prefix = type === 'added' ? '+' : type === 'removed' ? '-' : ' ';
 
   return (
-    <div className={`flex font-mono ${bgClass}`} style={{ fontSize: 'var(--editor-font-size, 13px)' }}>
+    <div
+      className={`flex font-mono ${bgClass}`}
+      style={{ fontSize: 'var(--editor-font-size, 13px)' }}
+    >
       <span className="w-12 flex-shrink-0 select-none px-2 text-right text-tertiary bg-surface-1">
         {oldLineNum ?? ''}
       </span>
@@ -91,7 +94,10 @@ const DiffLineCode = memo(function DiffLineCode({
   const highlightedContent = useMemo(() => highlightCode(content, language), [content, language]);
 
   return (
-    <div className={`font-mono ${bgClass} whitespace-nowrap`} style={{ fontSize: 'var(--editor-font-size, 13px)' }}>
+    <div
+      className={`font-mono ${bgClass} whitespace-nowrap`}
+      style={{ fontSize: 'var(--editor-font-size, 13px)' }}
+    >
       <span
         className="px-2 whitespace-pre hljs"
         dangerouslySetInnerHTML={{ __html: highlightedContent }}
@@ -363,7 +369,11 @@ const ConflictContent = memo(function ConflictContent({
           return (
             <div key={i}>
               {segment.lines.map((line, li) => (
-                <div key={li} className="font-mono whitespace-nowrap" style={{ fontSize: 'var(--editor-font-size, 13px)' }}>
+                <div
+                  key={li}
+                  className="font-mono whitespace-nowrap"
+                  style={{ fontSize: 'var(--editor-font-size, 13px)' }}
+                >
                   <span
                     className="px-2 whitespace-pre hljs"
                     dangerouslySetInnerHTML={{ __html: highlightCode(line, language) }}
@@ -408,7 +418,11 @@ const ConflictContent = memo(function ConflictContent({
                 Current ({segment.oursLabel})
               </div>
               {segment.oursLines.map((line, li) => (
-                <div key={li} className="font-mono whitespace-nowrap" style={{ fontSize: 'var(--editor-font-size, 13px)' }}>
+                <div
+                  key={li}
+                  className="font-mono whitespace-nowrap"
+                  style={{ fontSize: 'var(--editor-font-size, 13px)' }}
+                >
                   <span
                     className="px-2 whitespace-pre hljs"
                     dangerouslySetInnerHTML={{ __html: highlightCode(line, language) }}
@@ -423,7 +437,11 @@ const ConflictContent = memo(function ConflictContent({
                 Incoming ({segment.theirsLabel})
               </div>
               {segment.theirsLines.map((line, li) => (
-                <div key={li} className="font-mono whitespace-nowrap" style={{ fontSize: 'var(--editor-font-size, 13px)' }}>
+                <div
+                  key={li}
+                  className="font-mono whitespace-nowrap"
+                  style={{ fontSize: 'var(--editor-font-size, 13px)' }}
+                >
                   <span
                     className="px-2 whitespace-pre hljs"
                     dangerouslySetInnerHTML={{ __html: highlightCode(line, language) }}

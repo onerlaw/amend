@@ -616,8 +616,7 @@ fn get_branch_diff_files_sync(
     let merge_base = merge_base_output.trim().to_string();
 
     // Get changed files with name-status
-    let name_status_output =
-        run_git_command(repo_path, &["diff", "--name-status", &merge_base])?;
+    let name_status_output = run_git_command(repo_path, &["diff", "--name-status", &merge_base])?;
 
     let mut files = Vec::new();
     for line in name_status_output.lines() {
@@ -732,11 +731,8 @@ fn get_branch_file_diff_sync(
     };
 
     // Read old content from base ref
-    let old_content =
-        match run_git_command(repo_path, &["show", &format!("{}:{}", base_ref, file_path)]) {
-            Ok(content) => content,
-            Err(_) => String::new(),
-        };
+    let old_content = run_git_command(repo_path, &["show", &format!("{}:{}", base_ref, file_path)])
+        .unwrap_or_default();
 
     Ok(GitDiff {
         old_path: file_path.to_string(),

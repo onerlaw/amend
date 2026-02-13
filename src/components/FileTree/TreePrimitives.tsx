@@ -52,7 +52,12 @@ interface PanelHeaderProps {
   onRefresh: () => void;
 }
 
-export function PanelHeader({ title, badge, badgeColor = 'bg-green-600', onRefresh }: PanelHeaderProps) {
+export function PanelHeader({
+  title,
+  badge,
+  badgeColor = 'bg-green-600',
+  onRefresh,
+}: PanelHeaderProps) {
   return (
     <div className="flex items-center justify-between px-3 py-2">
       <div className="flex items-center gap-2">

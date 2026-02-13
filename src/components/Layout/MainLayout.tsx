@@ -21,7 +21,16 @@ import { ModalOverlay } from '@/components/ModalOverlay';
 import { indexProject, copyEntry, moveEntry, getClipboardFilePaths } from '@/lib/tauri';
 import { useContextMenuStore } from '@/stores/contextMenuStore';
 import { dispatchFileTreeRefresh } from '@/stores/contextMenuStore';
-import { PlusIcon, CloseIcon, InfoIcon, SunIcon, MoonIcon, MonitorIcon, SidebarIcon, NotesIcon } from '@/components/Icons';
+import {
+  PlusIcon,
+  CloseIcon,
+  InfoIcon,
+  SunIcon,
+  MoonIcon,
+  MonitorIcon,
+  SidebarIcon,
+  NotesIcon,
+} from '@/components/Icons';
 import { NotesPanel } from '@/components/NotesPanel';
 import { useNotesStore } from '@/stores/notesStore';
 
@@ -42,7 +51,13 @@ function ThemeToggle() {
 }
 
 export function MainLayout() {
-  const { panelMode, setPanelMode, diffFileListVisible, browseFileListVisible, toggleBrowseFileList } = useUIStore();
+  const {
+    panelMode,
+    setPanelMode,
+    diffFileListVisible,
+    browseFileListVisible,
+    toggleBrowseFileList,
+  } = useUIStore();
   const { isOpen: notesOpen, toggleNotes } = useNotesStore();
   const {
     currentDirectory,
@@ -276,9 +291,7 @@ export function MainLayout() {
           <button
             onClick={toggleNotes}
             className={`rounded-md p-1.5 ${
-              notesOpen
-                ? 'bg-accent text-white'
-                : 'text-secondary hover:bg-surface-3'
+              notesOpen ? 'bg-accent text-white' : 'text-secondary hover:bg-surface-3'
             }`}
             title="Notes (Cmd+Shift+N)"
           >
@@ -381,7 +394,9 @@ export function MainLayout() {
                 <BrowseEditorTabs ref={browseEditorTabsRef} />
               </Panel>
             )}
-            {panelMode === 'browse' && browseOpenFiles.length > 0 && browseFileListVisible && <PanelResizeHandle />}
+            {panelMode === 'browse' && browseOpenFiles.length > 0 && browseFileListVisible && (
+              <PanelResizeHandle />
+            )}
             {panelMode === 'browse' && browseFileListVisible && (
               <Panel id="browse-file-list" order={3} defaultSize={20} minSize={10} maxSize={40}>
                 <BrowseFileListPanel />

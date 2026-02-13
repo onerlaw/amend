@@ -78,10 +78,8 @@ export const useUIStore = create<UIState>()(
       setScrollTargetFile: (path: string | null) => set({ scrollTargetFile: path }),
       setSelectedDiffFile: (path: string | null) => set({ selectedDiffFile: path }),
       setThemeMode: (mode: ThemeMode) => set({ themeMode: mode }),
-      increaseFontSize: () =>
-        set((state) => ({ fontSize: Math.min(32, state.fontSize + 1) })),
-      decreaseFontSize: () =>
-        set((state) => ({ fontSize: Math.max(8, state.fontSize - 1) })),
+      increaseFontSize: () => set((state) => ({ fontSize: Math.min(32, state.fontSize + 1) })),
+      decreaseFontSize: () => set((state) => ({ fontSize: Math.max(8, state.fontSize - 1) })),
       resetFontSize: () => set({ fontSize: 13 }),
       setDiffMode: (mode: DiffMode) => set({ diffMode: mode }),
       setDiffBaseBranch: (branch: string | null) => set({ diffBaseBranch: branch }),

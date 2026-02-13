@@ -23,7 +23,11 @@ export function useDiffViewerState(gitPolling: GitPollingResult, enabled: boolea
     diffBaseBranch,
   } = useUIStore();
   const { status, isLoading: statusLoading, refresh } = gitPolling;
-  const { diffs: workingDiffs, loadDiff, clearDiffs: clearWorkingDiffs } = useMultiFileDiff(contextPath);
+  const {
+    diffs: workingDiffs,
+    loadDiff,
+    clearDiffs: clearWorkingDiffs,
+  } = useMultiFileDiff(contextPath);
 
   // Branch diff hook — always called but only active when in branch mode with a base branch
   const branchDiff = useBranchDiff(

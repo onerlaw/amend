@@ -17,11 +17,18 @@ export function NotesPanel() {
 
   // Drag state
   const [dragPos, setDragPos] = useState<{ x: number; y: number } | null>(null);
-  const dragStartRef = useRef<{ mouseX: number; mouseY: number; posX: number; posY: number } | null>(null);
+  const dragStartRef = useRef<{
+    mouseX: number;
+    mouseY: number;
+    posX: number;
+    posY: number;
+  } | null>(null);
 
   // Resize state
   const [resizeSize, setResizeSize] = useState<{ width: number; height: number } | null>(null);
-  const resizeStartRef = useRef<{ mouseX: number; mouseY: number; w: number; h: number } | null>(null);
+  const resizeStartRef = useRef<{ mouseX: number; mouseY: number; w: number; h: number } | null>(
+    null
+  );
 
   // Keep contentRef in sync
   useEffect(() => {
@@ -99,8 +106,14 @@ export function NotesPanel() {
         const dx = ev.clientX - dragStartRef.current.mouseX;
         const dy = ev.clientY - dragStartRef.current.mouseY;
         const currentSize = resizeSize ?? size;
-        const newX = Math.max(0, Math.min(dragStartRef.current.posX + dx, window.innerWidth - currentSize.width));
-        const newY = Math.max(0, Math.min(dragStartRef.current.posY + dy, window.innerHeight - currentSize.height));
+        const newX = Math.max(
+          0,
+          Math.min(dragStartRef.current.posX + dx, window.innerWidth - currentSize.width)
+        );
+        const newY = Math.max(
+          0,
+          Math.min(dragStartRef.current.posY + dy, window.innerHeight - currentSize.height)
+        );
         setDragPos({ x: newX, y: newY });
       };
 
@@ -128,7 +141,12 @@ export function NotesPanel() {
       e.preventDefault();
       e.stopPropagation();
       const currentSize = resizeSize ?? size;
-      resizeStartRef.current = { mouseX: e.clientX, mouseY: e.clientY, w: currentSize.width, h: currentSize.height };
+      resizeStartRef.current = {
+        mouseX: e.clientX,
+        mouseY: e.clientY,
+        w: currentSize.width,
+        h: currentSize.height,
+      };
 
       const handleMouseMove = (ev: MouseEvent) => {
         if (!resizeStartRef.current) return;
