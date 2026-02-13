@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useDiffViewer } from './DiffViewerContext';
 import { useUIStore } from '@/stores/uiStore';
 import { DiffFileSection } from './DiffFileSection';
-import { DocumentIcon, CheckCircleIcon, SidebarIcon, ChevronIcon } from '@/components/Icons';
+import { DocumentIcon, CheckCircleIcon, ChevronIcon } from '@/components/Icons';
 import { listBranches, GitBranch } from '@/lib/tauri';
 import '@/styles/highlight-theme.css';
 
@@ -120,8 +120,7 @@ export function DiffContentPanel() {
     branchIsLoading,
     branchError,
   } = useDiffViewer();
-  const { diffFileListVisible, toggleDiffFileList, setFocusedPanel, setDiffMode, diffBaseBranch } =
-    useUIStore();
+  const { setFocusedPanel, setDiffMode, diffBaseBranch } = useUIStore();
 
   // No directory open state
   if (!currentDirectory) {
@@ -183,18 +182,6 @@ export function DiffContentPanel() {
         {isBranchMode && contextPath && <BranchSelector repoPath={contextPath} />}
 
         <span className="text-xs text-tertiary flex-1">{statsText}</span>
-
-        <button
-          onClick={toggleDiffFileList}
-          className={`rounded-md p-1 ${
-            diffFileListVisible
-              ? 'text-accent hover:bg-surface-3'
-              : 'text-secondary hover:bg-surface-3'
-          }`}
-          title={diffFileListVisible ? 'Hide file list' : 'Show file list'}
-        >
-          <SidebarIcon className="h-3.5 w-3.5" />
-        </button>
       </div>
 
       {/* No branch selected prompt */}

@@ -57,6 +57,7 @@ export function MainLayout() {
     diffFileListVisible,
     browseFileListVisible,
     toggleBrowseFileList,
+    toggleDiffFileList,
   } = useUIStore();
   const { isOpen: notesOpen, toggleNotes } = useNotesStore();
   const {
@@ -348,15 +349,19 @@ export function MainLayout() {
           </div>
         </div>
         <div className="flex w-10 items-center justify-end">
-          {panelMode === 'browse' && (
+          {(panelMode === 'browse' || panelMode === 'diff') && (
             <button
-              onClick={toggleBrowseFileList}
+              onClick={panelMode === 'browse' ? toggleBrowseFileList : toggleDiffFileList}
               className={`rounded-md p-1.5 ${
-                browseFileListVisible
+                (panelMode === 'browse' ? browseFileListVisible : diffFileListVisible)
                   ? 'text-accent hover:bg-surface-3'
                   : 'text-secondary hover:bg-surface-3'
               }`}
-              title={browseFileListVisible ? 'Hide file list' : 'Show file list'}
+              title={
+                (panelMode === 'browse' ? browseFileListVisible : diffFileListVisible)
+                  ? 'Hide file list'
+                  : 'Show file list'
+              }
             >
               <SidebarIcon className="h-3.5 w-3.5" />
             </button>
