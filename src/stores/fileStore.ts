@@ -43,6 +43,10 @@ function tabMarkSaved(files: OpenFile[], path: string): OpenFile[] {
   return files.map((f) => (f.path === path ? { ...f, isDirty: false } : f));
 }
 
+function tabRefreshContent(files: OpenFile[], path: string, content: string): OpenFile[] {
+  return files.map((f) => (f.path === path ? { ...f, content, isDirty: false } : f));
+}
+
 function tabOpenAtLine(
   files: OpenFile[],
   file: OpenFile,
@@ -84,6 +88,7 @@ interface FileState {
   closeBrowseFile: (path: string) => void;
   updateBrowseFileContent: (path: string, content: string) => void;
   markBrowseFileSaved: (path: string) => void;
+  refreshBrowseFileContent: (path: string, content: string) => void;
   // Line navigation (for go-to-definition)
   pendingScrollToLine: number | null;
   pendingScrollToFile: string | null;
@@ -164,6 +169,9 @@ export const useFileStore = create<FileState>()(
       },
       markBrowseFileSaved: (path: string) => {
         set({ browseOpenFiles: tabMarkSaved(get().browseOpenFiles, path) });
+      },
+      refreshBrowseFileContent: (path: string, content: string) => {
+        set({ browseOpenFiles: tabRefreshContent(get().browseOpenFiles, path, content) });
       },
       // Line navigation (for go-to-definition)
       pendingScrollToLine: null,
