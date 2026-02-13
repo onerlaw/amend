@@ -15,6 +15,7 @@ interface UIState {
   themeMode: ThemeMode;
   focusedPanel: FocusedPanel;
   diffFileListVisible: boolean;
+  browseFileListVisible: boolean;
   browseExpandedDirs: Set<string>;
   collapsedDiffTreePaths: Set<string>;
   fontSize: number;
@@ -28,6 +29,7 @@ interface UIState {
   setThemeMode: (mode: ThemeMode) => void;
   setFocusedPanel: (panel: FocusedPanel) => void;
   toggleDiffFileList: () => void;
+  toggleBrowseFileList: () => void;
   toggleBrowseExpandedDir: (path: string) => void;
   toggleDiffTreePath: (path: string) => void;
   increaseFontSize: () => void;
@@ -47,6 +49,7 @@ export const useUIStore = create<UIState>()(
       themeMode: 'system',
       focusedPanel: 'terminal',
       diffFileListVisible: false,
+      browseFileListVisible: true,
       browseExpandedDirs: new Set(),
       collapsedDiffTreePaths: new Set(),
       fontSize: 13,
@@ -58,6 +61,8 @@ export const useUIStore = create<UIState>()(
         set((state) => (state.focusedPanel === panel ? state : { focusedPanel: panel })),
       toggleDiffFileList: () =>
         set((state) => ({ diffFileListVisible: !state.diffFileListVisible })),
+      toggleBrowseFileList: () =>
+        set((state) => ({ browseFileListVisible: !state.browseFileListVisible })),
       toggleDiffFileCollapse: (path: string) =>
         set((state) => ({
           collapsedDiffFiles: toggleSetItem(state.collapsedDiffFiles, path),
@@ -87,6 +92,7 @@ export const useUIStore = create<UIState>()(
         panelMode: state.panelMode,
         themeMode: state.themeMode,
         diffFileListVisible: state.diffFileListVisible,
+        browseFileListVisible: state.browseFileListVisible,
         fontSize: state.fontSize,
         diffMode: state.diffMode,
         diffBaseBranch: state.diffBaseBranch,

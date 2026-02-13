@@ -21,7 +21,7 @@ import { ModalOverlay } from '@/components/ModalOverlay';
 import { indexProject, copyEntry, moveEntry, getClipboardFilePaths } from '@/lib/tauri';
 import { useContextMenuStore } from '@/stores/contextMenuStore';
 import { dispatchFileTreeRefresh } from '@/stores/contextMenuStore';
-import { PlusIcon, CloseIcon, InfoIcon, SunIcon, MoonIcon, MonitorIcon } from '@/components/Icons';
+import { PlusIcon, CloseIcon, InfoIcon, SunIcon, MoonIcon, MonitorIcon, SidebarIcon } from '@/components/Icons';
 
 function ThemeToggle() {
   const { themeMode, cycleTheme } = useTheme();
@@ -40,7 +40,7 @@ function ThemeToggle() {
 }
 
 export function MainLayout() {
-  const { panelMode, setPanelMode, diffFileListVisible } = useUIStore();
+  const { panelMode, setPanelMode, diffFileListVisible, browseFileListVisible, toggleBrowseFileList } = useUIStore();
   const {
     currentDirectory,
     browseOpenFiles,
@@ -252,8 +252,9 @@ export function MainLayout() {
   return (
     <div className="flex h-screen flex-col bg-surface-0">
       {/* Title bar / toolbar */}
-      <div className="flex h-14 items-center justify-center bg-surface-2 px-4">
-        <div className="flex items-center gap-3">
+      <div className="flex h-14 items-center bg-surface-2 px-4">
+        <div className="w-10" />
+        <div className="flex flex-1 items-center justify-center gap-3">
           {/* Info/Help and Theme Toggle */}
           <button
             onClick={() => setShowShortcuts(true)}
@@ -313,6 +314,21 @@ export function MainLayout() {
             </button>
           </div>
         </div>
+        <div className="flex w-10 items-center justify-end">
+          {panelMode === 'browse' && (
+            <button
+              onClick={toggleBrowseFileList}
+              className={`rounded-md p-1.5 ${
+                browseFileListVisible
+                  ? 'text-accent hover:bg-surface-3'
+                  : 'text-secondary hover:bg-surface-3'
+              }`}
+              title={browseFileListVisible ? 'Hide file list' : 'Show file list'}
+            >
+              <SidebarIcon className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Main content */}
@@ -345,8 +361,8 @@ export function MainLayout() {
                 <BrowseEditorTabs ref={browseEditorTabsRef} />
               </Panel>
             )}
-            {panelMode === 'browse' && browseOpenFiles.length > 0 && <PanelResizeHandle />}
-            {panelMode === 'browse' && (
+            {panelMode === 'browse' && browseOpenFiles.length > 0 && browseFileListVisible && <PanelResizeHandle />}
+            {panelMode === 'browse' && browseFileListVisible && (
               <Panel id="browse-file-list" order={3} defaultSize={20} minSize={10} maxSize={40}>
                 <BrowseFileListPanel />
               </Panel>
