@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { useFileStore } from '@/stores/fileStore';
 import {
   readDirectory,
+  readFile,
   writeFile,
   startWatchingDirectory,
   stopWatchingDirectory,
@@ -24,6 +25,7 @@ export function useFileBrowserState() {
     closeBrowseFile,
     updateBrowseFileContent,
     markBrowseFileSaved,
+    refreshBrowseFileContent,
   } = useFileStore();
 
   const [entries, setEntries] = useState<FileEntry[]>([]);
@@ -65,6 +67,23 @@ export function useFileBrowserState() {
     let unlisten: (() => void) | undefined;
     onFsChanged(() => {
       window.dispatchEvent(new Event('file-tree-refresh'));
+
+      // Cancel all pending auto-save timers to prevent stale content from being written back
+      autoSaveTimers.current.forEach((timer) => clearTimeout(timer));
+      autoSaveTimers.current.clear();
+
+      // Re-read each open non-image file's content from disk
+      const openFiles = useFileStore.getState().browseOpenFiles;
+      for (const file of openFiles) {
+        if (file.isImage) continue;
+        readFile(file.path)
+          .then((content) => {
+            refreshBrowseFileContent(file.path, content);
+          })
+          .catch((err) => {
+            console.error(`[FileWatcher] Failed to re-read ${file.path}:`, err);
+          });
+      }
     }).then((fn) => {
       unlisten = fn;
     });
