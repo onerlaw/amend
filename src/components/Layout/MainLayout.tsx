@@ -21,7 +21,9 @@ import { ModalOverlay } from '@/components/ModalOverlay';
 import { indexProject, copyEntry, moveEntry, getClipboardFilePaths } from '@/lib/tauri';
 import { useContextMenuStore } from '@/stores/contextMenuStore';
 import { dispatchFileTreeRefresh } from '@/stores/contextMenuStore';
-import { PlusIcon, CloseIcon, InfoIcon, SunIcon, MoonIcon, MonitorIcon } from '@/components/Icons';
+import { PlusIcon, CloseIcon, InfoIcon, SunIcon, MoonIcon, MonitorIcon, NotesIcon } from '@/components/Icons';
+import { NotesPanel } from '@/components/NotesPanel';
+import { useNotesStore } from '@/stores/notesStore';
 
 function ThemeToggle() {
   const { themeMode, cycleTheme } = useTheme();
@@ -41,6 +43,7 @@ function ThemeToggle() {
 
 export function MainLayout() {
   const { panelMode, setPanelMode, diffFileListVisible } = useUIStore();
+  const { isOpen: notesOpen, toggleNotes } = useNotesStore();
   const {
     currentDirectory,
     browseOpenFiles,
@@ -196,6 +199,12 @@ export function MainLayout() {
         }
       }
 
+      // Cmd/Ctrl + Shift + N: Toggle notes panel
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'N') {
+        e.preventDefault();
+        useNotesStore.getState().toggleNotes();
+      }
+
       // Cmd/Ctrl + = or +: Increase font size
       if ((e.metaKey || e.ctrlKey) && (e.key === '=' || e.key === '+')) {
         e.preventDefault();
@@ -263,6 +272,17 @@ export function MainLayout() {
             <InfoIcon />
           </button>
           <ThemeToggle />
+          <button
+            onClick={toggleNotes}
+            className={`rounded-md p-1.5 ${
+              notesOpen
+                ? 'bg-accent text-white'
+                : 'text-secondary hover:bg-surface-3'
+            }`}
+            title="Notes (Cmd+Shift+N)"
+          >
+            <NotesIcon />
+          </button>
           <button
             onClick={() => terminalTabsRef.current?.openNewTerminal()}
             className="rounded-md p-1.5 text-secondary hover:bg-surface-3"
@@ -412,6 +432,12 @@ export function MainLayout() {
                 </kbd>
               </div>
               <div className="flex items-center justify-between py-1">
+                <span className="text-primary">Toggle Notes</span>
+                <kbd className="rounded-md bg-surface-1 px-2 py-0.5 font-mono text-secondary">
+                  Cmd+Shift+N
+                </kbd>
+              </div>
+              <div className="flex items-center justify-between py-1">
                 <span className="text-primary">Increase Font Size</span>
                 <kbd className="rounded-md bg-surface-1 px-2 py-0.5 font-mono text-secondary">
                   Cmd+=
@@ -433,6 +459,9 @@ export function MainLayout() {
           </div>
         </ModalOverlay>
       )}
+
+      {/* Floating Notes Panel */}
+      <NotesPanel />
     </div>
   );
 }
