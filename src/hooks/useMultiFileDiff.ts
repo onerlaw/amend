@@ -13,6 +13,7 @@ const CONCURRENCY_LIMIT = 15;
 
 /**
  * Hook for loading file diffs with concurrency control.
+ * Uses a generation ID to discard stale responses after context changes.
  */
 export function useMultiFileDiff(repoPath: string | null) {
   const [diffs, setDiffs] = useState<Map<string, FileDiffData>>(new Map());
@@ -20,9 +21,15 @@ export function useMultiFileDiff(repoPath: string | null) {
   const loadedRef = useRef<Set<string>>(new Set());
   const queueRef = useRef<string[]>([]);
   const activeCountRef = useRef(0);
+  const generationRef = useRef(0);
 
   const processQueue = useCallback(async () => {
+    const generation = generationRef.current;
+
     while (queueRef.current.length > 0 && activeCountRef.current < CONCURRENCY_LIMIT) {
+      // Bail if generation changed (context switch happened)
+      if (generationRef.current !== generation) return;
+
       const filePath = queueRef.current.shift();
       if (!filePath || !repoPath) continue;
       if (loadingRef.current.has(filePath) || loadedRef.current.has(filePath)) continue;
@@ -45,6 +52,10 @@ export function useMultiFileDiff(repoPath: string | null) {
 
       try {
         const diff: GitDiff = await getFileDiff(repoPath, filePath);
+
+        // Discard result if generation changed while awaiting
+        if (generationRef.current !== generation) return;
+
         loadedRef.current.add(filePath);
         setDiffs((prev) => {
           const newDiffs = new Map(prev);
@@ -58,6 +69,9 @@ export function useMultiFileDiff(repoPath: string | null) {
           return newDiffs;
         });
       } catch (err) {
+        // Discard error if generation changed while awaiting
+        if (generationRef.current !== generation) return;
+
         setDiffs((prev) => {
           const newDiffs = new Map(prev);
           newDiffs.set(filePath, {
@@ -72,8 +86,10 @@ export function useMultiFileDiff(repoPath: string | null) {
       } finally {
         loadingRef.current.delete(filePath);
         activeCountRef.current--;
-        // Continue processing queue
-        processQueue();
+        // Continue processing queue only if still current generation
+        if (generationRef.current === generation) {
+          processQueue();
+        }
       }
     }
   }, [repoPath]);
@@ -100,6 +116,8 @@ export function useMultiFileDiff(repoPath: string | null) {
   );
 
   const clearDiffs = useCallback(() => {
+    // Bump generation to invalidate all in-flight requests
+    generationRef.current++;
     setDiffs(new Map());
     loadingRef.current.clear();
     loadedRef.current.clear();
