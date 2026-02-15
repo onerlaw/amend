@@ -1,45 +1,32 @@
-import { useEffect, useRef, useState, forwardRef, useImperativeHandle, useCallback } from 'react';
+import { useEffect, useRef, forwardRef, useImperativeHandle, useCallback } from 'react';
 import { open } from '@tauri-apps/plugin-dialog';
+import { homeDir } from '@tauri-apps/api/path';
 import { useTerminalStore, TerminalTab } from '@/stores/terminalStore';
-import { useFileStore } from '@/stores/fileStore';
 import { useUIStore } from '@/stores/uiStore';
-import { useProjectStore, Project } from '@/stores/projectStore';
 import { useCreateTerminal, useCloseTerminal } from '@/hooks/useTerminal';
-import { useWorktrees } from '@/hooks/useWorktrees';
 import { TerminalPane } from './TerminalPane';
-import { WorktreeSelector } from './WorktreeSelector';
-import { GitWorktree } from '@/lib/tauri';
-import { CloseIcon, FolderIcon, DuplicateIcon, PlusIcon, SpinnerIcon } from '@/components/Icons';
+import { CloseIcon, FolderIcon, DuplicateIcon, PlusIcon } from '@/components/Icons';
 import { getFileName, formatShortcut } from '@/lib/fileUtils';
 import { useDraggableTabs } from '@/hooks/useDraggableTabs';
-import { ConfirmDialog, AlertDialog } from '@/components/ConfirmDialog';
 
-function TerminalTabLabel({ tab, projects }: { tab: TerminalTab; projects: Project[] }) {
-  const project = tab.projectId ? projects.find((p) => p.id === tab.projectId) : null;
-  const worktreeName = getFileName(tab.worktreePath);
-  const mainText = tab.title || project?.name || worktreeName;
-  const showSubtitle = mainText !== worktreeName;
+function TerminalTabLabel({ tab }: { tab: TerminalTab }) {
+  const dirName = getFileName(tab.cwd);
+  const mainText = tab.title || dirName;
 
   return (
-    <span className="flex flex-col max-w-[200px] min-w-0">
-      <span className="truncate leading-tight">{mainText}</span>
-      {showSubtitle && (
-        <span className="truncate text-[10px] leading-tight text-tertiary">{worktreeName}</span>
-      )}
-    </span>
+    <span className="truncate max-w-[200px]">{mainText}</span>
   );
 }
 
 export interface TerminalTabsHandle {
   openNewTerminal: () => void;
+  openFolder: () => void;
   duplicateTerminal: () => void;
 }
 
 export const TerminalTabs = forwardRef<TerminalTabsHandle>(function TerminalTabs(_, ref) {
   const { tabs, activeTabId, setActiveTab, reorderTabs } = useTerminalStore();
-  const { currentDirectory, setCurrentDirectory } = useFileStore();
   const { setFocusedPanel } = useUIStore();
-  const { projects, addProject } = useProjectStore();
   const createTerminal = useCreateTerminal();
   const closeTerminal = useCloseTerminal();
   const initializedRef = useRef(false);
@@ -47,151 +34,61 @@ export const TerminalTabs = forwardRef<TerminalTabsHandle>(function TerminalTabs
     itemCount: tabs.length,
     onReorder: reorderTabs,
   });
-  const [showWorktreeSelector, setShowWorktreeSelector] = useState(false);
-  const [showProjectPicker, setShowProjectPicker] = useState(false);
-  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
-  const [deleteWorktreeTarget, setDeleteWorktreeTarget] = useState<GitWorktree | null>(null);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
 
-  // Use selected project's path for worktree listing, or fall back to currentDirectory
-  const selectedProject = selectedProjectId
-    ? projects.find((p) => p.id === selectedProjectId)
-    : null;
-  const worktreeBasePath = selectedProject?.path ?? currentDirectory;
-  const { worktrees, add: addWorktree, remove: removeWorktree } = useWorktrees(worktreeBasePath);
-
-  const autoOpenRef = useRef(false);
-
+  // Auto-create a terminal in home dir when none exist
   useEffect(() => {
-    // Auto-create a terminal when none exist and a project is open
-    if (tabs.length === 0 && !initializedRef.current && currentDirectory) {
+    if (tabs.length === 0 && !initializedRef.current) {
       initializedRef.current = true;
-      const project = projects.find((p) => p.path === currentDirectory);
-      createTerminal(currentDirectory, project?.id ?? null).catch((err) => {
-        console.error('Failed to create terminal:', err);
-        initializedRef.current = false;
-      });
+      homeDir()
+        .then((home) => createTerminal(home))
+        .catch((err) => {
+          console.error('Failed to create terminal:', err);
+          initializedRef.current = false;
+        });
     }
     // Reset so a new terminal is auto-created if all tabs are closed later
     if (tabs.length > 0) {
       initializedRef.current = false;
     }
-  }, [tabs.length, createTerminal, currentDirectory, projects]);
+  }, [tabs.length, createTerminal]);
 
   const handleDuplicateTerminal = useCallback(() => {
     const activeTab = tabs.find((t) => t.id === activeTabId);
     if (!activeTab) return;
-    createTerminal(activeTab.worktreePath, activeTab.projectId, activeTabId ?? undefined);
+    createTerminal(activeTab.cwd, activeTabId ?? undefined);
   }, [tabs, activeTabId, createTerminal]);
 
-  const handleNewTerminal = useCallback(() => {
-    if (projects.length === 0) {
-      // No projects, show open folder dialog
-      handleOpenFolder();
-      return;
-    } else {
-      // Show project picker (includes "Open Folder..." option to add new projects)
-      setShowProjectPicker(true);
+  const handleNewTerminal = useCallback(async () => {
+    try {
+      const home = await homeDir();
+      createTerminal(home);
+    } catch (err) {
+      console.error('Failed to create terminal:', err);
     }
-  }, [projects]);
+  }, [createTerminal]);
 
   const handleOpenFolder = useCallback(async () => {
-    setShowProjectPicker(false);
     const selected = await open({
       directory: true,
       multiple: false,
-      title: 'Select Project Folder',
+      title: 'Open Folder',
     });
 
     if (selected && typeof selected === 'string') {
-      // Check if project already exists
-      const existing = projects.find((p) => p.path === selected);
-      if (existing) {
-        setSelectedProjectId(existing.id);
-        setShowWorktreeSelector(true);
-      } else {
-        const newProjectId = addProject(selected);
-        setCurrentDirectory(selected);
-        setSelectedProjectId(newProjectId);
-        setShowWorktreeSelector(true);
-      }
+      createTerminal(selected);
     }
-  }, [projects, addProject, setCurrentDirectory]);
-
-  useEffect(() => {
-    // Auto-open folder picker on first launch (no projects, no terminals)
-    if (projects.length === 0 && tabs.length === 0 && !autoOpenRef.current) {
-      autoOpenRef.current = true;
-      handleOpenFolder();
-    }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [createTerminal]);
 
   // Expose methods to parent via ref
   useImperativeHandle(
     ref,
     () => ({
       openNewTerminal: handleNewTerminal,
+      openFolder: handleOpenFolder,
       duplicateTerminal: handleDuplicateTerminal,
     }),
-    [handleNewTerminal, handleDuplicateTerminal]
+    [handleNewTerminal, handleOpenFolder, handleDuplicateTerminal]
   );
-
-  const handleProjectSelect = (project: Project) => {
-    setSelectedProjectId(project.id);
-    setShowProjectPicker(false);
-    setShowWorktreeSelector(true);
-  };
-
-  const handleProjectPickerCancel = () => {
-    setShowProjectPicker(false);
-    setSelectedProjectId(null);
-  };
-
-  const handleWorktreeSelect = (worktree: GitWorktree) => {
-    setShowWorktreeSelector(false);
-    createTerminal(worktree.path, selectedProjectId);
-    setSelectedProjectId(null);
-  };
-
-  const handleWorktreeCreate = async (path: string, branch: string, isNewBranch: boolean) => {
-    try {
-      const newWorktree = await addWorktree(
-        path,
-        isNewBranch ? undefined : branch,
-        isNewBranch ? branch : undefined
-      );
-      setShowWorktreeSelector(false);
-      createTerminal(newWorktree.path, selectedProjectId);
-      setSelectedProjectId(null);
-    } catch (err) {
-      console.error('Failed to create worktree:', err);
-    }
-  };
-
-  const handleWorktreeDelete = (worktree: GitWorktree) => {
-    setDeleteWorktreeTarget(worktree);
-  };
-
-  const confirmWorktreeDelete = async () => {
-    if (!deleteWorktreeTarget) return;
-    const worktree = deleteWorktreeTarget;
-    setDeleteWorktreeTarget(null);
-    try {
-      await removeWorktree(worktree.path);
-    } catch {
-      try {
-        await removeWorktree(worktree.path, true);
-      } catch (err) {
-        console.error('Failed to delete worktree:', err);
-        setDeleteError(`Failed to delete worktree: ${err}`);
-      }
-    }
-  };
-
-  const handleWorktreeSelectorCancel = () => {
-    setShowWorktreeSelector(false);
-    setSelectedProjectId(null);
-  };
 
   const handleCloseTerminal = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
@@ -219,9 +116,9 @@ export const TerminalTabs = forwardRef<TerminalTabsHandle>(function TerminalTabs
                     ? 'bg-terminal-bg text-primary'
                     : 'text-secondary hover:bg-surface-1 rounded-md'
                 } ${dragFromIndex === index ? 'opacity-50' : ''}`}
-                title={tab.worktreePath}
+                title={tab.cwd}
               >
-                <TerminalTabLabel tab={tab} projects={projects} />
+                <TerminalTabLabel tab={tab} />
                 <span
                   onMouseDown={(e) => e.stopPropagation()}
                   onClick={(e) => handleCloseTerminal(e, tab.id)}
@@ -249,9 +146,16 @@ export const TerminalTabs = forwardRef<TerminalTabsHandle>(function TerminalTabs
             </button>
           )}
           <button
+            onClick={handleOpenFolder}
+            className="flex items-center justify-center rounded-md p-1 text-secondary hover:bg-surface-3 hover:text-primary"
+            title={`Open Folder (${formatShortcut('Mod+O')})`}
+          >
+            <FolderIcon className="h-3.5 w-3.5" />
+          </button>
+          <button
             onClick={handleNewTerminal}
             className="flex items-center justify-center rounded-md p-1 text-secondary hover:bg-surface-3 hover:text-primary"
-            title="New Terminal"
+            title={`New Terminal (${formatShortcut('Mod+T')})`}
           >
             <PlusIcon className="h-3.5 w-3.5" />
           </button>
@@ -263,90 +167,33 @@ export const TerminalTabs = forwardRef<TerminalTabsHandle>(function TerminalTabs
         {tabs.map((tab) => (
           <TerminalPane key={tab.id} id={tab.id} isActive={activeTabId === tab.id} />
         ))}
-        {tabs.length === 0 && !currentDirectory && (
+        {tabs.length === 0 && (
           <div className="flex h-full flex-col items-center justify-center gap-4 text-center">
             <FolderIcon className="h-12 w-12 text-tertiary" />
             <div>
-              <h3 className="text-lg font-medium text-primary mb-1">Open a Project</h3>
-              <p className="text-sm text-tertiary">Get started by opening a project folder</p>
+              <h3 className="text-lg font-medium text-primary mb-1">Welcome to Amend</h3>
+              <p className="text-sm text-tertiary">Open a folder or start a new terminal</p>
             </div>
-            <button
-              onClick={handleOpenFolder}
-              className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90"
-            >
-              Open Folder
-            </button>
-            <kbd className="text-xs text-tertiary">{formatShortcut('Mod+O')}</kbd>
-          </div>
-        )}
-        {tabs.length === 0 && currentDirectory && (
-          <div className="flex h-full items-center justify-center gap-2 text-tertiary">
-            <SpinnerIcon className="h-4 w-4 animate-spin" />
-            Creating terminal...
-          </div>
-        )}
-        {showProjectPicker && (
-          <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/50">
-            <div className="w-64 rounded-lg bg-surface-2 p-4 shadow-xl">
-              <h3 className="mb-3 text-sm font-medium text-primary">Select Project</h3>
-              <div className="space-y-1">
-                {projects.map((project) => (
-                  <button
-                    key={project.id}
-                    onClick={() => handleProjectSelect(project)}
-                    className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs text-primary hover:bg-surface-3"
-                  >
-                    <FolderIcon className="h-4 w-4 flex-shrink-0" />
-                    <span className="truncate" title={project.path}>
-                      {project.name}
-                    </span>
-                  </button>
-                ))}
-                {/* Open Folder option */}
-                <button
-                  onClick={handleOpenFolder}
-                  className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs text-primary hover:bg-surface-3 border-t border-surface-3 mt-2 pt-2"
-                >
-                  <FolderIcon className="h-4 w-4 flex-shrink-0" />
-                  <span>Open Folder...</span>
-                </button>
-              </div>
-              <div className="mt-3 flex justify-end">
-                <button
-                  onClick={handleProjectPickerCancel}
-                  className="rounded-md px-3 py-1.5 text-xs text-secondary hover:bg-surface-3"
-                >
-                  Cancel
-                </button>
-              </div>
+            <div className="flex gap-2">
+              <button
+                onClick={handleOpenFolder}
+                className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90"
+              >
+                Open Folder
+              </button>
+              <button
+                onClick={handleNewTerminal}
+                className="rounded-md bg-surface-2 px-4 py-2 text-sm font-medium text-primary hover:bg-surface-3"
+              >
+                New Terminal
+              </button>
             </div>
+            <kbd className="text-xs text-tertiary">
+              {formatShortcut('Mod+O')} Open Folder &middot; {formatShortcut('Mod+T')} New Terminal
+            </kbd>
           </div>
-        )}
-        {showWorktreeSelector && worktreeBasePath && (
-          <WorktreeSelector
-            worktrees={worktrees}
-            onSelect={handleWorktreeSelect}
-            onCreate={handleWorktreeCreate}
-            onDelete={handleWorktreeDelete}
-            onCancel={handleWorktreeSelectorCancel}
-            repoPath={worktreeBasePath}
-          />
         )}
       </div>
-
-      {deleteWorktreeTarget && (
-        <ConfirmDialog
-          title="Delete Worktree"
-          message={`Delete worktree "${deleteWorktreeTarget.path}"? This will remove the worktree directory.`}
-          confirmLabel="Delete"
-          confirmClassName="bg-red-600 hover:bg-red-700"
-          onConfirm={confirmWorktreeDelete}
-          onCancel={() => setDeleteWorktreeTarget(null)}
-        />
-      )}
-      {deleteError && (
-        <AlertDialog title="Error" message={deleteError} onClose={() => setDeleteError(null)} />
-      )}
     </div>
   );
 });

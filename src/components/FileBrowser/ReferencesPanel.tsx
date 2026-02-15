@@ -16,7 +16,6 @@ export function ReferencesPanel() {
     referencesSymbol,
     hideReferencesPanel,
     contextPath,
-    currentDirectory,
     openBrowseFileAtLine,
   } = useFileStore();
   const [results, setResults] = useState<ReferencesByFile[]>([]);
@@ -24,11 +23,10 @@ export function ReferencesPanel() {
   const [totalCount, setTotalCount] = useState(0);
 
   useEffect(() => {
-    const rootPath = contextPath || currentDirectory;
-    if (!referencesSymbol || !rootPath) return;
+    if (!referencesSymbol || !contextPath) return;
 
     setLoading(true);
-    findReferences(referencesSymbol, rootPath)
+    findReferences(referencesSymbol, contextPath)
       .then((refs) => {
         setTotalCount(refs.length);
 
@@ -42,8 +40,8 @@ export function ReferencesPanel() {
 
         const grouped: ReferencesByFile[] = [];
         for (const [filePath, fileRefs] of byFile) {
-          const relativePath = filePath.startsWith(rootPath)
-            ? filePath.slice(rootPath.length + 1)
+          const relativePath = filePath.startsWith(contextPath)
+            ? filePath.slice(contextPath.length + 1)
             : filePath;
           grouped.push({ filePath, relativePath, refs: fileRefs });
         }
@@ -58,7 +56,7 @@ export function ReferencesPanel() {
         setTotalCount(0);
       })
       .finally(() => setLoading(false));
-  }, [referencesSymbol, contextPath, currentDirectory]);
+  }, [referencesSymbol, contextPath]);
 
   if (!referencesSymbol) return null;
 

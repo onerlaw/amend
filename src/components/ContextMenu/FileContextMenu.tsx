@@ -141,7 +141,7 @@ export function FileContextMenu() {
     openRenameDialog,
     openDeleteDialog,
   } = useContextMenuStore();
-  const { currentDirectory } = useFileStore();
+  const { contextPath } = useFileStore();
 
   const handleRename = useCallback(() => {
     if (!targetEntry) return;
@@ -185,10 +185,10 @@ export function FileContextMenu() {
   }, [targetEntry, clipboard, clearClipboard]);
 
   const handleCopyRelativePath = useCallback(async () => {
-    if (!targetEntry || !currentDirectory) return;
+    if (!targetEntry || !contextPath) return;
 
-    const relativePath = targetEntry.path.startsWith(currentDirectory)
-      ? targetEntry.path.substring(currentDirectory.length + 1)
+    const relativePath = targetEntry.path.startsWith(contextPath)
+      ? targetEntry.path.substring(contextPath.length + 1)
       : targetEntry.path;
 
     try {
@@ -196,7 +196,7 @@ export function FileContextMenu() {
     } catch (error) {
       console.error('Failed to copy to clipboard:', error);
     }
-  }, [targetEntry, currentDirectory]);
+  }, [targetEntry, contextPath]);
 
   const handleCopyFullPath = useCallback(async () => {
     if (!targetEntry) return;

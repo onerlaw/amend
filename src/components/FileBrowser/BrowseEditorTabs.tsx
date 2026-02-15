@@ -49,7 +49,6 @@ export const BrowseEditorTabs = forwardRef<BrowseEditorTabsHandle>(
       pendingScrollToFile,
       clearPendingScrollToLine,
       reorderBrowseFiles,
-      currentDirectory,
       contextPath,
       referencesSymbol,
       showReferencesPanel,
@@ -65,7 +64,7 @@ export const BrowseEditorTabs = forwardRef<BrowseEditorTabsHandle>(
       if (!activeFile?.path) return [];
 
       const currentFilePath = activeFile.path;
-      const projectRoot = contextPath || currentDirectory || '';
+      const projectRoot = contextPath || '';
 
       return [
         goToDefinitionExtension({
@@ -85,7 +84,6 @@ export const BrowseEditorTabs = forwardRef<BrowseEditorTabsHandle>(
       activeFile?.path,
       openBrowseFileAtLine,
       contextPath,
-      currentDirectory,
       showReferencesPanel,
     ]);
 

@@ -241,7 +241,6 @@ function DiffFileList({
 
 export function DiffContentPanel() {
   const {
-    currentDirectory,
     contextPath,
     allFiles,
     diffs,
@@ -258,13 +257,13 @@ export function DiffContentPanel() {
   const { setFocusedPanel, setDiffMode, diffBaseBranch } = useUIStore();
 
   // No directory open state
-  if (!currentDirectory) {
+  if (!contextPath) {
     return (
       <div className="flex h-full flex-col items-center justify-center bg-surface-0 px-6 text-center">
         <DocumentIcon className="h-16 w-16 text-tertiary mb-4" />
         <h3 className="text-lg font-medium text-primary mb-2">No Repository Open</h3>
         <p className="text-sm text-tertiary max-w-sm">
-          Use "Open Repo" ({formatShortcut('Mod+O')}) to open a Git repository and view changes.
+          Open a folder ({formatShortcut('Mod+O')}) or navigate to a Git repository to view changes.
         </p>
       </div>
     );

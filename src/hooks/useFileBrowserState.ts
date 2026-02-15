@@ -16,7 +16,7 @@ const AUTO_SAVE_DELAY = 1000;
 export type SaveStatus = 'idle' | 'pending' | 'saving' | 'error';
 
 export function useFileBrowserState() {
-  const { currentDirectory, contextPath, fileTreeVersion, invalidateFileTree } = useFileStore();
+  const { contextPath, fileTreeVersion, invalidateFileTree } = useFileStore();
   const {
     browseOpenFiles,
     browseActiveFilePath,
@@ -197,7 +197,6 @@ export function useFileBrowserState() {
   const activeFile = browseOpenFiles.find((f) => f.path === browseActiveFilePath) || null;
 
   return {
-    currentDirectory,
     contextPath,
     entries,
     isLoading,

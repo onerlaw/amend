@@ -1,5 +1,4 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
 import { reorderArray } from '@/lib/fileUtils';
 
 export interface OpenFile {
@@ -72,14 +71,10 @@ interface SavedBrowseState {
 }
 
 interface FileState {
-  currentDirectory: string | null;
-  setCurrentDirectory: (path: string) => void;
-  activeWorktreePath: string | null;
-  setActiveWorktreePath: (path: string | null) => void;
   contextPath: string | null;
   // Per-context browse state saved when switching tabs
   savedBrowseState: Record<string, SavedBrowseState>;
-  syncTabContext: (projectPath: string, worktreePath: string | null) => void;
+  syncTabContext: (newContextPath: string) => void;
   // Browse mode files
   browseOpenFiles: OpenFile[];
   browseActiveFilePath: string | null;
@@ -104,112 +99,80 @@ interface FileState {
   hideReferencesPanel: () => void;
 }
 
-export const useFileStore = create<FileState>()(
-  persist(
-    (set, get) => ({
-      currentDirectory: null,
-      setCurrentDirectory: (path: string) =>
-        set({
-          currentDirectory: path,
-          contextPath: path,
-          browseOpenFiles: [],
-          browseActiveFilePath: null,
-        }),
-      activeWorktreePath: null,
-      setActiveWorktreePath: (path: string | null) =>
-        set({ activeWorktreePath: path, contextPath: path ?? get().currentDirectory }),
-      contextPath: null,
-      savedBrowseState: {},
-      syncTabContext: (projectPath: string, worktreePath: string | null) => {
-        const state = get();
-        const newContextPath = worktreePath ?? projectPath;
-        const oldContextPath = state.contextPath;
+export const useFileStore = create<FileState>()((set, get) => ({
+  contextPath: null,
+  savedBrowseState: {},
+  syncTabContext: (newContextPath: string) => {
+    const state = get();
+    if (state.contextPath === newContextPath) return;
 
-        // Nothing to do if context hasn't changed
-        if (oldContextPath === newContextPath) return;
-
-        // Save current browse state for the old context
-        const saved = { ...state.savedBrowseState };
-        if (oldContextPath) {
-          saved[oldContextPath] = {
-            files: state.browseOpenFiles,
-            activePath: state.browseActiveFilePath,
-          };
-        }
-
-        // Restore browse state for the new context (or start empty)
-        const restored = saved[newContextPath];
-
-        set({
-          currentDirectory: projectPath,
-          activeWorktreePath: worktreePath,
-          contextPath: newContextPath,
-          browseOpenFiles: restored?.files ?? [],
-          browseActiveFilePath: restored?.activePath ?? null,
-          savedBrowseState: saved,
-        });
-      },
-      // Browse mode state
-      browseOpenFiles: [],
-      browseActiveFilePath: null,
-      openBrowseFile: (file: OpenFile) => {
-        const { files, activePath } = tabOpen(get().browseOpenFiles, file);
-        set({ browseOpenFiles: files, browseActiveFilePath: activePath });
-      },
-      setBrowseActiveFile: (path: string) => {
-        set({ browseActiveFilePath: path });
-      },
-      closeBrowseFile: (path: string) => {
-        const { files, activePath } = tabClose(
-          get().browseOpenFiles,
-          get().browseActiveFilePath,
-          path
-        );
-        set({ browseOpenFiles: files, browseActiveFilePath: activePath });
-      },
-      updateBrowseFileContent: (path: string, content: string) => {
-        set({ browseOpenFiles: tabUpdateContent(get().browseOpenFiles, path, content) });
-      },
-      markBrowseFileSaved: (path: string) => {
-        set({ browseOpenFiles: tabMarkSaved(get().browseOpenFiles, path) });
-      },
-      refreshBrowseFileContent: (path: string, content: string) => {
-        set({ browseOpenFiles: tabRefreshContent(get().browseOpenFiles, path, content) });
-      },
-      // Line navigation (for go-to-definition)
-      pendingScrollToLine: null,
-      pendingScrollToFile: null,
-      clearPendingScrollToLine: () => set({ pendingScrollToLine: null, pendingScrollToFile: null }),
-      openBrowseFileAtLine: (file: OpenFile, line: number) => {
-        const result = tabOpenAtLine(get().browseOpenFiles, file, line);
-        set({
-          browseOpenFiles: result.files,
-          browseActiveFilePath: result.activePath,
-          pendingScrollToLine: result.pendingScrollToLine,
-          pendingScrollToFile: result.pendingScrollToFile,
-        });
-      },
-      reorderBrowseFiles: (fromIndex: number, toIndex: number) => {
-        set({ browseOpenFiles: reorderArray(get().browseOpenFiles, fromIndex, toIndex) });
-      },
-      // File tree invalidation
-      fileTreeVersion: 0,
-      invalidateFileTree: () => set((s) => ({ fileTreeVersion: s.fileTreeVersion + 1 })),
-      // Find references panel
-      referencesSymbol: null,
-      showReferencesPanel: (symbol: string) => set({ referencesSymbol: symbol }),
-      hideReferencesPanel: () => set({ referencesSymbol: null }),
-    }),
-    {
-      name: 'amend-files',
-      partialize: (state) => ({
-        currentDirectory: state.currentDirectory,
-      }),
-      onRehydrateStorage: () => (state) => {
-        if (state) {
-          state.contextPath = state.activeWorktreePath ?? state.currentDirectory;
-        }
-      },
+    // Save current browse state for the old context
+    const saved = { ...state.savedBrowseState };
+    if (state.contextPath) {
+      saved[state.contextPath] = {
+        files: state.browseOpenFiles,
+        activePath: state.browseActiveFilePath,
+      };
     }
-  )
-);
+
+    // Restore browse state for the new context (or start empty)
+    const restored = saved[newContextPath];
+
+    set({
+      contextPath: newContextPath,
+      browseOpenFiles: restored?.files ?? [],
+      browseActiveFilePath: restored?.activePath ?? null,
+      savedBrowseState: saved,
+    });
+  },
+  // Browse mode state
+  browseOpenFiles: [],
+  browseActiveFilePath: null,
+  openBrowseFile: (file: OpenFile) => {
+    const { files, activePath } = tabOpen(get().browseOpenFiles, file);
+    set({ browseOpenFiles: files, browseActiveFilePath: activePath });
+  },
+  setBrowseActiveFile: (path: string) => {
+    set({ browseActiveFilePath: path });
+  },
+  closeBrowseFile: (path: string) => {
+    const { files, activePath } = tabClose(
+      get().browseOpenFiles,
+      get().browseActiveFilePath,
+      path
+    );
+    set({ browseOpenFiles: files, browseActiveFilePath: activePath });
+  },
+  updateBrowseFileContent: (path: string, content: string) => {
+    set({ browseOpenFiles: tabUpdateContent(get().browseOpenFiles, path, content) });
+  },
+  markBrowseFileSaved: (path: string) => {
+    set({ browseOpenFiles: tabMarkSaved(get().browseOpenFiles, path) });
+  },
+  refreshBrowseFileContent: (path: string, content: string) => {
+    set({ browseOpenFiles: tabRefreshContent(get().browseOpenFiles, path, content) });
+  },
+  // Line navigation (for go-to-definition)
+  pendingScrollToLine: null,
+  pendingScrollToFile: null,
+  clearPendingScrollToLine: () => set({ pendingScrollToLine: null, pendingScrollToFile: null }),
+  openBrowseFileAtLine: (file: OpenFile, line: number) => {
+    const result = tabOpenAtLine(get().browseOpenFiles, file, line);
+    set({
+      browseOpenFiles: result.files,
+      browseActiveFilePath: result.activePath,
+      pendingScrollToLine: result.pendingScrollToLine,
+      pendingScrollToFile: result.pendingScrollToFile,
+    });
+  },
+  reorderBrowseFiles: (fromIndex: number, toIndex: number) => {
+    set({ browseOpenFiles: reorderArray(get().browseOpenFiles, fromIndex, toIndex) });
+  },
+  // File tree invalidation
+  fileTreeVersion: 0,
+  invalidateFileTree: () => set((s) => ({ fileTreeVersion: s.fileTreeVersion + 1 })),
+  // Find references panel
+  referencesSymbol: null,
+  showReferencesPanel: (symbol: string) => set({ referencesSymbol: symbol }),
+  hideReferencesPanel: () => set({ referencesSymbol: null }),
+}));

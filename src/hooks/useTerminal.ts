@@ -192,7 +192,7 @@ export function useTerminal(containerId: string | null) {
       terminal.registerLinkProvider(
         new FileLinkProvider(terminal, () => {
           const tab = useTerminalStore.getState().tabs.find((t) => t.id === containerId);
-          return tab?.worktreePath ?? useFileStore.getState().contextPath;
+          return tab?.cwd ?? useFileStore.getState().contextPath;
         })
       );
 
@@ -305,10 +305,10 @@ export function useCreateTerminal() {
   const addTab = useTerminalStore((state) => state.addTab);
 
   const create = useCallback(
-    async (worktreePath: string, projectId: string | null = null, afterTabId?: string) => {
+    async (cwd: string, afterTabId?: string) => {
       try {
-        const id = await createTerminalBackend(worktreePath);
-        addTab(id, worktreePath, projectId, afterTabId);
+        const id = await createTerminalBackend(cwd);
+        addTab(id, cwd, afterTabId);
         return id;
       } catch (err) {
         console.error('Failed to create terminal:', err);

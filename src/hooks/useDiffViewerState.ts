@@ -12,7 +12,7 @@ export interface FileWithCategory {
 }
 
 export function useDiffViewerState(gitPolling: GitPollingResult, enabled: boolean = true) {
-  const { currentDirectory, contextPath } = useFileStore();
+  const { contextPath } = useFileStore();
   const {
     collapsedDiffFiles,
     toggleDiffFileCollapse,
@@ -122,7 +122,6 @@ export function useDiffViewerState(gitPolling: GitPollingResult, enabled: boolea
   );
 
   return {
-    currentDirectory,
     contextPath,
     status,
     statusLoading,

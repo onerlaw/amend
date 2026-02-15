@@ -17,8 +17,6 @@ describe('fileStore', () => {
   beforeEach(() => {
     // Reset the store between tests
     useFileStore.setState({
-      currentDirectory: null,
-      activeWorktreePath: null,
       contextPath: null,
       savedBrowseState: {},
       browseOpenFiles: [],
@@ -139,7 +137,7 @@ describe('fileStore', () => {
       useFileStore.getState().openBrowseFile(fileA);
 
       // Switch to context B
-      useFileStore.getState().syncTabContext('/project-b', null);
+      useFileStore.getState().syncTabContext('/project-b');
       expect(useFileStore.getState().contextPath).toBe('/project-b');
       expect(useFileStore.getState().browseOpenFiles).toHaveLength(0);
 
@@ -148,7 +146,7 @@ describe('fileStore', () => {
       useFileStore.getState().openBrowseFile(fileB);
 
       // Switch back to context A - should restore context A's files
-      useFileStore.getState().syncTabContext('/project-a', null);
+      useFileStore.getState().syncTabContext('/project-a');
       expect(useFileStore.getState().contextPath).toBe('/project-a');
       expect(useFileStore.getState().browseOpenFiles).toHaveLength(1);
       expect(useFileStore.getState().browseOpenFiles[0].path).toBe('/project-a/src/main.ts');
@@ -159,15 +157,9 @@ describe('fileStore', () => {
       const file = makeFile('/project/main.ts');
       useFileStore.getState().openBrowseFile(file);
 
-      useFileStore.getState().syncTabContext('/project', null);
+      useFileStore.getState().syncTabContext('/project');
       // Files should remain unchanged
       expect(useFileStore.getState().browseOpenFiles).toHaveLength(1);
-    });
-
-    it('uses worktree path as context when provided', () => {
-      useFileStore.setState({ contextPath: '/main-project' });
-      useFileStore.getState().syncTabContext('/main-project', '/worktree-path');
-      expect(useFileStore.getState().contextPath).toBe('/worktree-path');
     });
   });
 
@@ -193,19 +185,6 @@ describe('fileStore', () => {
       expect(state.pendingScrollToLine).toBe(42);
       expect(state.pendingScrollToFile).toBe('/project/main.ts');
       expect(state.browseActiveFilePath).toBe('/project/main.ts');
-    });
-  });
-
-  describe('setCurrentDirectory', () => {
-    it('clears browse files when setting new directory', () => {
-      useFileStore.getState().openBrowseFile(makeFile('/old/file.ts'));
-      useFileStore.getState().setCurrentDirectory('/new/project');
-
-      const state = useFileStore.getState();
-      expect(state.currentDirectory).toBe('/new/project');
-      expect(state.contextPath).toBe('/new/project');
-      expect(state.browseOpenFiles).toHaveLength(0);
-      expect(state.browseActiveFilePath).toBeNull();
     });
   });
 });

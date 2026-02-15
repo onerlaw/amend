@@ -30,11 +30,17 @@ export function useCommands({ terminalTabsRef, browseEditorTabsRef }: CommandRef
       if (!mod) return;
 
       switch (e.key) {
-        // Cmd/Ctrl + O or Cmd/Ctrl + T: Open new terminal
-        case 'o':
+        // Cmd/Ctrl + T: New terminal (home dir)
         case 't': {
           e.preventDefault();
           terminalTabsRef.current?.openNewTerminal();
+          return;
+        }
+
+        // Cmd/Ctrl + O: Open folder
+        case 'o': {
+          e.preventDefault();
+          terminalTabsRef.current?.openFolder();
           return;
         }
 

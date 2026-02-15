@@ -3,7 +3,6 @@ import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 import { useUIStore } from '@/stores/uiStore';
 import { useTerminalStore } from '@/stores/terminalStore';
 import { useFileStore } from '@/stores/fileStore';
-import { useProjectStore } from '@/stores/projectStore';
 import { useGitPolling } from '@/hooks/useGit';
 import { useTheme } from '@/hooks/useTheme';
 import { useCommands } from '@/hooks/useCommands';
@@ -12,7 +11,7 @@ import { DiffViewerProvider } from '@/components/DiffViewer/DiffViewerContext';
 import type { BrowseEditorTabsHandle } from '@/components/FileBrowser/BrowseEditorTabs';
 import { GlobalSearch } from '@/components/GlobalSearch/GlobalSearch';
 import { ModalOverlay } from '@/components/ModalOverlay';
-import { indexProject } from '@/lib/tauri';
+import { indexProject, getGitRoot } from '@/lib/tauri';
 import { formatShortcut } from '@/lib/fileUtils';
 import {
   PlusIcon,
@@ -78,7 +77,8 @@ function ShortcutsModal({ onClose }: { onClose: () => void }) {
         </div>
         <div className="space-y-2 text-xs">
           {[
-            ['New Terminal', `${formatShortcut('Mod+T')} / ${formatShortcut('Mod+O')}`],
+            ['New Terminal', formatShortcut('Mod+T')],
+            ['Open Folder', formatShortcut('Mod+O')],
             ['Duplicate Terminal', formatShortcut('Mod+D')],
             ['Cycle Terminals', formatShortcut('Mod+`')],
             ['Close Tab', formatShortcut('Mod+W')],
@@ -113,28 +113,41 @@ export function MainLayout() {
     toggleDiffFileList,
   } = useUIStore();
   const { isOpen: notesOpen, toggleNotes } = useNotesStore();
-  const { currentDirectory, browseOpenFiles, setActiveWorktreePath, syncTabContext, contextPath } =
-    useFileStore();
-  const { projects, addProject, setActiveProject } = useProjectStore();
+  const { browseOpenFiles, syncTabContext, contextPath } = useFileStore();
   const { tabs, activeTabId } = useTerminalStore();
   const [showShortcuts, setShowShortcuts] = useState(false);
   const terminalTabsRef = useRef<TerminalTabsHandle>(null);
   const browseEditorTabsRef = useRef<BrowseEditorTabsHandle>(null);
-  const migrationDone = useRef(false);
   const gitPolling = useGitPolling(contextPath);
   const diffStats = gitPolling.diffStats;
 
   // Centralized keyboard shortcuts
   useCommands({ terminalTabsRef, browseEditorTabsRef });
 
-  // Migration: if currentDirectory exists but no projects, auto-create one
+  // One-time cleanup of legacy localStorage data
   useEffect(() => {
-    if (migrationDone.current) return;
-    if (currentDirectory && projects.length === 0) {
-      addProject(currentDirectory);
-      migrationDone.current = true;
-    }
-  }, [currentDirectory, projects.length, addProject]);
+    localStorage.removeItem('amend-projects');
+    localStorage.removeItem('amend-files');
+  }, []);
+
+  // Derive active tab's cwd outside the effect so it only re-runs when the cwd changes
+  const activeTabCwd = tabs.find((t) => t.id === activeTabId)?.cwd;
+
+  // Sync file tree context with active terminal's cwd via git root detection
+  useEffect(() => {
+    if (!activeTabCwd) return;
+    let cancelled = false;
+
+    getGitRoot(activeTabCwd).then((gitRoot) => {
+      if (!cancelled) {
+        syncTabContext(gitRoot ?? activeTabCwd);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTabCwd, syncTabContext]);
 
   // Index project for symbol navigation when context path changes (deferred to avoid blocking startup)
   useEffect(() => {
@@ -146,24 +159,6 @@ export function MainLayout() {
     }, 2000);
     return () => clearTimeout(timer);
   }, [contextPath]);
-
-  // Sync active terminal's worktree and project to global state
-  useEffect(() => {
-    const activeTab = tabs.find((t) => t.id === activeTabId);
-    if (activeTab) {
-      if (activeTab.projectId) {
-        const project = projects.find((p) => p.id === activeTab.projectId);
-        if (project) {
-          setActiveProject(activeTab.projectId);
-          // Atomically save old browse state and restore for the new context
-          syncTabContext(project.path, activeTab.worktreePath);
-          return;
-        }
-      }
-      // Fallback: tab without a project, just update worktree
-      setActiveWorktreePath(activeTab.worktreePath);
-    }
-  }, [activeTabId, tabs, setActiveWorktreePath, projects, setActiveProject, syncTabContext]);
 
   return (
     <div className="flex h-screen flex-col bg-surface-0">

@@ -151,6 +151,10 @@ export interface GitWorktree {
 }
 
 // Git commands
+export async function getGitRoot(path: string): Promise<string | null> {
+  return invoke('get_git_root', { path });
+}
+
 export async function getGitStatus(repoPath: string): Promise<GitStatus> {
   return invoke('get_git_status', { repoPath });
 }

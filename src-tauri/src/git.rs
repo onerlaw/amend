@@ -119,6 +119,16 @@ fn wt_status_to_string(status: git2::Status) -> &'static str {
 }
 
 #[tauri::command]
+pub async fn get_git_root(path: String) -> Result<Option<String>, GitError> {
+    spawn_blocking(move || match Repository::discover(&path) {
+        Ok(repo) => Ok(repo.workdir().map(|p| p.to_string_lossy().to_string())),
+        Err(_) => Ok(None),
+    })
+    .await
+    .unwrap()
+}
+
+#[tauri::command]
 pub async fn is_git_repository(path: String) -> bool {
     spawn_blocking(move || Repository::discover(&path).is_ok())
         .await
