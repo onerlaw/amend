@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useState, useRef } from 'react';
+import { useEffect, useCallback, useState, useRef, lazy, Suspense } from 'react';
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 import { useUIStore } from '@/stores/uiStore';
 import { useTerminalStore } from '@/stores/terminalStore';
@@ -8,14 +8,8 @@ import { useCloseTerminal } from '@/hooks/useTerminal';
 import { useGitPolling } from '@/hooks/useGit';
 import { useTheme } from '@/hooks/useTheme';
 import { TerminalTabs, TerminalTabsHandle } from '@/components/Terminal/TerminalTabs';
-import { DiffContentPanel } from '@/components/DiffViewer/DiffContentPanel';
-import { DiffFileListPanel } from '@/components/DiffViewer/DiffFileListPanel';
 import { DiffViewerProvider } from '@/components/DiffViewer/DiffViewerContext';
-import {
-  BrowseEditorTabs,
-  BrowseEditorTabsHandle,
-} from '@/components/FileBrowser/BrowseEditorTabs';
-import { BrowseFileListPanel } from '@/components/FileBrowser/BrowseFileListPanel';
+import type { BrowseEditorTabsHandle } from '@/components/FileBrowser/BrowseEditorTabs';
 import { GlobalSearch } from '@/components/GlobalSearch/GlobalSearch';
 import { ModalOverlay } from '@/components/ModalOverlay';
 import { indexProject, copyEntry, moveEntry, getClipboardFilePaths } from '@/lib/tauri';
@@ -31,8 +25,31 @@ import {
   SidebarIcon,
   NotesIcon,
 } from '@/components/Icons';
-import { NotesPanel } from '@/components/NotesPanel';
 import { useNotesStore } from '@/stores/notesStore';
+
+const DiffContentPanel = lazy(() =>
+  import('@/components/DiffViewer/DiffContentPanel').then((m) => ({
+    default: m.DiffContentPanel,
+  }))
+);
+const DiffFileListPanel = lazy(() =>
+  import('@/components/DiffViewer/DiffFileListPanel').then((m) => ({
+    default: m.DiffFileListPanel,
+  }))
+);
+const BrowseEditorTabs = lazy(() =>
+  import('@/components/FileBrowser/BrowseEditorTabs').then((m) => ({
+    default: m.BrowseEditorTabs,
+  }))
+);
+const BrowseFileListPanel = lazy(() =>
+  import('@/components/FileBrowser/BrowseFileListPanel').then((m) => ({
+    default: m.BrowseFileListPanel,
+  }))
+);
+const NotesPanel = lazy(() =>
+  import('@/components/NotesPanel').then((m) => ({ default: m.NotesPanel }))
+);
 
 function ThemeToggle() {
   const { themeMode, cycleTheme } = useTheme();
@@ -382,13 +399,17 @@ export function MainLayout() {
             {panelMode === 'diff' && <PanelResizeHandle />}
             {panelMode === 'diff' && (
               <Panel id="diff-content" order={2} defaultSize={40} minSize={20}>
-                <DiffContentPanel />
+                <Suspense fallback={null}>
+                  <DiffContentPanel />
+                </Suspense>
               </Panel>
             )}
             {panelMode === 'diff' && diffFileListVisible && <PanelResizeHandle />}
             {panelMode === 'diff' && diffFileListVisible && (
               <Panel id="diff-file-list" order={3} defaultSize={20} minSize={10} maxSize={40}>
-                <DiffFileListPanel />
+                <Suspense fallback={null}>
+                  <DiffFileListPanel />
+                </Suspense>
               </Panel>
             )}
 
@@ -396,7 +417,9 @@ export function MainLayout() {
             {panelMode === 'browse' && <PanelResizeHandle />}
             {panelMode === 'browse' && browseOpenFiles.length > 0 && (
               <Panel id="browse-editor" order={2} defaultSize={40} minSize={20}>
-                <BrowseEditorTabs ref={browseEditorTabsRef} />
+                <Suspense fallback={null}>
+                  <BrowseEditorTabs ref={browseEditorTabsRef} />
+                </Suspense>
               </Panel>
             )}
             {panelMode === 'browse' && browseOpenFiles.length > 0 && browseFileListVisible && (
@@ -404,7 +427,9 @@ export function MainLayout() {
             )}
             {panelMode === 'browse' && browseFileListVisible && (
               <Panel id="browse-file-list" order={3} defaultSize={20} minSize={10} maxSize={40}>
-                <BrowseFileListPanel />
+                <Suspense fallback={null}>
+                  <BrowseFileListPanel />
+                </Suspense>
               </Panel>
             )}
           </PanelGroup>
@@ -497,7 +522,9 @@ export function MainLayout() {
       )}
 
       {/* Floating Notes Panel */}
-      <NotesPanel />
+      <Suspense fallback={null}>
+        <NotesPanel />
+      </Suspense>
     </div>
   );
 }
