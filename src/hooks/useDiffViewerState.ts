@@ -61,16 +61,6 @@ export function useDiffViewerState(gitPolling: GitPollingResult, enabled: boolea
     clearWorkingDiffs();
   }, [contextPath, clearWorkingDiffs, enabled]);
 
-  // Load all working diffs when files change (runs into clean state after clearWorkingDiffs)
-  useEffect(() => {
-    if (!enabled || diffMode !== 'working') return;
-    if (workingFiles.length > 0) {
-      workingFiles.forEach((file) => {
-        loadDiff(file.path);
-      });
-    }
-  }, [workingFiles, loadDiff, enabled, diffMode]);
-
   useEffect(() => {
     if (!enabled) return;
     if (contextPath) {
@@ -122,9 +112,13 @@ export function useDiffViewerState(gitPolling: GitPollingResult, enabled: boolea
       if (collapsedDiffFiles.has(path)) {
         toggleDiffFileCollapse(path);
       }
+      // Eagerly start loading the diff so it's ready when scrolled into view
+      if (diffMode === 'working') {
+        loadDiff(path);
+      }
       setScrollTargetFile(path);
     },
-    [collapsedDiffFiles, toggleDiffFileCollapse, setScrollTargetFile]
+    [collapsedDiffFiles, toggleDiffFileCollapse, setScrollTargetFile, diffMode, loadDiff]
   );
 
   return {
@@ -134,6 +128,7 @@ export function useDiffViewerState(gitPolling: GitPollingResult, enabled: boolea
     statusLoading,
     allFiles,
     diffs,
+    loadDiff,
     collapsedDiffFiles,
     scrollContainerRef,
     toggleDiffFileCollapse,
