@@ -353,7 +353,7 @@ const DiffContent = memo(function DiffContent({
       </div>
 
       {/* Scrollable code column — horizontal scroll only */}
-      <div className="overflow-x-auto flex-1 min-w-0">
+      <div className="overflow-x-auto overflow-y-hidden flex-1 min-w-0">
         <div className="min-w-fit">
           {sections.map((section, sectionIndex) => {
             const shouldVirtualize = section.lines.length > VIRTUALIZE_LINE_LIMIT;
