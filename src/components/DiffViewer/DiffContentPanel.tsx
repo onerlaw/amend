@@ -1,9 +1,10 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react';
 import { useDiffViewer } from './DiffViewerContext';
 import { useUIStore } from '@/stores/uiStore';
 import { DiffFileSection } from './DiffFileSection';
 import { DocumentIcon, CheckCircleIcon, ChevronIcon } from '@/components/Icons';
 import { listBranches, GitBranch } from '@/lib/tauri';
+import { FileDiffData } from '@/hooks/useMultiFileDiff';
 import '@/styles/highlight-theme.css';
 
 function BranchSelector({ repoPath }: { repoPath: string }) {
@@ -105,12 +106,145 @@ function BranchSelector({ repoPath }: { repoPath: string }) {
   );
 }
 
+/** Prefetch margin — load diffs for files within this distance of the viewport */
+const PREFETCH_MARGIN = '800px';
+
+/**
+ * Wrapper that lazily triggers diff loading when the file section enters
+ * (or is about to enter) the scroll viewport.
+ */
+const LazyDiffFileSection = memo(function LazyDiffFileSection({
+  filePath,
+  category,
+  diffData,
+  isCollapsed,
+  onToggleCollapse,
+  onEditFile,
+  repoPath,
+  onRefresh,
+  loadDiff,
+  scrollRoot,
+}: {
+  filePath: string;
+  category: 'staged' | 'unstaged' | 'untracked' | 'conflicted' | 'branch';
+  diffData: FileDiffData | undefined;
+  isCollapsed: boolean;
+  onToggleCollapse: () => void;
+  onEditFile: (filePath: string) => void;
+  repoPath: string;
+  onRefresh: () => void;
+  loadDiff: (path: string) => void;
+  scrollRoot: HTMLDivElement | null;
+}) {
+  const sentinelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el || !scrollRoot) return;
+
+    // Branch diffs are loaded in bulk by useBranchDiff; skip lazy loading
+    if (category === 'branch') return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          loadDiff(filePath);
+        }
+      },
+      { root: scrollRoot, rootMargin: PREFETCH_MARGIN }
+    );
+
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [filePath, loadDiff, scrollRoot, category]);
+
+  return (
+    <div ref={sentinelRef}>
+      <DiffFileSection
+        filePath={filePath}
+        category={category}
+        oldContent={diffData?.oldContent ?? ''}
+        newContent={diffData?.newContent ?? ''}
+        isBinary={diffData?.isBinary ?? false}
+        isCollapsed={isCollapsed}
+        isLoading={diffData?.isLoading ?? category !== 'branch'}
+        error={diffData?.error ?? null}
+        onToggleCollapse={onToggleCollapse}
+        onEditFile={onEditFile}
+        repoPath={repoPath}
+        onRefresh={onRefresh}
+      />
+    </div>
+  );
+});
+
+/**
+ * Inner list that uses a callback ref to guarantee the scroll root is
+ * available when LazyDiffFileSection mounts its IntersectionObserver.
+ */
+function DiffFileList({
+  allFiles,
+  diffs,
+  collapsedDiffFiles,
+  toggleDiffFileCollapse,
+  handleEditFile,
+  contextPath,
+  handleRefresh,
+  loadDiff,
+  scrollContainerRef,
+}: {
+  allFiles: {
+    path: string;
+    category: 'staged' | 'unstaged' | 'untracked' | 'conflicted' | 'branch';
+  }[];
+  diffs: Map<string, FileDiffData>;
+  collapsedDiffFiles: Set<string>;
+  toggleDiffFileCollapse: (path: string) => void;
+  handleEditFile: (filePath: string) => void;
+  contextPath: string;
+  handleRefresh: () => void;
+  loadDiff: (path: string) => void;
+  scrollContainerRef: React.RefObject<HTMLDivElement | null>;
+}) {
+  const [scrollRoot, setScrollRoot] = useState<HTMLDivElement | null>(null);
+
+  const containerRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      // Keep both the external ref and local state in sync
+      (scrollContainerRef as React.MutableRefObject<HTMLDivElement | null>).current = node;
+      setScrollRoot(node);
+    },
+    [scrollContainerRef]
+  );
+
+  return (
+    <div ref={containerRef} className="flex-1 overflow-y-auto">
+      {allFiles.map((file) => (
+        <LazyDiffFileSection
+          key={`${file.category}-${file.path}`}
+          filePath={file.path}
+          category={file.category}
+          diffData={diffs.get(file.path)}
+          isCollapsed={collapsedDiffFiles.has(file.path)}
+          onToggleCollapse={() => toggleDiffFileCollapse(file.path)}
+          onEditFile={handleEditFile}
+          repoPath={contextPath}
+          onRefresh={handleRefresh}
+          loadDiff={loadDiff}
+          scrollRoot={scrollRoot}
+        />
+      ))}
+    </div>
+  );
+}
+
 export function DiffContentPanel() {
   const {
     currentDirectory,
     contextPath,
     allFiles,
     diffs,
+    loadDiff,
     collapsedDiffFiles,
     scrollContainerRef,
     toggleDiffFileCollapse,
@@ -224,28 +358,17 @@ export function DiffContentPanel() {
         )}
 
       {changedFilesCount > 0 && (
-        <div ref={scrollContainerRef} className="flex-1 overflow-y-auto">
-          {allFiles.map((file) => {
-            const diffData = diffs.get(file.path);
-            return (
-              <DiffFileSection
-                key={`${file.category}-${file.path}`}
-                filePath={file.path}
-                category={file.category}
-                oldContent={diffData?.oldContent ?? ''}
-                newContent={diffData?.newContent ?? ''}
-                isBinary={diffData?.isBinary ?? false}
-                isCollapsed={collapsedDiffFiles.has(file.path)}
-                isLoading={diffData?.isLoading ?? true}
-                error={diffData?.error ?? null}
-                onToggleCollapse={() => toggleDiffFileCollapse(file.path)}
-                onEditFile={handleEditFile}
-                repoPath={contextPath || ''}
-                onRefresh={handleRefresh}
-              />
-            );
-          })}
-        </div>
+        <DiffFileList
+          allFiles={allFiles}
+          diffs={diffs}
+          collapsedDiffFiles={collapsedDiffFiles}
+          toggleDiffFileCollapse={toggleDiffFileCollapse}
+          handleEditFile={handleEditFile}
+          contextPath={contextPath || ''}
+          handleRefresh={handleRefresh}
+          loadDiff={loadDiff}
+          scrollContainerRef={scrollContainerRef}
+        />
       )}
     </div>
   );
