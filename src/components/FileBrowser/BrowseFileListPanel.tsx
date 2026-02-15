@@ -51,18 +51,27 @@ function BrowseFileList({
   // Re-fetch expanded directory contents when file tree refreshes
   useEffect(() => {
     const handleRefresh = async () => {
-      dirContentsCache.clear();
       const expandedPaths = Array.from(expandedDirs);
-      if (expandedPaths.length === 0) return;
+      if (expandedPaths.length === 0) {
+        dirContentsCache.clear();
+        setCacheVersion((v) => v + 1);
+        return;
+      }
       try {
         const results = await readDirectories(expandedPaths);
+        // Build new cache and swap atomically to avoid empty-tree flicker
+        const newCache = new Map<string, FileEntry[]>();
         for (let i = 0; i < expandedPaths.length; i++) {
           if (results[i]) {
-            dirContentsCache.set(expandedPaths[i], results[i]);
+            newCache.set(expandedPaths[i], results[i]);
           }
         }
+        dirContentsCache.clear();
+        for (const [k, v] of newCache) {
+          dirContentsCache.set(k, v);
+        }
       } catch {
-        // Fallback silently on error
+        // Keep existing cache on error rather than clearing
       }
       setCacheVersion((v) => v + 1);
     };

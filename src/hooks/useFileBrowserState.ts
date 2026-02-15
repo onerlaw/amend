@@ -34,12 +34,18 @@ export function useFileBrowserState() {
 
   const autoSaveTimers = useRef<Map<string, NodeJS.Timeout>>(new Map());
 
+  const initialLoadDone = useRef(false);
+
   const loadDirectory = useCallback(async () => {
     if (!contextPath) return;
-    setIsLoading(true);
+    // Only show loading spinner on initial load, not on refreshes
+    if (!initialLoadDone.current) {
+      setIsLoading(true);
+    }
     try {
       const contents = await readDirectory(contextPath);
       setEntries(contents);
+      initialLoadDone.current = true;
     } catch (err) {
       console.error('Failed to read directory:', err);
     }
@@ -47,6 +53,7 @@ export function useFileBrowserState() {
   }, [contextPath]);
 
   useEffect(() => {
+    initialLoadDone.current = false;
     loadDirectory();
   }, [loadDirectory]);
 
@@ -57,6 +64,8 @@ export function useFileBrowserState() {
   }, [loadDirectory]);
 
   // File system watcher: auto-refresh on external changes
+  const fsDebounceTimer = useRef<NodeJS.Timeout | null>(null);
+
   useEffect(() => {
     if (!contextPath) return;
 
@@ -66,24 +75,32 @@ export function useFileBrowserState() {
 
     let unlisten: (() => void) | undefined;
     onFsChanged(() => {
-      window.dispatchEvent(new Event('file-tree-refresh'));
-
       // Cancel all pending auto-save timers to prevent stale content from being written back
       autoSaveTimers.current.forEach((timer) => clearTimeout(timer));
       autoSaveTimers.current.clear();
 
-      // Re-read each open non-image file's content from disk
-      const openFiles = useFileStore.getState().browseOpenFiles;
-      for (const file of openFiles) {
-        if (file.isImage) continue;
-        readFile(file.path)
-          .then((content) => {
-            refreshBrowseFileContent(file.path, content);
-          })
-          .catch((err) => {
-            console.error(`[FileWatcher] Failed to re-read ${file.path}:`, err);
-          });
+      // Debounce the UI refresh on the frontend side to coalesce rapid events
+      // (e.g. npm install generating hundreds of fs-changed events)
+      if (fsDebounceTimer.current) {
+        clearTimeout(fsDebounceTimer.current);
       }
+      fsDebounceTimer.current = setTimeout(() => {
+        fsDebounceTimer.current = null;
+        window.dispatchEvent(new Event('file-tree-refresh'));
+
+        // Re-read each open non-image file's content from disk
+        const openFiles = useFileStore.getState().browseOpenFiles;
+        for (const file of openFiles) {
+          if (file.isImage) continue;
+          readFile(file.path)
+            .then((content) => {
+              refreshBrowseFileContent(file.path, content);
+            })
+            .catch((err) => {
+              console.error(`[FileWatcher] Failed to re-read ${file.path}:`, err);
+            });
+        }
+      }, 1000);
     }).then((fn) => {
       unlisten = fn;
     });
@@ -93,6 +110,9 @@ export function useFileBrowserState() {
         console.error('[FileWatcher] Failed to stop watching:', err);
       });
       unlisten?.();
+      if (fsDebounceTimer.current) {
+        clearTimeout(fsDebounceTimer.current);
+      }
     };
   }, [contextPath]);
 
