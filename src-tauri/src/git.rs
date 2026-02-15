@@ -707,12 +707,22 @@ fn get_branch_file_diff_sync(
             String::new()
         };
 
-        // Read base ref blob as base64
-        let old_content =
-            match run_git_command(repo_path, &["show", &format!("{}:{}", base_ref, file_path)]) {
-                Ok(raw) => STANDARD.encode(raw.as_bytes()),
-                Err(_) => String::new(),
-            };
+        // Read base ref blob as raw bytes via git2 (not string conversion)
+        let old_content = match repo.revparse_single(base_ref) {
+            Ok(obj) => {
+                let tree = obj.peel_to_tree().map_err(|e| {
+                    GitError::CommandFailed(format!("Failed to peel to tree: {}", e))
+                })?;
+                match tree.get_path(Path::new(file_path)) {
+                    Ok(entry) => {
+                        let blob = repo.find_blob(entry.id())?;
+                        STANDARD.encode(blob.content())
+                    }
+                    Err(_) => String::new(),
+                }
+            }
+            Err(_) => String::new(),
+        };
 
         return Ok(GitDiff {
             old_path: file_path.to_string(),
@@ -730,9 +740,20 @@ fn get_branch_file_diff_sync(
         String::new()
     };
 
-    // Read old content from base ref
-    let old_content = run_git_command(repo_path, &["show", &format!("{}:{}", base_ref, file_path)])
-        .unwrap_or_default();
+    // Read old content from base ref via git2
+    let old_content = match repo.revparse_single(base_ref) {
+        Ok(obj) => match obj.peel_to_tree() {
+            Ok(tree) => match tree.get_path(Path::new(file_path)) {
+                Ok(entry) => {
+                    let blob = repo.find_blob(entry.id())?;
+                    String::from_utf8_lossy(blob.content()).to_string()
+                }
+                Err(_) => String::new(),
+            },
+            Err(_) => String::new(),
+        },
+        Err(_) => String::new(),
+    };
 
     Ok(GitDiff {
         old_path: file_path.to_string(),
