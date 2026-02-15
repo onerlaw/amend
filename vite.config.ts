@@ -13,6 +13,40 @@ export default defineConfig(async () => ({
     },
   },
   clearScreen: false,
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'react-vendor': ['react', 'react-dom'],
+          codemirror: [
+            '@codemirror/commands',
+            '@codemirror/lang-css',
+            '@codemirror/lang-html',
+            '@codemirror/lang-java',
+            '@codemirror/lang-javascript',
+            '@codemirror/lang-json',
+            '@codemirror/lang-markdown',
+            '@codemirror/lang-python',
+            '@codemirror/lang-rust',
+            '@codemirror/language',
+            '@codemirror/legacy-modes/mode/clike',
+            '@codemirror/search',
+            '@codemirror/state',
+            '@codemirror/view',
+            '@lezer/highlight',
+          ],
+          xterm: [
+            '@xterm/xterm',
+            '@xterm/addon-fit',
+            '@xterm/addon-web-links',
+            '@xterm/addon-webgl',
+          ],
+          highlightjs: ['highlight.js'],
+          diff: ['diff'],
+        },
+      },
+    },
+  },
   server: {
     port: 1420,
     strictPort: true,
