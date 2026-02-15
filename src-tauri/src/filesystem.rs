@@ -490,3 +490,75 @@ return paths as text
         Vec::new()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    mod validate_path_tests {
+        use super::*;
+
+        #[test]
+        fn accepts_absolute_path() {
+            let result = validate_path("/home/user/project");
+            assert!(result.is_ok());
+            assert_eq!(result.unwrap(), PathBuf::from("/home/user/project"));
+        }
+
+        #[test]
+        fn rejects_relative_path() {
+            let result = validate_path("relative/path");
+            assert!(result.is_err());
+            match result.unwrap_err() {
+                FileSystemError::InvalidPath(msg) => {
+                    assert!(msg.contains("must be absolute"));
+                }
+                other => panic!("Expected InvalidPath, got {:?}", other),
+            }
+        }
+
+        #[test]
+        fn rejects_path_with_parent_traversal() {
+            let result = validate_path("/home/user/../etc/passwd");
+            assert!(result.is_err());
+            match result.unwrap_err() {
+                FileSystemError::InvalidPath(msg) => {
+                    assert!(msg.contains("must not contain '..'"));
+                }
+                other => panic!("Expected InvalidPath, got {:?}", other),
+            }
+        }
+
+        #[test]
+        fn accepts_path_with_dots_in_names() {
+            // ".hidden" is a normal component, not a parent dir reference
+            let result = validate_path("/home/user/.hidden/file.txt");
+            assert!(result.is_ok());
+        }
+
+        #[test]
+        fn rejects_bare_relative_path() {
+            let result = validate_path("file.txt");
+            assert!(result.is_err());
+        }
+
+        #[test]
+        fn accepts_root_path() {
+            let result = validate_path("/");
+            assert!(result.is_ok());
+        }
+
+        #[test]
+        fn rejects_dot_dot_at_start() {
+            let result = validate_path("/../etc");
+            assert!(result.is_err());
+        }
+
+        #[test]
+        fn accepts_path_with_current_dir_component() {
+            // "." (current dir) is allowed, only ".." is blocked
+            let result = validate_path("/home/./user");
+            assert!(result.is_ok());
+        }
+    }
+}

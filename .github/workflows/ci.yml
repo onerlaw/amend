@@ -25,6 +25,9 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Frontend tests
+        run: npm test
+
       - name: TypeScript check
         run: npm run build -- --mode development
 
@@ -47,6 +50,9 @@ jobs:
 
       - name: Rust clippy
         run: cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings
+
+      - name: Rust tests
+        run: cargo test --manifest-path src-tauri/Cargo.toml
 
   build-test:
     runs-on: ubuntu-22.04

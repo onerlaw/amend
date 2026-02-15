@@ -801,3 +801,153 @@ pub fn list_branches(repo_path: String) -> Result<Vec<GitBranch>, GitError> {
 
     Ok(branches)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    mod validate_no_flag {
+        use super::*;
+
+        #[test]
+        fn rejects_flag_starting_with_dash() {
+            let result = validate_no_flag("--exec", "branch name");
+            assert!(result.is_err());
+            let err = result.unwrap_err();
+            assert!(
+                matches!(err, GitError::InvalidArgument(_)),
+                "Expected InvalidArgument, got {:?}",
+                err
+            );
+        }
+
+        #[test]
+        fn rejects_single_dash_flag() {
+            assert!(validate_no_flag("-v", "arg").is_err());
+        }
+
+        #[test]
+        fn accepts_normal_branch_name() {
+            assert!(validate_no_flag("main", "branch name").is_ok());
+            assert!(validate_no_flag("feature/my-branch", "branch name").is_ok());
+        }
+
+        #[test]
+        fn accepts_empty_string() {
+            assert!(validate_no_flag("", "arg").is_ok());
+        }
+
+        #[test]
+        fn accepts_path_like_strings() {
+            assert!(validate_no_flag("src/lib/main.rs", "file path").is_ok());
+            assert!(validate_no_flag("file.txt", "file path").is_ok());
+        }
+    }
+
+    mod is_image_extension_tests {
+        use super::*;
+
+        #[test]
+        fn detects_common_image_formats() {
+            assert!(is_image_extension("photo.png"));
+            assert!(is_image_extension("photo.jpg"));
+            assert!(is_image_extension("photo.jpeg"));
+            assert!(is_image_extension("photo.gif"));
+            assert!(is_image_extension("icon.svg"));
+            assert!(is_image_extension("photo.webp"));
+            assert!(is_image_extension("photo.bmp"));
+            assert!(is_image_extension("favicon.ico"));
+        }
+
+        #[test]
+        fn case_insensitive() {
+            assert!(is_image_extension("PHOTO.PNG"));
+            assert!(is_image_extension("Photo.JPG"));
+            assert!(is_image_extension("icon.SVG"));
+        }
+
+        #[test]
+        fn rejects_non_image_extensions() {
+            assert!(!is_image_extension("main.rs"));
+            assert!(!is_image_extension("style.css"));
+            assert!(!is_image_extension("data.json"));
+            assert!(!is_image_extension("README.md"));
+        }
+
+        #[test]
+        fn handles_paths_with_directories() {
+            assert!(is_image_extension("src/assets/logo.png"));
+            assert!(is_image_extension("/home/user/photo.jpg"));
+            assert!(!is_image_extension("src/lib/main.ts"));
+        }
+
+        #[test]
+        fn handles_no_extension() {
+            assert!(!is_image_extension("Makefile"));
+            assert!(!is_image_extension(""));
+        }
+
+        #[test]
+        fn handles_multiple_dots() {
+            assert!(is_image_extension("my.photo.backup.png"));
+            assert!(!is_image_extension("archive.tar.gz"));
+        }
+    }
+
+    mod index_status_to_string_tests {
+        use super::*;
+
+        #[test]
+        fn maps_index_new() {
+            assert_eq!(index_status_to_string(git2::Status::INDEX_NEW), "added");
+        }
+
+        #[test]
+        fn maps_index_modified() {
+            assert_eq!(
+                index_status_to_string(git2::Status::INDEX_MODIFIED),
+                "modified"
+            );
+        }
+
+        #[test]
+        fn maps_index_deleted() {
+            assert_eq!(
+                index_status_to_string(git2::Status::INDEX_DELETED),
+                "deleted"
+            );
+        }
+
+        #[test]
+        fn maps_index_renamed() {
+            assert_eq!(
+                index_status_to_string(git2::Status::INDEX_RENAMED),
+                "renamed"
+            );
+        }
+    }
+
+    mod wt_status_to_string_tests {
+        use super::*;
+
+        #[test]
+        fn maps_wt_new() {
+            assert_eq!(wt_status_to_string(git2::Status::WT_NEW), "added");
+        }
+
+        #[test]
+        fn maps_wt_modified() {
+            assert_eq!(wt_status_to_string(git2::Status::WT_MODIFIED), "modified");
+        }
+
+        #[test]
+        fn maps_wt_deleted() {
+            assert_eq!(wt_status_to_string(git2::Status::WT_DELETED), "deleted");
+        }
+
+        #[test]
+        fn maps_wt_renamed() {
+            assert_eq!(wt_status_to_string(git2::Status::WT_RENAMED), "renamed");
+        }
+    }
+}
