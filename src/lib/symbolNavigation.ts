@@ -191,7 +191,7 @@ export function findDefinitionInFile(view: EditorView, symbolName: string): Loca
       if (DEFINITION_CONTEXT_TYPES.has(node.name) || DEFINITION_TYPES.has(node.name)) {
         // Look for identifiers within this definition
         const innerTree = node.node;
-        let cursor = innerTree.cursor();
+        const cursor = innerTree.cursor();
         let depth = 0;
         const maxDepth = 5; // Don't go too deep
 
@@ -300,7 +300,7 @@ export function getImportPathAtPosition(
   pos: number
 ): { path: string; from: number; to: number } | null {
   const tree = syntaxTree(view.state);
-  let node: SyntaxNode | null = tree.resolveInner(pos, 0);
+  const node: SyntaxNode | null = tree.resolveInner(pos, 0);
 
   // Walk up to find a String node
   let stringNode: SyntaxNode | null = null;

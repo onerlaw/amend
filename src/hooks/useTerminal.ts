@@ -103,7 +103,7 @@ export function useTerminal(containerId: string | null) {
           // Keep the same scroll offset from the top
           terminal.scrollToLine(viewport.viewportY);
         }
-      } catch (e) {
+      } catch (_e) {
         // Renderer may not be ready yet, ignore
       }
     }
