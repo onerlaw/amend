@@ -10,8 +10,9 @@ import { TerminalPane } from './TerminalPane';
 import { WorktreeSelector } from './WorktreeSelector';
 import { GitWorktree } from '@/lib/tauri';
 import { CloseIcon, FolderIcon, DuplicateIcon, PlusIcon, SpinnerIcon } from '@/components/Icons';
-import { getFileName } from '@/lib/fileUtils';
+import { getFileName, formatShortcut } from '@/lib/fileUtils';
 import { useDraggableTabs } from '@/hooks/useDraggableTabs';
+import { ConfirmDialog, AlertDialog } from '@/components/ConfirmDialog';
 
 function TerminalTabLabel({ tab, projects }: { tab: TerminalTab; projects: Project[] }) {
   const project = tab.projectId ? projects.find((p) => p.id === tab.projectId) : null;
@@ -49,6 +50,8 @@ export const TerminalTabs = forwardRef<TerminalTabsHandle>(function TerminalTabs
   const [showWorktreeSelector, setShowWorktreeSelector] = useState(false);
   const [showProjectPicker, setShowProjectPicker] = useState(false);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  const [deleteWorktreeTarget, setDeleteWorktreeTarget] = useState<GitWorktree | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   // Use selected project's path for worktree listing, or fall back to currentDirectory
   const selectedProject = selectedProjectId
@@ -165,12 +168,14 @@ export const TerminalTabs = forwardRef<TerminalTabsHandle>(function TerminalTabs
     }
   };
 
-  const handleWorktreeDelete = async (worktree: GitWorktree) => {
-    if (
-      !confirm(`Delete worktree "${worktree.path}"?\n\nThis will remove the worktree directory.`)
-    ) {
-      return;
-    }
+  const handleWorktreeDelete = (worktree: GitWorktree) => {
+    setDeleteWorktreeTarget(worktree);
+  };
+
+  const confirmWorktreeDelete = async () => {
+    if (!deleteWorktreeTarget) return;
+    const worktree = deleteWorktreeTarget;
+    setDeleteWorktreeTarget(null);
     try {
       await removeWorktree(worktree.path);
     } catch {
@@ -178,7 +183,7 @@ export const TerminalTabs = forwardRef<TerminalTabsHandle>(function TerminalTabs
         await removeWorktree(worktree.path, true);
       } catch (err) {
         console.error('Failed to delete worktree:', err);
-        alert(`Failed to delete worktree: ${err}`);
+        setDeleteError(`Failed to delete worktree: ${err}`);
       }
     }
   };
@@ -271,7 +276,7 @@ export const TerminalTabs = forwardRef<TerminalTabsHandle>(function TerminalTabs
             >
               Open Folder
             </button>
-            <kbd className="text-xs text-tertiary">⌘O</kbd>
+            <kbd className="text-xs text-tertiary">{formatShortcut('Mod+O')}</kbd>
           </div>
         )}
         {tabs.length === 0 && currentDirectory && (
@@ -328,6 +333,20 @@ export const TerminalTabs = forwardRef<TerminalTabsHandle>(function TerminalTabs
           />
         )}
       </div>
+
+      {deleteWorktreeTarget && (
+        <ConfirmDialog
+          title="Delete Worktree"
+          message={`Delete worktree "${deleteWorktreeTarget.path}"? This will remove the worktree directory.`}
+          confirmLabel="Delete"
+          confirmClassName="bg-red-600 hover:bg-red-700"
+          onConfirm={confirmWorktreeDelete}
+          onCancel={() => setDeleteWorktreeTarget(null)}
+        />
+      )}
+      {deleteError && (
+        <AlertDialog title="Error" message={deleteError} onClose={() => setDeleteError(null)} />
+      )}
     </div>
   );
 });

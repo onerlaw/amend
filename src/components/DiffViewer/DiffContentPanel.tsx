@@ -5,6 +5,7 @@ import { DiffFileSection } from './DiffFileSection';
 import { DocumentIcon, CheckCircleIcon, ChevronIcon } from '@/components/Icons';
 import { listBranches, GitBranch } from '@/lib/tauri';
 import { FileDiffData } from '@/hooks/useMultiFileDiff';
+import { formatShortcut } from '@/lib/fileUtils';
 import '@/styles/highlight-theme.css';
 
 function BranchSelector({ repoPath }: { repoPath: string }) {
@@ -263,7 +264,7 @@ export function DiffContentPanel() {
         <DocumentIcon className="h-16 w-16 text-tertiary mb-4" />
         <h3 className="text-lg font-medium text-primary mb-2">No Repository Open</h3>
         <p className="text-sm text-tertiary max-w-sm">
-          Use "Open Repo" (Cmd+O) to open a Git repository and view changes.
+          Use "Open Repo" ({formatShortcut('Mod+O')}) to open a Git repository and view changes.
         </p>
       </div>
     );

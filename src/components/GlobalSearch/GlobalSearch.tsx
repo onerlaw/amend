@@ -4,7 +4,7 @@ import { searchFiles, SearchResult } from '@/lib/tauri';
 import { useFileStore } from '@/stores/fileStore';
 import { useUIStore } from '@/stores/uiStore';
 import { getFileIconColor, openFileInBrowseMode } from '@/lib/fileUtils';
-import { modifierKey } from '@/lib/fileUtils';
+import { modifierKey, formatShortcut } from '@/lib/fileUtils';
 import { SearchIcon, FileIcon, SpinnerIcon } from '@/components/Icons';
 
 export function GlobalSearch() {
@@ -129,7 +129,7 @@ export function GlobalSearch() {
       <button
         onClick={() => openSearch()}
         className="flex items-center gap-2 rounded-lg bg-surface-1 px-4 py-1.5 text-sm text-secondary hover:bg-surface-3 w-72"
-        title="Search (Cmd+P)"
+        title={`Search (${formatShortcut('Mod+P')})`}
       >
         <SearchIcon className="h-4 w-4 text-tertiary" />
         <span className="flex-1 text-left text-tertiary">Search...</span>

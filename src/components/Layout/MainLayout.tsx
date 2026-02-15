@@ -13,6 +13,7 @@ import type { BrowseEditorTabsHandle } from '@/components/FileBrowser/BrowseEdit
 import { GlobalSearch } from '@/components/GlobalSearch/GlobalSearch';
 import { ModalOverlay } from '@/components/ModalOverlay';
 import { indexProject, copyEntry, moveEntry, getClipboardFilePaths } from '@/lib/tauri';
+import { formatShortcut } from '@/lib/fileUtils';
 import { useContextMenuStore } from '@/stores/contextMenuStore';
 import { dispatchFileTreeRefresh } from '@/stores/contextMenuStore';
 import {
@@ -311,7 +312,7 @@ export function MainLayout() {
             className={`rounded-md p-1.5 ${
               notesOpen ? 'bg-accent text-white' : 'text-secondary hover:bg-surface-3'
             }`}
-            title="Notes (Cmd+Shift+N)"
+            title={`Notes (${formatShortcut('Mod+Shift+N')})`}
           >
             <NotesIcon />
           </button>
@@ -453,67 +454,67 @@ export function MainLayout() {
               <div className="flex items-center justify-between py-1">
                 <span className="text-primary">New Terminal</span>
                 <kbd className="rounded-md bg-surface-1 px-2 py-0.5 font-mono text-secondary">
-                  Cmd+T / Cmd+O
+                  {formatShortcut('Mod+T')} / {formatShortcut('Mod+O')}
                 </kbd>
               </div>
               <div className="flex items-center justify-between py-1">
                 <span className="text-primary">Duplicate Terminal</span>
                 <kbd className="rounded-md bg-surface-1 px-2 py-0.5 font-mono text-secondary">
-                  Cmd+D
+                  {formatShortcut('Mod+D')}
                 </kbd>
               </div>
               <div className="flex items-center justify-between py-1">
                 <span className="text-primary">Cycle Terminals</span>
                 <kbd className="rounded-md bg-surface-1 px-2 py-0.5 font-mono text-secondary">
-                  Cmd+`
+                  {formatShortcut('Mod+`')}
                 </kbd>
               </div>
               <div className="flex items-center justify-between py-1">
                 <span className="text-primary">Close Tab</span>
                 <kbd className="rounded-md bg-surface-1 px-2 py-0.5 font-mono text-secondary">
-                  Cmd+W
+                  {formatShortcut('Mod+W')}
                 </kbd>
               </div>
               <div className="flex items-center justify-between py-1">
                 <span className="text-primary">Search</span>
                 <kbd className="rounded-md bg-surface-1 px-2 py-0.5 font-mono text-secondary">
-                  Cmd+P / Cmd+Shift+F
+                  {formatShortcut('Mod+P')} / {formatShortcut('Mod+Shift+F')}
                 </kbd>
               </div>
               <div className="flex items-center justify-between py-1">
                 <span className="text-primary">Find in File</span>
                 <kbd className="rounded-md bg-surface-1 px-2 py-0.5 font-mono text-secondary">
-                  Cmd+F
+                  {formatShortcut('Mod+F')}
                 </kbd>
               </div>
               <div className="flex items-center justify-between py-1">
                 <span className="text-primary">Paste Files</span>
                 <kbd className="rounded-md bg-surface-1 px-2 py-0.5 font-mono text-secondary">
-                  Cmd+V
+                  {formatShortcut('Mod+V')}
                 </kbd>
               </div>
               <div className="flex items-center justify-between py-1">
                 <span className="text-primary">Toggle Notes</span>
                 <kbd className="rounded-md bg-surface-1 px-2 py-0.5 font-mono text-secondary">
-                  Cmd+Shift+N
+                  {formatShortcut('Mod+Shift+N')}
                 </kbd>
               </div>
               <div className="flex items-center justify-between py-1">
                 <span className="text-primary">Increase Font Size</span>
                 <kbd className="rounded-md bg-surface-1 px-2 py-0.5 font-mono text-secondary">
-                  Cmd+=
+                  {formatShortcut('Mod+=')}
                 </kbd>
               </div>
               <div className="flex items-center justify-between py-1">
                 <span className="text-primary">Decrease Font Size</span>
                 <kbd className="rounded-md bg-surface-1 px-2 py-0.5 font-mono text-secondary">
-                  Cmd+-
+                  {formatShortcut('Mod+-')}
                 </kbd>
               </div>
               <div className="flex items-center justify-between py-1">
                 <span className="text-primary">Reset Font Size</span>
                 <kbd className="rounded-md bg-surface-1 px-2 py-0.5 font-mono text-secondary">
-                  Cmd+0
+                  {formatShortcut('Mod+0')}
                 </kbd>
               </div>
             </div>
