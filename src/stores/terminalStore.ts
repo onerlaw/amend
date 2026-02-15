@@ -79,9 +79,7 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
 
     set({
       tabs: tabs.map((t) =>
-        t.id === id
-          ? { ...t, worktreePath: cwd, projectId: matchedProject?.id ?? t.projectId }
-          : t
+        t.id === id ? { ...t, worktreePath: cwd, projectId: matchedProject?.id ?? t.projectId } : t
       ),
     });
   },
