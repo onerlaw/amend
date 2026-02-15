@@ -6,11 +6,22 @@ import { useFileStore, OpenFile } from '@/stores/fileStore';
 export const isMac = navigator.platform.toUpperCase().includes('MAC');
 export const isWindows = navigator.platform.toUpperCase().includes('WIN');
 export const modifierKey = isMac ? '\u2318' : 'Ctrl';
+export const modifierKeyName = isMac ? 'Cmd' : 'Ctrl';
 export const revealLabel = isMac
   ? 'Reveal in Finder'
   : isWindows
     ? 'Reveal in File Explorer'
     : 'Open Containing Folder';
+
+/**
+ * Format a shortcut string with the platform-appropriate modifier.
+ * Uses ⌘ on macOS, Ctrl on Windows/Linux.
+ * e.g. formatShortcut('Mod+P') => '⌘P' (macOS) or 'Ctrl+P' (Windows/Linux)
+ *      formatShortcut('Mod+Shift+N') => '⌘Shift+N' (macOS) or 'Ctrl+Shift+N' (Windows/Linux)
+ */
+export function formatShortcut(shortcut: string): string {
+  return shortcut.replace(/Mod\+/g, isMac ? '\u2318' : 'Ctrl+');
+}
 
 const IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'bmp', 'ico']);
 

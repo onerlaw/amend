@@ -4,7 +4,7 @@ import { useFileBrowserState } from '@/hooks/useFileBrowserState';
 import { readDirectories, FileEntry } from '@/lib/tauri';
 import { useContextMenuStore } from '@/stores/contextMenuStore';
 import { useUIStore } from '@/stores/uiStore';
-import { getFileIconColor, sortDirectoriesFirst } from '@/lib/fileUtils';
+import { getFileIconColor, sortDirectoriesFirst, formatShortcut } from '@/lib/fileUtils';
 import { FolderIcon, FileIcon } from '@/components/Icons';
 import { TreeRow, DirectoryIndicator, PanelHeader } from '@/components/FileTree/TreePrimitives';
 
@@ -180,8 +180,11 @@ export function BrowseFileListPanel() {
           <FolderIcon className="h-12 w-12 text-tertiary mb-4" />
           <h3 className="text-sm font-medium text-primary mb-1">No Repository Open</h3>
           <p className="text-xs text-tertiary">
-            Use <kbd className="px-1 py-0.5 rounded bg-surface-3 text-tertiary">⌘O</kbd> to open a
-            project
+            Use{' '}
+            <kbd className="px-1 py-0.5 rounded bg-surface-3 text-tertiary">
+              {formatShortcut('Mod+O')}
+            </kbd>{' '}
+            to open a project
           </p>
         </div>
       ) : (

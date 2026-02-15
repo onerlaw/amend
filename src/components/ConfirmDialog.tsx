@@ -53,3 +53,39 @@ export function ConfirmDialog({
     </ModalOverlay>
   );
 }
+
+interface AlertDialogProps {
+  title: string;
+  message: ReactNode;
+  onClose: () => void;
+}
+
+export function AlertDialog({ title, message, onClose }: AlertDialogProps) {
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === 'Escape') {
+      e.preventDefault();
+      onClose();
+    }
+  };
+
+  return (
+    <ModalOverlay onClose={onClose}>
+      <div
+        className="w-80 rounded-lg border border-surface-3 bg-surface-2 p-4 shadow-xl"
+        onKeyDown={handleKeyDown}
+      >
+        <div className="mb-2 text-sm font-medium text-primary">{title}</div>
+        <p className="mb-4 text-sm text-secondary">{message}</p>
+        <div className="flex justify-end">
+          <button
+            autoFocus
+            onClick={onClose}
+            className="rounded-md bg-accent px-3 py-1 text-xs text-white hover:bg-accent/90"
+          >
+            OK
+          </button>
+        </div>
+      </div>
+    </ModalOverlay>
+  );
+}

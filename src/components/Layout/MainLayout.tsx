@@ -13,6 +13,7 @@ import type { BrowseEditorTabsHandle } from '@/components/FileBrowser/BrowseEdit
 import { GlobalSearch } from '@/components/GlobalSearch/GlobalSearch';
 import { ModalOverlay } from '@/components/ModalOverlay';
 import { indexProject } from '@/lib/tauri';
+import { formatShortcut } from '@/lib/fileUtils';
 import {
   PlusIcon,
   CloseIcon,
@@ -77,17 +78,17 @@ function ShortcutsModal({ onClose }: { onClose: () => void }) {
         </div>
         <div className="space-y-2 text-xs">
           {[
-            ['New Terminal', 'Cmd+T / Cmd+O'],
-            ['Duplicate Terminal', 'Cmd+D'],
-            ['Cycle Terminals', 'Cmd+`'],
-            ['Close Tab', 'Cmd+W'],
-            ['Search', 'Cmd+P / Cmd+Shift+F'],
-            ['Find in File', 'Cmd+F'],
-            ['Paste Files', 'Cmd+V'],
-            ['Toggle Notes', 'Cmd+Shift+N'],
-            ['Increase Font Size', 'Cmd+='],
-            ['Decrease Font Size', 'Cmd+-'],
-            ['Reset Font Size', 'Cmd+0'],
+            ['New Terminal', `${formatShortcut('Mod+T')} / ${formatShortcut('Mod+O')}`],
+            ['Duplicate Terminal', formatShortcut('Mod+D')],
+            ['Cycle Terminals', formatShortcut('Mod+`')],
+            ['Close Tab', formatShortcut('Mod+W')],
+            ['Search', `${formatShortcut('Mod+P')} / ${formatShortcut('Mod+Shift+F')}`],
+            ['Find in File', formatShortcut('Mod+F')],
+            ['Paste Files', formatShortcut('Mod+V')],
+            ['Toggle Notes', formatShortcut('Mod+Shift+N')],
+            ['Increase Font Size', formatShortcut('Mod+=')],
+            ['Decrease Font Size', formatShortcut('Mod+-')],
+            ['Reset Font Size', formatShortcut('Mod+0')],
           ].map(([label, keys]) => (
             <div key={label} className="flex items-center justify-between py-1">
               <span className="text-primary">{label}</span>
@@ -184,7 +185,7 @@ export function MainLayout() {
             className={`rounded-md p-1.5 ${
               notesOpen ? 'bg-accent text-white' : 'text-secondary hover:bg-surface-3'
             }`}
-            title="Notes (Cmd+Shift+N)"
+            title={`Notes (${formatShortcut('Mod+Shift+N')})`}
           >
             <NotesIcon />
           </button>

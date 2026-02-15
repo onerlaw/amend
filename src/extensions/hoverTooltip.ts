@@ -2,8 +2,7 @@ import { hoverTooltip, Tooltip, EditorView } from '@codemirror/view';
 import { Extension } from '@codemirror/state';
 import { getSymbolAtPosition, findDefinitionInFile, LocalDefinition } from '@/lib/symbolNavigation';
 import { findDefinition, SymbolDefinition } from '@/lib/tauri';
-import { getFileName } from '@/lib/fileUtils';
-import { isMac } from '@/lib/fileUtils';
+import { getFileName, modifierKeyName } from '@/lib/fileUtils';
 
 export interface HoverTooltipConfig {
   currentFilePath: string;
@@ -125,7 +124,7 @@ function buildTooltipDom(opts: {
 
   const hint = document.createElement('div');
   hint.className = 'cm-tooltip-signature-hint';
-  hint.textContent = `${isMac ? 'Cmd' : 'Ctrl'}+Click to go to definition`;
+  hint.textContent = `${modifierKeyName}+Click to go to definition`;
   container.appendChild(hint);
 
   return container;
