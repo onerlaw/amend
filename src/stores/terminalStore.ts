@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { reorderArray } from '@/lib/fileUtils';
+import { useProjectStore } from '@/stores/projectStore';
 
 export interface TerminalTab {
   id: string;
@@ -15,6 +16,7 @@ interface TerminalState {
   removeTab: (id: string) => void;
   setActiveTab: (id: string) => void;
   setTabTitle: (id: string, title: string) => void;
+  updateTabCwd: (id: string, cwd: string) => void;
   reorderTabs: (fromIndex: number, toIndex: number) => void;
 }
 
@@ -61,6 +63,26 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
   setTabTitle: (id: string, title: string) => {
     set({
       tabs: get().tabs.map((tab) => (tab.id === id ? { ...tab, title } : tab)),
+    });
+  },
+
+  updateTabCwd: (id: string, cwd: string) => {
+    const tabs = get().tabs;
+    const tab = tabs.find((t) => t.id === id);
+    if (!tab || tab.worktreePath === cwd) return;
+
+    // Try to match cwd to a known project (most specific path wins)
+    const projects = useProjectStore.getState().projects;
+    const matchedProject = projects
+      .filter((p) => cwd.startsWith(p.path))
+      .sort((a, b) => b.path.length - a.path.length)[0];
+
+    set({
+      tabs: tabs.map((t) =>
+        t.id === id
+          ? { ...t, worktreePath: cwd, projectId: matchedProject?.id ?? t.projectId }
+          : t
+      ),
     });
   },
 

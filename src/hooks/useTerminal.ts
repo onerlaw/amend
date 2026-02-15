@@ -228,12 +228,31 @@ export function useTerminal(containerId: string | null) {
         useTerminalStore.getState().removeTab(containerId);
       });
 
+      // Set up OSC 7 handler for cwd detection (shells emit this after each command)
+      const oscDisposable = terminal.parser.registerOscHandler(7, (data) => {
+        try {
+          const url = new URL(data);
+          const cwd = decodeURIComponent(url.pathname);
+          if (cwd) {
+            useTerminalStore.getState().updateTabCwd(containerId, cwd);
+          }
+        } catch {
+          // Ignore malformed OSC 7 data
+        }
+        return true;
+      });
+
       // Set up title change listener
       const titleDisposable = terminal.onTitleChange((title) => {
         useTerminalStore.getState().setTabTitle(containerId, title);
       });
 
-      unlistenRef.current = [unlistenOutput, unlistenExit, () => titleDisposable.dispose()];
+      unlistenRef.current = [
+        unlistenOutput,
+        unlistenExit,
+        () => oscDisposable.dispose(),
+        () => titleDisposable.dispose(),
+      ];
 
       // Mark as initialized before fitting
       isInitializedRef.current = true;
