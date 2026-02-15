@@ -23,6 +23,11 @@ export function useGitPolling(repoPath: string | null) {
 
       if (!silent) {
         setIsLoading(true);
+        // Force state updates even if data is unchanged — after clearWorkingDiffs()
+        // clears the diff map, we need setStatus to fire so workingFiles recalculates
+        // and the diff-loading effect re-triggers.
+        lastStatusRef.current = '';
+        lastStatsRef.current = '';
       }
       setError(null);
 
