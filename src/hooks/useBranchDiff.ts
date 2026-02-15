@@ -24,9 +24,15 @@ export function useBranchDiff(repoPath: string | null, baseRef: string | null) {
   const queueRef = useRef<string[]>([]);
   const activeCountRef = useRef(0);
   const mergeBaseRef = useRef<string | null>(null);
+  const generationRef = useRef(0);
 
   const processQueue = useCallback(async () => {
+    const generation = generationRef.current;
+
     while (queueRef.current.length > 0 && activeCountRef.current < CONCURRENCY_LIMIT) {
+      // Bail if generation changed (context/baseRef switch happened)
+      if (generationRef.current !== generation) return;
+
       const filePath = queueRef.current.shift();
       const mb = mergeBaseRef.current;
       if (!filePath || !repoPath || !mb) continue;
@@ -49,6 +55,10 @@ export function useBranchDiff(repoPath: string | null, baseRef: string | null) {
 
       try {
         const diff: GitDiff = await getBranchFileDiff(repoPath, mb, filePath);
+
+        // Discard result if generation changed while awaiting
+        if (generationRef.current !== generation) return;
+
         loadedRef.current.add(filePath);
         setDiffs((prev) => {
           const next = new Map(prev);
@@ -62,6 +72,9 @@ export function useBranchDiff(repoPath: string | null, baseRef: string | null) {
           return next;
         });
       } catch (err) {
+        // Discard error if generation changed while awaiting
+        if (generationRef.current !== generation) return;
+
         setDiffs((prev) => {
           const next = new Map(prev);
           next.set(filePath, {
@@ -76,12 +89,17 @@ export function useBranchDiff(repoPath: string | null, baseRef: string | null) {
       } finally {
         loadingRef.current.delete(filePath);
         activeCountRef.current--;
-        processQueue();
+        // Continue processing queue only if still current generation
+        if (generationRef.current === generation) {
+          processQueue();
+        }
       }
     }
   }, [repoPath]);
 
   const clearDiffs = useCallback(() => {
+    // Bump generation to invalidate all in-flight requests
+    generationRef.current++;
     setDiffs(new Map());
     setFiles([]);
     setDiffStats(null);
@@ -97,6 +115,10 @@ export function useBranchDiff(repoPath: string | null, baseRef: string | null) {
   const load = useCallback(async () => {
     if (!repoPath || !baseRef) return;
 
+    // Bump generation to invalidate any in-flight requests from previous load
+    generationRef.current++;
+    const generation = generationRef.current;
+
     // Clear previous state
     setDiffs(new Map());
     loadingRef.current.clear();
@@ -109,6 +131,10 @@ export function useBranchDiff(repoPath: string | null, baseRef: string | null) {
 
     try {
       const summary = await getBranchDiffFiles(repoPath, baseRef);
+
+      // Discard result if generation changed while awaiting
+      if (generationRef.current !== generation) return;
+
       setFiles(summary.files);
       setDiffStats(summary.diffStats);
       setMergeBase(summary.mergeBase);
@@ -120,9 +146,14 @@ export function useBranchDiff(repoPath: string | null, baseRef: string | null) {
       }
       processQueue();
     } catch (err) {
+      // Discard error if generation changed while awaiting
+      if (generationRef.current !== generation) return;
+
       setError(err instanceof Error ? err.message : 'Failed to load branch diff');
     } finally {
-      setIsLoading(false);
+      if (generationRef.current === generation) {
+        setIsLoading(false);
+      }
     }
   }, [repoPath, baseRef, processQueue]);
 
