@@ -3,6 +3,7 @@ import { Virtuoso } from 'react-virtuoso';
 import { useFileBrowserState } from '@/hooks/useFileBrowserState';
 import { readDirectories, FileEntry } from '@/lib/tauri';
 import { useContextMenuStore } from '@/stores/contextMenuStore';
+import { useFileStore } from '@/stores/fileStore';
 import { useUIStore } from '@/stores/uiStore';
 import { getFileIconColor, sortDirectoriesFirst, formatShortcut } from '@/lib/fileUtils';
 import { FolderIcon, FileIcon } from '@/components/Icons';
@@ -46,11 +47,13 @@ function BrowseFileList({
   const contextTargetPath = targetEntry?.path ?? null;
   const expandedDirs = useUIStore((s) => s.browseExpandedDirs);
   const toggleBrowseExpandedDir = useUIStore((s) => s.toggleBrowseExpandedDir);
+  const fileTreeVersion = useFileStore((s) => s.fileTreeVersion);
   const [cacheVersion, setCacheVersion] = useState(0);
 
-  // Re-fetch expanded directory contents when file tree refreshes
+  // Re-fetch expanded directory contents when file tree version changes
   useEffect(() => {
-    const handleRefresh = async () => {
+    if (fileTreeVersion === 0) return;
+    const refreshExpanded = async () => {
       const expandedPaths = Array.from(expandedDirs);
       if (expandedPaths.length === 0) {
         dirContentsCache.clear();
@@ -59,7 +62,6 @@ function BrowseFileList({
       }
       try {
         const results = await readDirectories(expandedPaths);
-        // Build new cache and swap atomically to avoid empty-tree flicker
         const newCache = new Map<string, FileEntry[]>();
         for (let i = 0; i < expandedPaths.length; i++) {
           if (results[i]) {
@@ -75,10 +77,8 @@ function BrowseFileList({
       }
       setCacheVersion((v) => v + 1);
     };
-
-    window.addEventListener('file-tree-refresh', handleRefresh);
-    return () => window.removeEventListener('file-tree-refresh', handleRefresh);
-  }, [expandedDirs]);
+    refreshExpanded();
+  }, [fileTreeVersion, expandedDirs]);
 
   const toggleDir = useCallback(
     async (path: string) => {

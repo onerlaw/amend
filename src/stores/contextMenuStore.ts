@@ -84,8 +84,3 @@ export const useContextMenuStore = create<ContextMenuState>((set) => ({
       deleteTarget: null,
     }),
 }));
-
-/** Dispatch this event after file operations to trigger tree refresh */
-export function dispatchFileTreeRefresh() {
-  window.dispatchEvent(new Event('file-tree-refresh'));
-}
