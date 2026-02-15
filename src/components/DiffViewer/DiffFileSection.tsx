@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect, useCallback, memo } from 'react';
+import { useMemo, useState, useEffect, useCallback, useRef, memo } from 'react';
 import * as Diff from 'diff';
 import { highlightCode, getLanguageFromPath } from '@/lib/highlight';
 import { getFileName, toggleSetItem, buildImageDataUrl } from '@/lib/fileUtils';
@@ -10,6 +10,11 @@ import {
   FileSegment,
 } from '@/lib/conflictParser';
 import { writeFile, stageFile } from '@/lib/tauri';
+
+// Thresholds for performance safeguards
+const HIGHLIGHT_LINE_LIMIT = 5000; // Disable syntax highlighting above this many diff lines
+const VIRTUALIZE_LINE_LIMIT = 500; // Virtualize sections with more lines than this
+const VIRTUALIZE_OVERSCAN = 50; // Extra lines to render above/below viewport
 
 interface DiffFileSectionProps {
   filePath: string;
@@ -106,6 +111,93 @@ const DiffLineCode = memo(function DiffLineCode({
   );
 });
 
+// Virtualized section: only renders lines near the viewport
+const VirtualizedLines = memo(function VirtualizedLines({
+  lines,
+  language,
+  renderGutter,
+}: {
+  lines: Omit<DiffLineProps, 'language'>[];
+  language?: string;
+  renderGutter: boolean;
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [visibleRange, setVisibleRange] = useState({
+    start: 0,
+    end: Math.min(VIRTUALIZE_OVERSCAN, lines.length),
+  });
+  const lineHeight = 20; // approximate line height in px
+
+  // Track scroll position to determine visible range
+  useEffect(() => {
+    const scrollParent = containerRef.current?.closest('.overflow-y-auto');
+    if (!scrollParent) return;
+
+    const updateVisibleRange = () => {
+      const el = containerRef.current;
+      if (!el) return;
+
+      const scrollRect = scrollParent.getBoundingClientRect();
+      const elRect = el.getBoundingClientRect();
+
+      // How far the scroll container's top is into this element
+      const topOffset = scrollRect.top - elRect.top;
+      const bottomOffset = topOffset + scrollRect.height;
+
+      const startLine = Math.max(0, Math.floor(topOffset / lineHeight) - VIRTUALIZE_OVERSCAN);
+      const endLine = Math.min(
+        lines.length,
+        Math.ceil(bottomOffset / lineHeight) + VIRTUALIZE_OVERSCAN
+      );
+
+      setVisibleRange((prev) => {
+        if (prev.start === startLine && prev.end === endLine) return prev;
+        return { start: startLine, end: endLine };
+      });
+    };
+
+    updateVisibleRange();
+    scrollParent.addEventListener('scroll', updateVisibleRange, { passive: true });
+    return () => scrollParent.removeEventListener('scroll', updateVisibleRange);
+  }, [lines.length, lineHeight]);
+
+  const topPad = visibleRange.start * lineHeight;
+  const bottomPad = (lines.length - visibleRange.end) * lineHeight;
+  const visibleLines = lines.slice(visibleRange.start, visibleRange.end);
+
+  if (renderGutter) {
+    return (
+      <div ref={containerRef}>
+        <div style={{ height: topPad }} />
+        {visibleLines.map((line, i) => (
+          <DiffLineGutter
+            key={visibleRange.start + i}
+            type={line.type}
+            oldLineNum={line.oldLineNum}
+            newLineNum={line.newLineNum}
+          />
+        ))}
+        <div style={{ height: bottomPad }} />
+      </div>
+    );
+  }
+
+  return (
+    <div ref={containerRef}>
+      <div style={{ height: topPad }} />
+      {visibleLines.map((line, i) => (
+        <DiffLineCode
+          key={visibleRange.start + i}
+          type={line.type}
+          content={line.content}
+          language={language}
+        />
+      ))}
+      <div style={{ height: bottomPad }} />
+    </div>
+  );
+});
+
 // Collapsed separator component
 const CollapsedSeparator = memo(function CollapsedSeparator({
   hiddenCount,
@@ -156,6 +248,53 @@ function getStatusBadge(category: 'staged' | 'unstaged' | 'untracked' | 'conflic
   );
 }
 
+// Renders gutter lines for a section — plain or virtualized
+function SectionGutter({
+  lines,
+  virtualize,
+}: {
+  lines: Omit<DiffLineProps, 'language'>[];
+  virtualize: boolean;
+}) {
+  if (virtualize) {
+    return <VirtualizedLines lines={lines} renderGutter={true} />;
+  }
+  return (
+    <>
+      {lines.map((line, lineIndex) => (
+        <DiffLineGutter
+          key={lineIndex}
+          type={line.type}
+          oldLineNum={line.oldLineNum}
+          newLineNum={line.newLineNum}
+        />
+      ))}
+    </>
+  );
+}
+
+// Renders code lines for a section — plain or virtualized
+function SectionCode({
+  lines,
+  language,
+  virtualize,
+}: {
+  lines: Omit<DiffLineProps, 'language'>[];
+  language?: string;
+  virtualize: boolean;
+}) {
+  if (virtualize) {
+    return <VirtualizedLines lines={lines} language={language} renderGutter={false} />;
+  }
+  return (
+    <>
+      {lines.map((line, lineIndex) => (
+        <DiffLineCode key={lineIndex} type={line.type} content={line.content} language={language} />
+      ))}
+    </>
+  );
+}
+
 // Diff content component - two-column layout: fixed gutter + scrollable code.
 // The gutter column is outside the horizontal scroll container so it never
 // scrolls sideways (works around WebKit position:sticky bugs in flex scroll
@@ -171,7 +310,7 @@ const DiffContent = memo(function DiffContent({
   onToggleSection: (index: number) => void;
   filePath: string;
 }) {
-  const language = getLanguageFromPath(filePath);
+  const rawLanguage = getLanguageFromPath(filePath);
 
   const totalLines = sections.reduce((sum, s) => sum + s.lines.length, 0);
   if (totalLines === 0) {
@@ -182,11 +321,15 @@ const DiffContent = memo(function DiffContent({
     );
   }
 
+  // Disable syntax highlighting for very large diffs
+  const language = totalLines > HIGHLIGHT_LINE_LIMIT ? undefined : rawLanguage;
+
   return (
     <div className="flex">
       {/* Fixed gutter column — never scrolls horizontally */}
       <div className="flex-shrink-0">
         {sections.map((section, sectionIndex) => {
+          const shouldVirtualize = section.lines.length > VIRTUALIZE_LINE_LIMIT;
           if (section.kind === 'collapsed') {
             const isExpanded = expandedSections.has(sectionIndex);
             return (
@@ -195,28 +338,15 @@ const DiffContent = memo(function DiffContent({
                 <div className="flex items-center gap-1.5 px-3 py-1 bg-surface-2 border-y border-surface-3 font-mono text-xs text-tertiary">
                   {'\u00A0'}
                 </div>
-                {isExpanded &&
-                  section.lines.map((line, lineIndex) => (
-                    <DiffLineGutter
-                      key={lineIndex}
-                      type={line.type}
-                      oldLineNum={line.oldLineNum}
-                      newLineNum={line.newLineNum}
-                    />
-                  ))}
+                {isExpanded && (
+                  <SectionGutter lines={section.lines} virtualize={shouldVirtualize} />
+                )}
               </div>
             );
           }
           return (
             <div key={sectionIndex}>
-              {section.lines.map((line, lineIndex) => (
-                <DiffLineGutter
-                  key={lineIndex}
-                  type={line.type}
-                  oldLineNum={line.oldLineNum}
-                  newLineNum={line.newLineNum}
-                />
-              ))}
+              <SectionGutter lines={section.lines} virtualize={shouldVirtualize} />
             </div>
           );
         })}
@@ -226,6 +356,7 @@ const DiffContent = memo(function DiffContent({
       <div className="overflow-x-auto flex-1 min-w-0">
         <div className="min-w-fit">
           {sections.map((section, sectionIndex) => {
+            const shouldVirtualize = section.lines.length > VIRTUALIZE_LINE_LIMIT;
             if (section.kind === 'collapsed') {
               const isExpanded = expandedSections.has(sectionIndex);
               return (
@@ -235,28 +366,23 @@ const DiffContent = memo(function DiffContent({
                     isExpanded={isExpanded}
                     onToggle={() => onToggleSection(sectionIndex)}
                   />
-                  {isExpanded &&
-                    section.lines.map((line, lineIndex) => (
-                      <DiffLineCode
-                        key={lineIndex}
-                        type={line.type}
-                        content={line.content}
-                        language={language}
-                      />
-                    ))}
+                  {isExpanded && (
+                    <SectionCode
+                      lines={section.lines}
+                      language={language}
+                      virtualize={shouldVirtualize}
+                    />
+                  )}
                 </div>
               );
             }
             return (
               <div key={sectionIndex}>
-                {section.lines.map((line, lineIndex) => (
-                  <DiffLineCode
-                    key={lineIndex}
-                    type={line.type}
-                    content={line.content}
-                    language={language}
-                  />
-                ))}
+                <SectionCode
+                  lines={section.lines}
+                  language={language}
+                  virtualize={shouldVirtualize}
+                />
               </div>
             );
           })}

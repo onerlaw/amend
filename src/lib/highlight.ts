@@ -101,18 +101,39 @@ export function getLanguageFromPath(filePath: string): string | undefined {
   return extensionMap[ext];
 }
 
+// LRU cache for highlighted output to avoid re-highlighting identical lines
+const HIGHLIGHT_CACHE_MAX = 2000;
+const highlightCache = new Map<string, string>();
+
 export function highlightCode(code: string, language?: string): string {
   if (!language) {
     return escapeHtml(code);
   }
 
-  try {
-    const result = hljs.highlight(code, { language });
-    return result.value;
-  } catch {
-    // If highlighting fails, return escaped HTML
-    return escapeHtml(code);
+  const cacheKey = `${language}:${code}`;
+  const cached = highlightCache.get(cacheKey);
+  if (cached !== undefined) {
+    // Move to end for LRU behavior
+    highlightCache.delete(cacheKey);
+    highlightCache.set(cacheKey, cached);
+    return cached;
   }
+
+  let result: string;
+  try {
+    result = hljs.highlight(code, { language }).value;
+  } catch {
+    result = escapeHtml(code);
+  }
+
+  // Evict oldest entries when cache is full
+  if (highlightCache.size >= HIGHLIGHT_CACHE_MAX) {
+    const firstKey = highlightCache.keys().next().value!;
+    highlightCache.delete(firstKey);
+  }
+  highlightCache.set(cacheKey, result);
+
+  return result;
 }
 
 function escapeHtml(text: string): string {
