@@ -6,6 +6,7 @@ import { ContextMenu } from '@/components/ContextMenu/ContextMenu';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { DiscardIcon } from '@/components/Icons';
 import { TreeRow, DirectoryIndicator } from '@/components/FileTree/TreePrimitives';
+import { FileCategories, FileTreeNode, buildWorkingTree, buildBranchTree } from '@/lib/diffTree';
 
 interface DiffFileListProps {
   status: GitStatus | null;
@@ -17,127 +18,6 @@ interface DiffFileListProps {
   onSelectFile?: (path: string) => void;
   branchFiles?: GitFileStatus[];
   mode?: DiffMode;
-}
-
-interface FileCategories {
-  staged?: string;
-  unstaged?: string;
-  untracked?: boolean;
-  conflicted?: boolean;
-  branch?: string;
-}
-
-interface FileTreeNode {
-  name: string;
-  path: string;
-  isDirectory: boolean;
-  children: Map<string, FileTreeNode>;
-  categories?: FileCategories;
-}
-
-function buildUnifiedTree(status: GitStatus): FileTreeNode {
-  const root: FileTreeNode = {
-    name: '',
-    path: '',
-    isDirectory: true,
-    children: new Map(),
-  };
-
-  function ensurePath(filePath: string): FileTreeNode {
-    const parts = filePath.split('/');
-    let current = root;
-
-    for (let i = 0; i < parts.length; i++) {
-      const part = parts[i];
-      const isLast = i === parts.length - 1;
-      const currentPath = parts.slice(0, i + 1).join('/');
-
-      if (!current.children.has(part)) {
-        current.children.set(part, {
-          name: part,
-          path: currentPath,
-          isDirectory: !isLast,
-          children: new Map(),
-        });
-      }
-
-      current = current.children.get(part)!;
-    }
-
-    if (!current.categories) {
-      current.categories = {};
-    }
-
-    return current;
-  }
-
-  for (const file of status.staged) {
-    const node = ensurePath(file.path);
-    node.categories!.staged = file.status;
-  }
-
-  for (const file of status.unstaged) {
-    const node = ensurePath(file.path);
-    node.categories!.unstaged = file.status;
-  }
-
-  for (const path of status.untracked) {
-    const node = ensurePath(path);
-    node.categories!.untracked = true;
-  }
-
-  if (status.conflicted) {
-    for (const path of status.conflicted) {
-      const node = ensurePath(path);
-      node.categories!.conflicted = true;
-    }
-  }
-
-  return root;
-}
-
-function buildBranchTree(files: GitFileStatus[]): FileTreeNode {
-  const root: FileTreeNode = {
-    name: '',
-    path: '',
-    isDirectory: true,
-    children: new Map(),
-  };
-
-  function ensurePath(filePath: string): FileTreeNode {
-    const parts = filePath.split('/');
-    let current = root;
-
-    for (let i = 0; i < parts.length; i++) {
-      const part = parts[i];
-      const isLast = i === parts.length - 1;
-      const currentPath = parts.slice(0, i + 1).join('/');
-
-      if (!current.children.has(part)) {
-        current.children.set(part, {
-          name: part,
-          path: currentPath,
-          isDirectory: !isLast,
-          children: new Map(),
-        });
-      }
-
-      current = current.children.get(part)!;
-    }
-
-    if (!current.categories) {
-      current.categories = {};
-    }
-
-    return current;
-  }
-
-  for (const file of files) {
-    const node = ensurePath(file.path);
-    node.categories!.branch = file.status;
-  }
-
-  return root;
 }
 
 const STATUS_LETTERS: Record<string, string> = {
@@ -375,7 +255,7 @@ export function DiffFileList({
       return buildBranchTree(branchFiles);
     }
     if (!status) return null;
-    return buildUnifiedTree(status);
+    return buildWorkingTree(status);
   }, [status, branchFiles, mode]);
 
   if (isLoading) {
