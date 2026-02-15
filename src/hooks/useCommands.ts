@@ -4,7 +4,6 @@ import { useTerminalStore } from '@/stores/terminalStore';
 import { useFileStore } from '@/stores/fileStore';
 import { useCloseTerminal } from '@/hooks/useTerminal';
 import { useContextMenuStore } from '@/stores/contextMenuStore';
-import { dispatchFileTreeRefresh } from '@/stores/contextMenuStore';
 import { useNotesStore } from '@/stores/notesStore';
 import { copyEntry, moveEntry, getClipboardFilePaths } from '@/lib/tauri';
 import type { TerminalTabsHandle } from '@/components/Terminal/TerminalTabs';
@@ -160,7 +159,7 @@ function handlePasteFiles(e: KeyboardEvent, contextPath: string | null, panelMod
           await copyEntry(clipboard.entry!.path, destPath);
         }
         clearClipboard();
-        dispatchFileTreeRefresh();
+        useFileStore.getState().invalidateFileTree();
       } catch (err) {
         console.error('Failed to paste file:', err);
       }
@@ -195,7 +194,7 @@ function handlePasteFiles(e: KeyboardEvent, contextPath: string | null, panelMod
           }
         }
       }
-      dispatchFileTreeRefresh();
+      useFileStore.getState().invalidateFileTree();
     } catch (err) {
       console.error('Failed to paste files from clipboard:', err);
     }
