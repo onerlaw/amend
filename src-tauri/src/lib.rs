@@ -5,10 +5,11 @@ mod symbols;
 mod terminal;
 mod watcher;
 
-use filesystem::FileSystemManager;
+use filesystem::{FileSystemManager, SearchGeneration};
 use symbols::{SymbolDefinition, SymbolIndex, SymbolReference};
 use tauri::State;
 use terminal::TerminalManager;
+use tokio::task::spawn_blocking;
 use watcher::FileWatcher;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -20,6 +21,7 @@ pub fn run() {
         .plugin(tauri_plugin_process::init())
         .manage(TerminalManager::new())
         .manage(FileSystemManager::new())
+        .manage(SearchGeneration::new())
         .manage(SymbolIndex::new())
         .manage(FileWatcher::new())
         .invoke_handler(tauri::generate_handler![
@@ -74,21 +76,32 @@ pub fn run() {
 #[tauri::command]
 async fn index_project(root_path: String, index: State<'_, SymbolIndex>) -> Result<(), String> {
     let idx = index.inner().clone();
-    tokio::task::spawn_blocking(move || idx.index_project(&root_path))
+    spawn_blocking(move || idx.index_project(&root_path))
         .await
         .unwrap()
 }
 
 #[tauri::command]
-fn find_definition(symbol: String, index: State<SymbolIndex>) -> Vec<SymbolDefinition> {
-    index.find_definition(&symbol)
+async fn find_definition(
+    symbol: String,
+    index: State<'_, SymbolIndex>,
+) -> Result<Vec<SymbolDefinition>, String> {
+    let idx = index.inner().clone();
+    Ok(spawn_blocking(move || idx.find_definition(&symbol))
+        .await
+        .unwrap())
 }
 
 #[tauri::command]
-fn find_references(
+async fn find_references(
     symbol: String,
     root_path: String,
-    index: State<SymbolIndex>,
-) -> Vec<SymbolReference> {
-    index.find_references(&symbol, &root_path)
+    index: State<'_, SymbolIndex>,
+) -> Result<Vec<SymbolReference>, String> {
+    let idx = index.inner().clone();
+    Ok(
+        spawn_blocking(move || idx.find_references(&symbol, &root_path))
+            .await
+            .unwrap(),
+    )
 }
