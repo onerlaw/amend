@@ -67,24 +67,42 @@ export function GlobalSearch() {
     }
   }, [isOpen]);
 
-  // Debounced search
+  // Debounced search with stale-result handling.
+  // The backend uses a generation counter so that when a new search_files call is
+  // issued, any in-flight search aborts early with "Search cancelled". We track
+  // a local generation ID so we never apply results from a stale request.
+  const searchGenRef = useRef(0);
+
   useEffect(() => {
     if (!isOpen || !query.trim() || !searchRoot) {
       setResults([]);
       return;
     }
 
+    const gen = ++searchGenRef.current;
+
     const timeoutId = setTimeout(async () => {
       setIsSearching(true);
       try {
         const searchResults = await searchFiles(searchRoot, query.trim(), true);
-        setResults(searchResults);
-        setSelectedIndex(0);
+        // Only apply results if this is still the latest search
+        if (searchGenRef.current === gen) {
+          setResults(searchResults);
+          setSelectedIndex(0);
+        }
       } catch (err) {
-        console.error('Search failed:', err);
-        setResults([]);
+        // Ignore cancellation errors from the backend (stale search)
+        const msg = String(err);
+        if (!msg.includes('Search cancelled')) {
+          console.error('Search failed:', err);
+        }
+        if (searchGenRef.current === gen) {
+          setResults([]);
+        }
       } finally {
-        setIsSearching(false);
+        if (searchGenRef.current === gen) {
+          setIsSearching(false);
+        }
       }
     }, 150);
 

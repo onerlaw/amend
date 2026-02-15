@@ -5,6 +5,8 @@ use ignore::WalkBuilder;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
 use thiserror::Error;
 use tokio::task::spawn_blocking;
 
@@ -16,9 +18,31 @@ pub enum FileSystemError {
     NotFound(String),
     #[error("Invalid path: {0}")]
     InvalidPath(String),
+    #[error("Search cancelled")]
+    SearchCancelled,
 }
 
 impl_serialize_as_string!(FileSystemError);
+
+/// Tracks the latest search generation so stale searches abort early.
+#[derive(Clone)]
+pub struct SearchGeneration(Arc<AtomicU64>);
+
+impl SearchGeneration {
+    pub fn new() -> Self {
+        Self(Arc::new(AtomicU64::new(0)))
+    }
+
+    /// Increment and return the new generation ID.
+    fn next(&self) -> u64 {
+        self.0.fetch_add(1, Ordering::SeqCst) + 1
+    }
+
+    /// Return the current generation ID.
+    fn current(&self) -> u64 {
+        self.0.load(Ordering::SeqCst)
+    }
+}
 
 /// Validate that a path is absolute and contains no `..` components.
 fn validate_path(path: &str) -> Result<PathBuf, FileSystemError> {
@@ -150,6 +174,8 @@ impl FileSystemManager {
         root_path: &str,
         query: &str,
         search_content: bool,
+        generation: &SearchGeneration,
+        my_gen: u64,
     ) -> Result<Vec<SearchResult>, FileSystemError> {
         let path = Path::new(root_path);
         if !path.exists() {
@@ -167,6 +193,11 @@ impl FileSystemManager {
             .build();
 
         for entry in walker.flatten() {
+            // Abort early if a newer search has been issued
+            if generation.current() != my_gen {
+                return Err(FileSystemError::SearchCancelled);
+            }
+
             if filename_matches.len() + content_matches.len() >= MAX_RESULTS {
                 break;
             }
@@ -335,126 +366,156 @@ pub async fn read_directories(
 }
 
 #[tauri::command]
-pub fn read_file(
+pub async fn read_file(
     state: tauri::State<'_, FileSystemManager>,
     path: String,
 ) -> Result<String, FileSystemError> {
-    state.read_file(&path)
-}
-
-#[tauri::command]
-pub fn read_file_base64(
-    state: tauri::State<'_, FileSystemManager>,
-    path: String,
-) -> Result<String, FileSystemError> {
-    state.read_file_base64(&path)
-}
-
-#[tauri::command]
-pub fn write_file(
-    state: tauri::State<'_, FileSystemManager>,
-    path: String,
-    contents: String,
-) -> Result<(), FileSystemError> {
-    state.write_file(&path, &contents)
-}
-
-#[tauri::command]
-pub async fn search_files(
-    state: tauri::State<'_, FileSystemManager>,
-    root_path: String,
-    query: String,
-    search_content: bool,
-) -> Result<Vec<SearchResult>, FileSystemError> {
     let mgr = state.inner().clone();
-    spawn_blocking(move || mgr.search_files(&root_path, &query, search_content))
+    spawn_blocking(move || mgr.read_file(&path)).await.unwrap()
+}
+
+#[tauri::command]
+pub async fn read_file_base64(
+    state: tauri::State<'_, FileSystemManager>,
+    path: String,
+) -> Result<String, FileSystemError> {
+    let mgr = state.inner().clone();
+    spawn_blocking(move || mgr.read_file_base64(&path))
         .await
         .unwrap()
 }
 
 #[tauri::command]
-pub fn rename_entry(
+pub async fn write_file(
+    state: tauri::State<'_, FileSystemManager>,
+    path: String,
+    contents: String,
+) -> Result<(), FileSystemError> {
+    let mgr = state.inner().clone();
+    spawn_blocking(move || mgr.write_file(&path, &contents))
+        .await
+        .unwrap()
+}
+
+#[tauri::command]
+pub async fn search_files(
+    state: tauri::State<'_, FileSystemManager>,
+    generation: tauri::State<'_, SearchGeneration>,
+    root_path: String,
+    query: String,
+    search_content: bool,
+) -> Result<Vec<SearchResult>, FileSystemError> {
+    let mgr = state.inner().clone();
+    let gen = generation.inner().clone();
+    let my_gen = gen.next();
+    spawn_blocking(move || mgr.search_files(&root_path, &query, search_content, &gen, my_gen))
+        .await
+        .unwrap()
+}
+
+#[tauri::command]
+pub async fn rename_entry(
     state: tauri::State<'_, FileSystemManager>,
     old_path: String,
     new_path: String,
 ) -> Result<(), FileSystemError> {
-    state.rename_entry(&old_path, &new_path)
+    let mgr = state.inner().clone();
+    spawn_blocking(move || mgr.rename_entry(&old_path, &new_path))
+        .await
+        .unwrap()
 }
 
 #[tauri::command]
-pub fn delete_file(
+pub async fn delete_file(
     state: tauri::State<'_, FileSystemManager>,
     path: String,
 ) -> Result<(), FileSystemError> {
-    state.delete_file(&path)
+    let mgr = state.inner().clone();
+    spawn_blocking(move || mgr.delete_file(&path))
+        .await
+        .unwrap()
 }
 
 #[tauri::command]
-pub fn delete_directory(
+pub async fn delete_directory(
     state: tauri::State<'_, FileSystemManager>,
     path: String,
 ) -> Result<(), FileSystemError> {
-    state.delete_directory(&path)
+    let mgr = state.inner().clone();
+    spawn_blocking(move || mgr.delete_directory(&path))
+        .await
+        .unwrap()
 }
 
 #[tauri::command]
-pub fn reveal_in_file_manager(path: String) -> Result<(), FileSystemError> {
-    let p = Path::new(&path);
-    if !p.exists() {
-        return Err(FileSystemError::NotFound(path.clone()));
-    }
+pub async fn reveal_in_file_manager(path: String) -> Result<(), FileSystemError> {
+    spawn_blocking(move || {
+        let p = Path::new(&path);
+        if !p.exists() {
+            return Err(FileSystemError::NotFound(path.clone()));
+        }
 
-    #[cfg(target_os = "macos")]
-    {
-        std::process::Command::new("open")
-            .args(["-R", &path])
-            .spawn()
-            .map_err(FileSystemError::Io)?;
-    }
+        #[cfg(target_os = "macos")]
+        {
+            std::process::Command::new("open")
+                .args(["-R", &path])
+                .spawn()
+                .map_err(FileSystemError::Io)?;
+        }
 
-    #[cfg(target_os = "windows")]
-    {
-        std::process::Command::new("explorer")
-            .args(["/select,", &path])
-            .spawn()
-            .map_err(FileSystemError::Io)?;
-    }
+        #[cfg(target_os = "windows")]
+        {
+            std::process::Command::new("explorer")
+                .args(["/select,", &path])
+                .spawn()
+                .map_err(FileSystemError::Io)?;
+        }
 
-    #[cfg(target_os = "linux")]
-    {
-        let parent = p.parent().unwrap_or(p);
-        std::process::Command::new("xdg-open")
-            .arg(parent)
-            .spawn()
-            .map_err(FileSystemError::Io)?;
-    }
+        #[cfg(target_os = "linux")]
+        {
+            let parent = p.parent().unwrap_or(p);
+            std::process::Command::new("xdg-open")
+                .arg(parent)
+                .spawn()
+                .map_err(FileSystemError::Io)?;
+        }
 
-    Ok(())
+        Ok(())
+    })
+    .await
+    .unwrap()
 }
 
 #[tauri::command]
-pub fn copy_entry(
+pub async fn copy_entry(
     state: tauri::State<'_, FileSystemManager>,
     src: String,
     dest: String,
 ) -> Result<(), FileSystemError> {
-    state.copy_entry(&src, &dest)
+    let mgr = state.inner().clone();
+    spawn_blocking(move || mgr.copy_entry(&src, &dest))
+        .await
+        .unwrap()
 }
 
 #[tauri::command]
-pub fn move_entry(
+pub async fn move_entry(
     state: tauri::State<'_, FileSystemManager>,
     src: String,
     dest: String,
 ) -> Result<(), FileSystemError> {
-    state.move_entry(&src, &dest)
+    let mgr = state.inner().clone();
+    spawn_blocking(move || mgr.move_entry(&src, &dest))
+        .await
+        .unwrap()
 }
 
 #[tauri::command]
-pub fn get_clipboard_file_paths() -> Vec<String> {
-    #[cfg(target_os = "macos")]
-    {
-        let script = r#"
+pub async fn get_clipboard_file_paths() -> Vec<String> {
+    spawn_blocking(|| {
+        #[cfg(target_os = "macos")]
+        {
+            let script = r#"
 use framework "AppKit"
 set pb to current application's NSPasteboard's generalPasteboard()
 set urls to pb's readObjectsForClasses:{current application's NSURL} options:(missing value)
@@ -468,25 +529,28 @@ end repeat
 set AppleScript's text item delimiters to linefeed
 return paths as text
 "#;
-        match std::process::Command::new("osascript")
-            .args(["-l", "AppleScript", "-e", script])
-            .output()
-        {
-            Ok(output) => {
-                let stdout = String::from_utf8_lossy(&output.stdout);
-                stdout
-                    .trim()
-                    .lines()
-                    .filter(|l| !l.is_empty())
-                    .map(|l| l.to_string())
-                    .collect()
+            match std::process::Command::new("osascript")
+                .args(["-l", "AppleScript", "-e", script])
+                .output()
+            {
+                Ok(output) => {
+                    let stdout = String::from_utf8_lossy(&output.stdout);
+                    stdout
+                        .trim()
+                        .lines()
+                        .filter(|l| !l.is_empty())
+                        .map(|l| l.to_string())
+                        .collect()
+                }
+                Err(_) => Vec::new(),
             }
-            Err(_) => Vec::new(),
         }
-    }
 
-    #[cfg(not(target_os = "macos"))]
-    {
-        Vec::new()
-    }
+        #[cfg(not(target_os = "macos"))]
+        {
+            Vec::new()
+        }
+    })
+    .await
+    .unwrap()
 }

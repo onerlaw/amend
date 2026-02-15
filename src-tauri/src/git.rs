@@ -267,8 +267,14 @@ fn get_file_diff_sync(repo_path: &str, file_path: &str) -> Result<GitDiff, GitEr
 }
 
 #[tauri::command]
-pub fn list_worktrees(repo_path: String) -> Result<Vec<GitWorktree>, GitError> {
-    let stdout = run_git_command(&repo_path, &["worktree", "list", "--porcelain"])?;
+pub async fn list_worktrees(repo_path: String) -> Result<Vec<GitWorktree>, GitError> {
+    spawn_blocking(move || list_worktrees_sync(&repo_path))
+        .await
+        .unwrap()
+}
+
+fn list_worktrees_sync(repo_path: &str) -> Result<Vec<GitWorktree>, GitError> {
+    let stdout = run_git_command(repo_path, &["worktree", "list", "--porcelain"])?;
     let mut worktrees = Vec::new();
     let mut current_path: Option<String> = None;
     let mut current_branch: Option<String> = None;
@@ -318,7 +324,7 @@ pub fn list_worktrees(repo_path: String) -> Result<Vec<GitWorktree>, GitError> {
 }
 
 #[tauri::command]
-pub fn add_worktree(
+pub async fn add_worktree(
     repo_path: String,
     worktree_path: String,
     branch: Option<String>,
@@ -332,83 +338,103 @@ pub fn add_worktree(
         validate_no_flag(nb, "new branch name")?;
     }
 
-    let mut args = vec!["worktree", "add"];
+    spawn_blocking(move || {
+        let mut args = vec!["worktree", "add"];
 
-    // Build arguments based on options
-    let new_branch_arg;
-    if let Some(ref new_branch_name) = new_branch {
-        args.push("-b");
-        new_branch_arg = new_branch_name.clone();
-        args.push(&new_branch_arg);
-    }
+        // Build arguments based on options
+        let new_branch_arg;
+        if let Some(ref new_branch_name) = new_branch {
+            args.push("-b");
+            new_branch_arg = new_branch_name.clone();
+            args.push(&new_branch_arg);
+        }
 
-    args.push(&worktree_path);
+        args.push(&worktree_path);
 
-    let branch_arg;
-    if let Some(ref branch_name) = branch {
-        branch_arg = branch_name.clone();
-        args.push(&branch_arg);
-    }
+        let branch_arg;
+        if let Some(ref branch_name) = branch {
+            branch_arg = branch_name.clone();
+            args.push(&branch_arg);
+        }
 
-    run_git_command(&repo_path, &args)?;
+        run_git_command(&repo_path, &args)?;
 
-    // Determine the branch name for the result
-    let result_branch = new_branch.or(branch).unwrap_or_else(|| "HEAD".to_string());
+        // Determine the branch name for the result
+        let result_branch = new_branch.or(branch).unwrap_or_else(|| "HEAD".to_string());
 
-    // Convert to absolute path if relative
-    let absolute_path = if Path::new(&worktree_path).is_absolute() {
-        worktree_path
-    } else {
-        Path::new(&repo_path)
-            .join(&worktree_path)
-            .to_string_lossy()
-            .to_string()
-    };
+        // Convert to absolute path if relative
+        let absolute_path = if Path::new(&worktree_path).is_absolute() {
+            worktree_path
+        } else {
+            Path::new(&repo_path)
+                .join(&worktree_path)
+                .to_string_lossy()
+                .to_string()
+        };
 
-    Ok(GitWorktree {
-        path: absolute_path,
-        branch: result_branch,
-        is_main: false,
+        Ok(GitWorktree {
+            path: absolute_path,
+            branch: result_branch,
+            is_main: false,
+        })
     })
+    .await
+    .unwrap()
 }
 
 #[tauri::command]
-pub fn remove_worktree(
+pub async fn remove_worktree(
     repo_path: String,
     worktree_path: String,
     force: bool,
 ) -> Result<(), GitError> {
-    let mut args = vec!["worktree", "remove"];
+    spawn_blocking(move || {
+        let mut args = vec!["worktree", "remove"];
 
-    if force {
-        args.push("--force");
-    }
+        if force {
+            args.push("--force");
+        }
 
-    args.push(&worktree_path);
+        args.push(&worktree_path);
 
-    run_git_command(&repo_path, &args)?;
-    Ok(())
+        run_git_command(&repo_path, &args)?;
+        Ok(())
+    })
+    .await
+    .unwrap()
 }
 
 #[tauri::command]
-pub fn restore_file(repo_path: String, file_path: String) -> Result<(), GitError> {
+pub async fn restore_file(repo_path: String, file_path: String) -> Result<(), GitError> {
     validate_no_flag(&file_path, "file path")?;
-    run_git_command(&repo_path, &["restore", "--", &file_path])?;
-    Ok(())
+    spawn_blocking(move || {
+        run_git_command(&repo_path, &["restore", "--", &file_path])?;
+        Ok(())
+    })
+    .await
+    .unwrap()
 }
 
 #[tauri::command]
-pub fn unstage_file(repo_path: String, file_path: String) -> Result<(), GitError> {
+pub async fn unstage_file(repo_path: String, file_path: String) -> Result<(), GitError> {
     validate_no_flag(&file_path, "file path")?;
-    run_git_command(&repo_path, &["restore", "--staged", "--", &file_path])?;
-    Ok(())
+    spawn_blocking(move || {
+        run_git_command(&repo_path, &["restore", "--staged", "--", &file_path])?;
+        Ok(())
+    })
+    .await
+    .unwrap()
 }
 
 #[tauri::command]
-pub fn stage_file(repo_path: String, file_path: String) -> Result<(), GitError> {
+pub async fn stage_file(repo_path: String, file_path: String) -> Result<(), GitError> {
     validate_no_flag(&file_path, "file path")?;
-    run_git_command(&repo_path, &["add", "--", &file_path])?;
-    Ok(())
+    spawn_blocking(move || {
+        run_git_command(&repo_path, &["add", "--", &file_path])?;
+        Ok(())
+    })
+    .await
+    .unwrap()
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -765,39 +791,43 @@ fn get_branch_file_diff_sync(
 }
 
 #[tauri::command]
-pub fn list_branches(repo_path: String) -> Result<Vec<GitBranch>, GitError> {
-    // Get local branches
-    let stdout = run_git_command(&repo_path, &["branch", "--format=%(refname:short)|%(HEAD)"])?;
+pub async fn list_branches(repo_path: String) -> Result<Vec<GitBranch>, GitError> {
+    spawn_blocking(move || {
+        // Get local branches
+        let stdout = run_git_command(&repo_path, &["branch", "--format=%(refname:short)|%(HEAD)"])?;
 
-    let mut branches: Vec<GitBranch> = stdout
-        .lines()
-        .filter(|line| !line.is_empty())
-        .map(|line| {
-            let parts: Vec<&str> = line.split('|').collect();
-            let name = parts.first().unwrap_or(&"").to_string();
-            let is_current = parts.get(1).map(|s| *s == "*").unwrap_or(false);
-            GitBranch {
-                name,
-                is_remote: false,
-                is_current,
-            }
-        })
-        .collect();
+        let mut branches: Vec<GitBranch> = stdout
+            .lines()
+            .filter(|line| !line.is_empty())
+            .map(|line| {
+                let parts: Vec<&str> = line.split('|').collect();
+                let name = parts.first().unwrap_or(&"").to_string();
+                let is_current = parts.get(1).map(|s| *s == "*").unwrap_or(false);
+                GitBranch {
+                    name,
+                    is_remote: false,
+                    is_current,
+                }
+            })
+            .collect();
 
-    // Get remote branches
-    if let Ok(remote_stdout) =
-        run_git_command(&repo_path, &["branch", "-r", "--format=%(refname:short)"])
-    {
-        for line in remote_stdout.lines() {
-            if !line.is_empty() && !line.contains("HEAD") {
-                branches.push(GitBranch {
-                    name: line.to_string(),
-                    is_remote: true,
-                    is_current: false,
-                });
+        // Get remote branches
+        if let Ok(remote_stdout) =
+            run_git_command(&repo_path, &["branch", "-r", "--format=%(refname:short)"])
+        {
+            for line in remote_stdout.lines() {
+                if !line.is_empty() && !line.contains("HEAD") {
+                    branches.push(GitBranch {
+                        name: line.to_string(),
+                        is_remote: true,
+                        is_current: false,
+                    });
+                }
             }
         }
-    }
 
-    Ok(branches)
+        Ok(branches)
+    })
+    .await
+    .unwrap()
 }

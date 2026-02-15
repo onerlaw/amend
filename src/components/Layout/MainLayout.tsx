@@ -1,21 +1,19 @@
-import { useEffect, useCallback, useState, useRef, lazy, Suspense } from 'react';
+import { useEffect, useState, useRef, lazy, Suspense } from 'react';
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 import { useUIStore } from '@/stores/uiStore';
 import { useTerminalStore } from '@/stores/terminalStore';
 import { useFileStore } from '@/stores/fileStore';
 import { useProjectStore } from '@/stores/projectStore';
-import { useCloseTerminal } from '@/hooks/useTerminal';
 import { useGitPolling } from '@/hooks/useGit';
 import { useTheme } from '@/hooks/useTheme';
+import { useCommands } from '@/hooks/useCommands';
 import { TerminalTabs, TerminalTabsHandle } from '@/components/Terminal/TerminalTabs';
 import { DiffViewerProvider } from '@/components/DiffViewer/DiffViewerContext';
 import type { BrowseEditorTabsHandle } from '@/components/FileBrowser/BrowseEditorTabs';
 import { GlobalSearch } from '@/components/GlobalSearch/GlobalSearch';
 import { ModalOverlay } from '@/components/ModalOverlay';
-import { indexProject, copyEntry, moveEntry, getClipboardFilePaths } from '@/lib/tauri';
+import { indexProject } from '@/lib/tauri';
 import { formatShortcut } from '@/lib/fileUtils';
-import { useContextMenuStore } from '@/stores/contextMenuStore';
-import { dispatchFileTreeRefresh } from '@/stores/contextMenuStore';
 import {
   PlusIcon,
   CloseIcon,
@@ -68,6 +66,43 @@ function ThemeToggle() {
   );
 }
 
+function ShortcutsModal({ onClose }: { onClose: () => void }) {
+  return (
+    <ModalOverlay onClose={onClose}>
+      <div className="w-80 rounded-xl bg-surface-2 p-4 shadow-xl">
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-primary">Keyboard Shortcuts</h2>
+          <button onClick={onClose} className="rounded-md p-1 text-secondary hover:bg-surface-3">
+            <CloseIcon className="h-4 w-4" />
+          </button>
+        </div>
+        <div className="space-y-2 text-xs">
+          {[
+            ['New Terminal', `${formatShortcut('Mod+T')} / ${formatShortcut('Mod+O')}`],
+            ['Duplicate Terminal', formatShortcut('Mod+D')],
+            ['Cycle Terminals', formatShortcut('Mod+`')],
+            ['Close Tab', formatShortcut('Mod+W')],
+            ['Search', `${formatShortcut('Mod+P')} / ${formatShortcut('Mod+Shift+F')}`],
+            ['Find in File', formatShortcut('Mod+F')],
+            ['Paste Files', formatShortcut('Mod+V')],
+            ['Toggle Notes', formatShortcut('Mod+Shift+N')],
+            ['Increase Font Size', formatShortcut('Mod+=')],
+            ['Decrease Font Size', formatShortcut('Mod+-')],
+            ['Reset Font Size', formatShortcut('Mod+0')],
+          ].map(([label, keys]) => (
+            <div key={label} className="flex items-center justify-between py-1">
+              <span className="text-primary">{label}</span>
+              <kbd className="rounded-md bg-surface-1 px-2 py-0.5 font-mono text-secondary">
+                {keys}
+              </kbd>
+            </div>
+          ))}
+        </div>
+      </div>
+    </ModalOverlay>
+  );
+}
+
 export function MainLayout() {
   const {
     panelMode,
@@ -78,24 +113,19 @@ export function MainLayout() {
     toggleDiffFileList,
   } = useUIStore();
   const { isOpen: notesOpen, toggleNotes } = useNotesStore();
-  const {
-    currentDirectory,
-    browseOpenFiles,
-    browseActiveFilePath,
-    closeBrowseFile,
-    setActiveWorktreePath,
-    syncTabContext,
-    contextPath,
-  } = useFileStore();
+  const { currentDirectory, browseOpenFiles, setActiveWorktreePath, syncTabContext, contextPath } =
+    useFileStore();
   const { projects, addProject, setActiveProject } = useProjectStore();
-  const { tabs, activeTabId, setActiveTab } = useTerminalStore();
-  const closeTerminal = useCloseTerminal();
+  const { tabs, activeTabId } = useTerminalStore();
   const [showShortcuts, setShowShortcuts] = useState(false);
   const terminalTabsRef = useRef<TerminalTabsHandle>(null);
   const browseEditorTabsRef = useRef<BrowseEditorTabsHandle>(null);
   const migrationDone = useRef(false);
   const gitPolling = useGitPolling(contextPath);
   const diffStats = gitPolling.diffStats;
+
+  // Centralized keyboard shortcuts
+  useCommands({ terminalTabsRef, browseEditorTabsRef });
 
   // Migration: if currentDirectory exists but no projects, auto-create one
   useEffect(() => {
@@ -134,163 +164,6 @@ export function MainLayout() {
       setActiveWorktreePath(activeTab.worktreePath);
     }
   }, [activeTabId, tabs, setActiveWorktreePath, projects, setActiveProject, syncTabContext]);
-
-  // Keyboard shortcuts
-  const handleKeyDown = useCallback(
-    (e: KeyboardEvent) => {
-      // Cmd/Ctrl + O or Cmd/Ctrl + T: Open new terminal flow (project picker -> worktree selector)
-      if ((e.metaKey || e.ctrlKey) && (e.key === 'o' || e.key === 't')) {
-        e.preventDefault();
-        terminalTabsRef.current?.openNewTerminal();
-      }
-
-      // Cmd/Ctrl + `: Cycle terminals
-      if ((e.metaKey || e.ctrlKey) && e.key === '`') {
-        e.preventDefault();
-        if (tabs.length > 1 && activeTabId) {
-          const currentIndex = tabs.findIndex((t) => t.id === activeTabId);
-          const nextIndex = (currentIndex + 1) % tabs.length;
-          setActiveTab(tabs[nextIndex].id);
-        }
-      }
-
-      // Cmd/Ctrl + D: Duplicate current terminal
-      if ((e.metaKey || e.ctrlKey) && e.key === 'd') {
-        e.preventDefault();
-        terminalTabsRef.current?.duplicateTerminal();
-      }
-
-      // Cmd/Ctrl + F (without Shift): Find in file (browse mode)
-      if ((e.metaKey || e.ctrlKey) && e.key === 'f' && !e.shiftKey) {
-        if (panelMode === 'browse' && browseActiveFilePath) {
-          e.preventDefault();
-          browseEditorTabsRef.current?.openSearch();
-        }
-      }
-
-      // Cmd/Ctrl + V: Paste files into file browser
-      if ((e.metaKey || e.ctrlKey) && e.key === 'v') {
-        const { focusedPanel } = useUIStore.getState();
-        if (panelMode === 'browse' && focusedPanel === 'file-list' && contextPath) {
-          e.preventDefault();
-
-          const { clipboard, clearClipboard } = useContextMenuStore.getState();
-
-          // Priority 1: internal clipboard (cut/copy from context menu)
-          if (clipboard.entry && clipboard.operation) {
-            const destPath = `${contextPath}/${clipboard.entry.name}`;
-            (async () => {
-              try {
-                if (clipboard.operation === 'cut') {
-                  await moveEntry(clipboard.entry!.path, destPath);
-                } else {
-                  await copyEntry(clipboard.entry!.path, destPath);
-                }
-                clearClipboard();
-                dispatchFileTreeRefresh();
-              } catch (err) {
-                console.error('Failed to paste file:', err);
-              }
-            })();
-            return;
-          }
-
-          // Priority 2: OS clipboard file paths
-          (async () => {
-            try {
-              const paths = await getClipboardFilePaths();
-              if (paths.length === 0) return;
-
-              for (const srcPath of paths) {
-                const fileName = srcPath.split('/').pop() || 'file';
-                let destPath = `${contextPath}/${fileName}`;
-
-                // Collision handling: name (1).ext, name (2).ext, etc.
-                let counter = 1;
-                const dot = fileName.lastIndexOf('.');
-                const baseName = dot > 0 ? fileName.slice(0, dot) : fileName;
-                const ext = dot > 0 ? fileName.slice(dot) : '';
-
-                while (true) {
-                  try {
-                    // Check if file exists by trying to get metadata via a readDirectory of parent
-                    // Use a simpler approach: try the copy and handle error
-                    await copyEntry(srcPath, destPath);
-                    break;
-                  } catch {
-                    // Likely collision, try next name
-                    destPath = `${contextPath}/${baseName} (${counter})${ext}`;
-                    counter++;
-                    if (counter > 100) break;
-                  }
-                }
-              }
-              dispatchFileTreeRefresh();
-            } catch (err) {
-              console.error('Failed to paste files from clipboard:', err);
-            }
-          })();
-        }
-      }
-
-      // Cmd/Ctrl + Shift + N: Toggle notes panel
-      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'N') {
-        e.preventDefault();
-        useNotesStore.getState().toggleNotes();
-      }
-
-      // Cmd/Ctrl + = or +: Increase font size
-      if ((e.metaKey || e.ctrlKey) && (e.key === '=' || e.key === '+')) {
-        e.preventDefault();
-        useUIStore.getState().increaseFontSize();
-      }
-
-      // Cmd/Ctrl + -: Decrease font size
-      if ((e.metaKey || e.ctrlKey) && e.key === '-') {
-        e.preventDefault();
-        useUIStore.getState().decreaseFontSize();
-      }
-
-      // Cmd/Ctrl + 0: Reset font size
-      if ((e.metaKey || e.ctrlKey) && e.key === '0') {
-        e.preventDefault();
-        useUIStore.getState().resetFontSize();
-      }
-
-      // Cmd/Ctrl + W: Close current tab
-      if ((e.metaKey || e.ctrlKey) && e.key === 'w') {
-        e.preventDefault();
-
-        const { focusedPanel } = useUIStore.getState();
-
-        if (focusedPanel === 'terminal') {
-          // Don't close if it's the last terminal
-          if (tabs.length > 1 && activeTabId) {
-            closeTerminal(activeTabId);
-          }
-        } else if (focusedPanel === 'editor') {
-          if (panelMode === 'browse' && browseActiveFilePath) {
-            closeBrowseFile(browseActiveFilePath);
-          }
-          // Note: Diff mode files are not closable via this shortcut (they're auto-loaded)
-        }
-      }
-    },
-    [
-      tabs,
-      activeTabId,
-      setActiveTab,
-      closeTerminal,
-      panelMode,
-      browseActiveFilePath,
-      closeBrowseFile,
-    ]
-  );
-
-  useEffect(() => {
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleKeyDown]);
 
   return (
     <div className="flex h-screen flex-col bg-surface-0">
@@ -438,89 +311,7 @@ export function MainLayout() {
       </div>
 
       {/* Keyboard Shortcuts Modal */}
-      {showShortcuts && (
-        <ModalOverlay onClose={() => setShowShortcuts(false)}>
-          <div className="w-80 rounded-xl bg-surface-2 p-4 shadow-xl">
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-primary">Keyboard Shortcuts</h2>
-              <button
-                onClick={() => setShowShortcuts(false)}
-                className="rounded-md p-1 text-secondary hover:bg-surface-3"
-              >
-                <CloseIcon className="h-4 w-4" />
-              </button>
-            </div>
-            <div className="space-y-2 text-xs">
-              <div className="flex items-center justify-between py-1">
-                <span className="text-primary">New Terminal</span>
-                <kbd className="rounded-md bg-surface-1 px-2 py-0.5 font-mono text-secondary">
-                  {formatShortcut('Mod+T')} / {formatShortcut('Mod+O')}
-                </kbd>
-              </div>
-              <div className="flex items-center justify-between py-1">
-                <span className="text-primary">Duplicate Terminal</span>
-                <kbd className="rounded-md bg-surface-1 px-2 py-0.5 font-mono text-secondary">
-                  {formatShortcut('Mod+D')}
-                </kbd>
-              </div>
-              <div className="flex items-center justify-between py-1">
-                <span className="text-primary">Cycle Terminals</span>
-                <kbd className="rounded-md bg-surface-1 px-2 py-0.5 font-mono text-secondary">
-                  {formatShortcut('Mod+`')}
-                </kbd>
-              </div>
-              <div className="flex items-center justify-between py-1">
-                <span className="text-primary">Close Tab</span>
-                <kbd className="rounded-md bg-surface-1 px-2 py-0.5 font-mono text-secondary">
-                  {formatShortcut('Mod+W')}
-                </kbd>
-              </div>
-              <div className="flex items-center justify-between py-1">
-                <span className="text-primary">Search</span>
-                <kbd className="rounded-md bg-surface-1 px-2 py-0.5 font-mono text-secondary">
-                  {formatShortcut('Mod+P')} / {formatShortcut('Mod+Shift+F')}
-                </kbd>
-              </div>
-              <div className="flex items-center justify-between py-1">
-                <span className="text-primary">Find in File</span>
-                <kbd className="rounded-md bg-surface-1 px-2 py-0.5 font-mono text-secondary">
-                  {formatShortcut('Mod+F')}
-                </kbd>
-              </div>
-              <div className="flex items-center justify-between py-1">
-                <span className="text-primary">Paste Files</span>
-                <kbd className="rounded-md bg-surface-1 px-2 py-0.5 font-mono text-secondary">
-                  {formatShortcut('Mod+V')}
-                </kbd>
-              </div>
-              <div className="flex items-center justify-between py-1">
-                <span className="text-primary">Toggle Notes</span>
-                <kbd className="rounded-md bg-surface-1 px-2 py-0.5 font-mono text-secondary">
-                  {formatShortcut('Mod+Shift+N')}
-                </kbd>
-              </div>
-              <div className="flex items-center justify-between py-1">
-                <span className="text-primary">Increase Font Size</span>
-                <kbd className="rounded-md bg-surface-1 px-2 py-0.5 font-mono text-secondary">
-                  {formatShortcut('Mod+=')}
-                </kbd>
-              </div>
-              <div className="flex items-center justify-between py-1">
-                <span className="text-primary">Decrease Font Size</span>
-                <kbd className="rounded-md bg-surface-1 px-2 py-0.5 font-mono text-secondary">
-                  {formatShortcut('Mod+-')}
-                </kbd>
-              </div>
-              <div className="flex items-center justify-between py-1">
-                <span className="text-primary">Reset Font Size</span>
-                <kbd className="rounded-md bg-surface-1 px-2 py-0.5 font-mono text-secondary">
-                  {formatShortcut('Mod+0')}
-                </kbd>
-              </div>
-            </div>
-          </div>
-        </ModalOverlay>
-      )}
+      {showShortcuts && <ShortcutsModal onClose={() => setShowShortcuts(false)} />}
 
       {/* Floating Notes Panel */}
       <Suspense fallback={null}>
