@@ -199,6 +199,15 @@ export function useTerminal(containerId: string | null) {
       terminalRef.current = terminal;
       fitAddonRef.current = fitAddon;
 
+      // Handle Cmd/Ctrl+K to clear terminal
+      terminal.attachCustomKeyEventHandler((e) => {
+        if ((e.metaKey || e.ctrlKey) && e.key === 'k' && e.type === 'keydown') {
+          terminal.clear();
+          return false;
+        }
+        return true;
+      });
+
       // Set up input handler
       terminal.onData((data) => {
         writeToTerminal(containerId, data).catch(console.error);
@@ -233,11 +242,12 @@ export function useTerminal(containerId: string | null) {
         try {
           const url = new URL(data);
           const cwd = decodeURIComponent(url.pathname);
+          console.log('[CWD] OSC 7 received:', { raw: data, parsed: cwd, tabId: containerId });
           if (cwd) {
             useTerminalStore.getState().updateTabCwd(containerId, cwd);
           }
-        } catch {
-          // Ignore malformed OSC 7 data
+        } catch (e) {
+          console.warn('[CWD] OSC 7 parse failed:', { raw: data, error: e });
         }
         return true;
       });
