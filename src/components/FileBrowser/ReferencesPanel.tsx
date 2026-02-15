@@ -12,17 +12,23 @@ interface ReferencesByFile {
 }
 
 export function ReferencesPanel() {
-  const { referencesSymbol, hideReferencesPanel, currentDirectory, openBrowseFileAtLine } =
-    useFileStore();
+  const {
+    referencesSymbol,
+    hideReferencesPanel,
+    contextPath,
+    currentDirectory,
+    openBrowseFileAtLine,
+  } = useFileStore();
   const [results, setResults] = useState<ReferencesByFile[]>([]);
   const [loading, setLoading] = useState(true);
   const [totalCount, setTotalCount] = useState(0);
 
   useEffect(() => {
-    if (!referencesSymbol || !currentDirectory) return;
+    const rootPath = contextPath || currentDirectory;
+    if (!referencesSymbol || !rootPath) return;
 
     setLoading(true);
-    findReferences(referencesSymbol, currentDirectory)
+    findReferences(referencesSymbol, rootPath)
       .then((refs) => {
         setTotalCount(refs.length);
 
@@ -36,8 +42,8 @@ export function ReferencesPanel() {
 
         const grouped: ReferencesByFile[] = [];
         for (const [filePath, fileRefs] of byFile) {
-          const relativePath = filePath.startsWith(currentDirectory)
-            ? filePath.slice(currentDirectory.length + 1)
+          const relativePath = filePath.startsWith(rootPath)
+            ? filePath.slice(rootPath.length + 1)
             : filePath;
           grouped.push({ filePath, relativePath, refs: fileRefs });
         }
@@ -52,7 +58,7 @@ export function ReferencesPanel() {
         setTotalCount(0);
       })
       .finally(() => setLoading(false));
-  }, [referencesSymbol, currentDirectory]);
+  }, [referencesSymbol, contextPath, currentDirectory]);
 
   if (!referencesSymbol) return null;
 

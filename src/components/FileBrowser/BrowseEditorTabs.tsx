@@ -65,7 +65,7 @@ export const BrowseEditorTabs = forwardRef<BrowseEditorTabsHandle>(
       if (!activeFile?.path) return [];
 
       const currentFilePath = activeFile.path;
-      const projectRoot = currentDirectory || '';
+      const projectRoot = contextPath || currentDirectory || '';
 
       return [
         goToDefinitionExtension({
@@ -81,7 +81,13 @@ export const BrowseEditorTabs = forwardRef<BrowseEditorTabsHandle>(
         symbolHoverTooltip({ currentFilePath }),
         cmdHeldCursorExtension(),
       ];
-    }, [activeFile?.path, openBrowseFileAtLine, currentDirectory, showReferencesPanel]);
+    }, [
+      activeFile?.path,
+      openBrowseFileAtLine,
+      contextPath,
+      currentDirectory,
+      showReferencesPanel,
+    ]);
 
     // Consume pending scroll-to-line state
     useEffect(() => {
