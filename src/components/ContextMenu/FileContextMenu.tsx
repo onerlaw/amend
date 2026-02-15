@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState, useEffect, useRef } from 'react';
 import { ContextMenu, ContextMenuItem } from './ContextMenu';
-import { useContextMenuStore, dispatchFileTreeRefresh } from '@/stores/contextMenuStore';
+import { useContextMenuStore } from '@/stores/contextMenuStore';
 import { useFileStore } from '@/stores/fileStore';
 import { ModalOverlay } from '@/components/ModalOverlay';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
@@ -49,7 +49,7 @@ function RenameDialog() {
 
     try {
       await renameEntry(renameTarget.path, newPath);
-      dispatchFileTreeRefresh();
+      useFileStore.getState().invalidateFileTree();
     } catch (error) {
       console.error('Failed to rename:', error);
     }
@@ -109,7 +109,7 @@ function ConfirmDeleteDialog() {
       } else {
         await deleteFile(deleteTarget.path);
       }
-      dispatchFileTreeRefresh();
+      useFileStore.getState().invalidateFileTree();
     } catch (error) {
       console.error('Failed to delete:', error);
     }
@@ -178,7 +178,7 @@ export function FileContextMenu() {
         await copyEntry(clipboard.entry.path, destPath);
       }
       clearClipboard();
-      dispatchFileTreeRefresh();
+      useFileStore.getState().invalidateFileTree();
     } catch (error) {
       console.error('Failed to paste:', error);
     }

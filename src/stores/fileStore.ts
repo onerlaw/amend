@@ -95,6 +95,9 @@ interface FileState {
   clearPendingScrollToLine: () => void;
   openBrowseFileAtLine: (file: OpenFile, line: number) => void;
   reorderBrowseFiles: (fromIndex: number, toIndex: number) => void;
+  // File tree invalidation (replaces window event bus)
+  fileTreeVersion: number;
+  invalidateFileTree: () => void;
   // Find references panel
   referencesSymbol: string | null;
   showReferencesPanel: (symbol: string) => void;
@@ -189,6 +192,9 @@ export const useFileStore = create<FileState>()(
       reorderBrowseFiles: (fromIndex: number, toIndex: number) => {
         set({ browseOpenFiles: reorderArray(get().browseOpenFiles, fromIndex, toIndex) });
       },
+      // File tree invalidation (replaces window event bus)
+      fileTreeVersion: 0,
+      invalidateFileTree: () => set((s) => ({ fileTreeVersion: s.fileTreeVersion + 1 })),
       // Find references panel
       referencesSymbol: null,
       showReferencesPanel: (symbol: string) => set({ referencesSymbol: symbol }),

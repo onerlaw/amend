@@ -10,7 +10,6 @@ import {
   FileEntry,
 } from '@/lib/tauri';
 import { openFileInBrowseMode } from '@/lib/fileUtils';
-import { dispatchFileTreeRefresh } from '@/stores/contextMenuStore';
 
 const AUTO_SAVE_DELAY = 1000;
 
@@ -26,7 +25,9 @@ export function useFileBrowserState() {
     updateBrowseFileContent,
     markBrowseFileSaved,
     refreshBrowseFileContent,
+    invalidateFileTree,
   } = useFileStore();
+  const fileTreeVersion = useFileStore((s) => s.fileTreeVersion);
 
   const [entries, setEntries] = useState<FileEntry[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -59,9 +60,9 @@ export function useFileBrowserState() {
 
   // Refresh file tree when file operations occur (rename, delete, paste)
   useEffect(() => {
-    window.addEventListener('file-tree-refresh', loadDirectory);
-    return () => window.removeEventListener('file-tree-refresh', loadDirectory);
-  }, [loadDirectory]);
+    if (fileTreeVersion === 0) return;
+    loadDirectory();
+  }, [fileTreeVersion, loadDirectory]);
 
   // File system watcher: auto-refresh on external changes
   const fsDebounceTimer = useRef<NodeJS.Timeout | null>(null);
@@ -86,7 +87,7 @@ export function useFileBrowserState() {
       }
       fsDebounceTimer.current = setTimeout(() => {
         fsDebounceTimer.current = null;
-        window.dispatchEvent(new Event('file-tree-refresh'));
+        useFileStore.getState().invalidateFileTree();
 
         // Re-read each open non-image file's content from disk
         const openFiles = useFileStore.getState().browseOpenFiles;
@@ -207,7 +208,7 @@ export function useFileBrowserState() {
     handleSelectFile,
     handleCloseFile,
     handleContentChange,
-    handleRefresh: dispatchFileTreeRefresh,
+    handleRefresh: invalidateFileTree,
     setBrowseActiveFile,
     getSaveStatus,
   };

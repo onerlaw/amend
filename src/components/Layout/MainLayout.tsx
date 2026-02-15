@@ -14,7 +14,6 @@ import { GlobalSearch } from '@/components/GlobalSearch/GlobalSearch';
 import { ModalOverlay } from '@/components/ModalOverlay';
 import { indexProject, copyEntry, moveEntry, getClipboardFilePaths } from '@/lib/tauri';
 import { useContextMenuStore } from '@/stores/contextMenuStore';
-import { dispatchFileTreeRefresh } from '@/stores/contextMenuStore';
 import {
   PlusIcon,
   CloseIcon,
@@ -186,7 +185,7 @@ export function MainLayout() {
                   await copyEntry(clipboard.entry!.path, destPath);
                 }
                 clearClipboard();
-                dispatchFileTreeRefresh();
+                useFileStore.getState().invalidateFileTree();
               } catch (err) {
                 console.error('Failed to paste file:', err);
               }
@@ -224,7 +223,7 @@ export function MainLayout() {
                   }
                 }
               }
-              dispatchFileTreeRefresh();
+              useFileStore.getState().invalidateFileTree();
             } catch (err) {
               console.error('Failed to paste files from clipboard:', err);
             }
