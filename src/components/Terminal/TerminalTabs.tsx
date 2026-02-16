@@ -3,7 +3,7 @@ import { open } from '@tauri-apps/plugin-dialog';
 import { homeDir } from '@tauri-apps/api/path';
 import { useTerminalStore, TerminalTab } from '@/stores/terminalStore';
 import { useUIStore } from '@/stores/uiStore';
-import { useCreateTerminal, useCloseTerminal } from '@/hooks/useTerminal';
+import { useCreateTerminal, useCloseTerminal } from '@/hooks/useTerminalLifecycle';
 import { TerminalPane } from './TerminalPane';
 import { CloseIcon, FolderIcon } from '@/components/Icons';
 import { getFileName, formatShortcut } from '@/lib/fileUtils';

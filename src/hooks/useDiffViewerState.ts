@@ -4,6 +4,7 @@ import { useUIStore } from '@/stores/uiStore';
 import { useMultiFileDiff } from '@/hooks/useMultiFileDiff';
 import { useBranchDiff } from '@/hooks/useBranchDiff';
 import { openFileInBrowseMode, getFileName } from '@/lib/fileUtils';
+import { join } from '@/lib/pathUtils';
 import { GitPollingResult } from '@/hooks/useGit';
 
 export interface FileWithCategory {
@@ -54,6 +55,7 @@ export function useDiffViewerState(gitPolling: GitPollingResult, enabled: boolea
 
   const allFiles = diffMode === 'branch' ? branchFiles : workingFiles;
   const diffs = diffMode === 'branch' ? branchDiff.diffs : workingDiffs;
+  const activeLoadDiff = diffMode === 'branch' ? branchDiff.loadDiff : loadDiff;
 
   // Reset when context path changes (must run before loadDiff to avoid race)
   useEffect(() => {
@@ -88,12 +90,12 @@ export function useDiffViewerState(gitPolling: GitPollingResult, enabled: boolea
       refresh();
       clearWorkingDiffs();
     }
-  }, [diffMode, refresh, clearWorkingDiffs, branchDiff.refresh]);
+  }, [diffMode, refresh, clearWorkingDiffs, branchDiff]);
 
   const handleEditFile = useCallback(
     async (filePath: string) => {
       if (!contextPath) return;
-      const fullPath = `${contextPath}/${filePath}`;
+      const fullPath = join(contextPath, filePath);
       const displayName = getFileName(filePath);
 
       try {
@@ -113,12 +115,10 @@ export function useDiffViewerState(gitPolling: GitPollingResult, enabled: boolea
         toggleDiffFileCollapse(path);
       }
       // Eagerly start loading the diff so it's ready when scrolled into view
-      if (diffMode === 'working') {
-        loadDiff(path);
-      }
+      activeLoadDiff(path);
       setScrollTargetFile(path);
     },
-    [collapsedDiffFiles, toggleDiffFileCollapse, setScrollTargetFile, diffMode, loadDiff]
+    [collapsedDiffFiles, toggleDiffFileCollapse, setScrollTargetFile, activeLoadDiff]
   );
 
   return {
@@ -127,7 +127,7 @@ export function useDiffViewerState(gitPolling: GitPollingResult, enabled: boolea
     statusLoading,
     allFiles,
     diffs,
-    loadDiff,
+    loadDiff: activeLoadDiff,
     collapsedDiffFiles,
     scrollContainerRef,
     toggleDiffFileCollapse,

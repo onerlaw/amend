@@ -143,9 +143,6 @@ const LazyDiffFileSection = memo(function LazyDiffFileSection({
     const el = sentinelRef.current;
     if (!el || !scrollRoot) return;
 
-    // Branch diffs are loaded in bulk by useBranchDiff; skip lazy loading
-    if (category === 'branch') return;
-
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries[0]?.isIntersecting) {
@@ -168,7 +165,7 @@ const LazyDiffFileSection = memo(function LazyDiffFileSection({
         newContent={diffData?.newContent ?? ''}
         isBinary={diffData?.isBinary ?? false}
         isCollapsed={isCollapsed}
-        isLoading={diffData?.isLoading ?? category !== 'branch'}
+        isLoading={diffData?.isLoading ?? true}
         error={diffData?.error ?? null}
         onToggleCollapse={onToggleCollapse}
         onEditFile={onEditFile}

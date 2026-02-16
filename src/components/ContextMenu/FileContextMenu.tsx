@@ -5,6 +5,7 @@ import { useFileStore } from '@/stores/fileStore';
 import { ModalOverlay } from '@/components/ModalOverlay';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { revealLabel } from '@/lib/fileUtils';
+import { dirname, join } from '@/lib/pathUtils';
 import {
   renameEntry,
   deleteFile,
@@ -44,8 +45,7 @@ function RenameDialog() {
       return;
     }
 
-    const parentPath = renameTarget.path.substring(0, renameTarget.path.lastIndexOf('/'));
-    const newPath = `${parentPath}/${name}`;
+    const newPath = join(dirname(renameTarget.path), name);
 
     try {
       await renameEntry(renameTarget.path, newPath);
@@ -166,10 +166,8 @@ export function FileContextMenu() {
   const handlePaste = useCallback(async () => {
     if (!targetEntry || !clipboard.entry || !clipboard.operation) return;
 
-    const destDir = targetEntry.isDirectory
-      ? targetEntry.path
-      : targetEntry.path.substring(0, targetEntry.path.lastIndexOf('/'));
-    const destPath = `${destDir}/${clipboard.entry.name}`;
+    const destDir = targetEntry.isDirectory ? targetEntry.path : dirname(targetEntry.path);
+    const destPath = join(destDir, clipboard.entry.name);
 
     try {
       if (clipboard.operation === 'cut') {

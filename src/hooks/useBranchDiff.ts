@@ -21,7 +21,8 @@ export function useBranchDiff(repoPath: string | null, baseRef: string | null) {
     [repoPath]
   );
 
-  const { diffs, enqueueBatch, clear: clearQueue } = useDiffQueue(fetchDiff);
+  const BRANCH_CONCURRENCY = 5;
+  const { diffs, enqueue, clear: clearQueue } = useDiffQueue(fetchDiff, BRANCH_CONCURRENCY);
 
   const clearDiffs = useCallback(() => {
     clearQueue();
@@ -55,9 +56,6 @@ export function useBranchDiff(repoPath: string | null, baseRef: string | null) {
       setDiffStats(summary.diffStats);
       setMergeBase(summary.mergeBase);
       mergeBaseRef.current = summary.mergeBase;
-
-      // Queue all file diffs
-      enqueueBatch(summary.files.map((f) => f.path));
     } catch (err) {
       // Discard error if generation changed while awaiting
       if (loadGenerationRef.current !== generation) return;
@@ -68,7 +66,7 @@ export function useBranchDiff(repoPath: string | null, baseRef: string | null) {
         setIsLoading(false);
       }
     }
-  }, [repoPath, baseRef, clearQueue, enqueueBatch]);
+  }, [repoPath, baseRef, clearQueue]);
 
   // Load when repoPath or baseRef changes
   useEffect(() => {
@@ -79,5 +77,15 @@ export function useBranchDiff(repoPath: string | null, baseRef: string | null) {
     }
   }, [repoPath, baseRef, load, clearDiffs]);
 
-  return { files, diffStats, diffs, mergeBase, isLoading, error, refresh: load, clearDiffs };
+  return {
+    files,
+    diffStats,
+    diffs,
+    mergeBase,
+    isLoading,
+    error,
+    refresh: load,
+    clearDiffs,
+    loadDiff: enqueue,
+  };
 }

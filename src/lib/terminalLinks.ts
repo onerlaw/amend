@@ -3,6 +3,7 @@ import { openFileInBrowseMode } from '@/lib/fileUtils';
 import { useFileStore, OpenFile } from '@/stores/fileStore';
 import { readFile } from '@/lib/tauri';
 import { getLanguageFromPath } from '@/lib/highlight';
+import { normalize, join, basename } from '@/lib/pathUtils';
 
 // Known code/config file extensions for matching bare filenames (without /)
 const KNOWN_EXTENSIONS = new Set([
@@ -70,19 +71,6 @@ const FILE_PATH_REGEX =
 function getExtension(path: string): string {
   const dot = path.lastIndexOf('.');
   return dot >= 0 ? path.slice(dot + 1).toLowerCase() : '';
-}
-
-function normalizePath(path: string): string {
-  const parts = path.split('/');
-  const normalized: string[] = [];
-  for (const part of parts) {
-    if (part === '..') {
-      normalized.pop();
-    } else if (part !== '.' && part !== '') {
-      normalized.push(part);
-    }
-  }
-  return '/' + normalized.join('/');
 }
 
 /**
@@ -157,19 +145,17 @@ export class FileLinkProvider implements ILinkProvider {
 
     let fullPath: string;
     if (filePath.startsWith('/')) {
-      fullPath = filePath;
+      fullPath = normalize(filePath);
     } else if (workDir) {
-      fullPath = `${workDir}/${filePath}`;
+      fullPath = join(workDir, filePath);
     } else {
       return;
     }
 
-    fullPath = normalizePath(fullPath);
-
     try {
       if (line !== undefined) {
         const content = await readFile(fullPath);
-        const name = fullPath.split('/').pop() || fullPath;
+        const name = basename(fullPath) || fullPath;
         const language = getLanguageFromPath(fullPath) || '';
         const file: OpenFile = { path: fullPath, name, content, isDirty: false, language };
         useFileStore.getState().openBrowseFileAtLine(file, line);

@@ -20,6 +20,8 @@ pub enum FileSystemError {
     InvalidPath(String),
     #[error("Search cancelled")]
     SearchCancelled,
+    #[error("Task failed: {0}")]
+    TaskJoin(String),
 }
 
 impl_serialize_as_string!(FileSystemError);
@@ -57,6 +59,42 @@ fn validate_path(path: &str) -> Result<PathBuf, FileSystemError> {
         if let std::path::Component::ParentDir = component {
             return Err(FileSystemError::InvalidPath(format!(
                 "path must not contain '..': {}",
+                path
+            )));
+        }
+    }
+    Ok(p)
+}
+
+/// Sensitive system directories that must never be targets of mutation operations.
+const SENSITIVE_PREFIXES: &[&str] = &[
+    "/etc",
+    "/System",
+    "/usr",
+    "/bin",
+    "/sbin",
+    "/Library",
+    "/var",
+    "/private/etc",
+    "/private/var",
+    // Windows paths (for cross-platform safety)
+    "C:\\Windows",
+    "C:\\Program Files",
+    "C:\\Program Files (x86)",
+];
+
+/// Validate a path for mutation operations (write, delete, copy, move, rename).
+/// Rejects paths inside sensitive system directories in addition to the base checks.
+fn validate_mutation_path(path: &str) -> Result<PathBuf, FileSystemError> {
+    let p = validate_path(path)?;
+    let path_str = p.to_string_lossy();
+    for prefix in SENSITIVE_PREFIXES {
+        if path_str.starts_with(prefix)
+            && (path_str.len() == prefix.len()
+                || path_str.as_bytes().get(prefix.len()) == Some(&b'/'))
+        {
+            return Err(FileSystemError::InvalidPath(format!(
+                "refusing to mutate sensitive system path: {}",
                 path
             )));
         }
@@ -164,7 +202,7 @@ impl FileSystemManager {
     }
 
     pub fn write_file(&self, path: &str, contents: &str) -> Result<(), FileSystemError> {
-        validate_path(path)?;
+        validate_mutation_path(path)?;
         fs::write(path, contents)?;
         Ok(())
     }
@@ -263,8 +301,8 @@ impl FileSystemManager {
     }
 
     pub fn rename_entry(&self, old_path: &str, new_path: &str) -> Result<(), FileSystemError> {
-        validate_path(old_path)?;
-        validate_path(new_path)?;
+        validate_mutation_path(old_path)?;
+        validate_mutation_path(new_path)?;
         let old = Path::new(old_path);
         if !old.exists() {
             return Err(FileSystemError::NotFound(old_path.to_string()));
@@ -274,7 +312,7 @@ impl FileSystemManager {
     }
 
     pub fn delete_file(&self, path: &str) -> Result<(), FileSystemError> {
-        validate_path(path)?;
+        validate_mutation_path(path)?;
         let p = Path::new(path);
         if !p.exists() {
             return Err(FileSystemError::NotFound(path.to_string()));
@@ -284,7 +322,7 @@ impl FileSystemManager {
     }
 
     pub fn delete_directory(&self, path: &str) -> Result<(), FileSystemError> {
-        validate_path(path)?;
+        validate_mutation_path(path)?;
         let p = Path::new(path);
         if !p.exists() {
             return Err(FileSystemError::NotFound(path.to_string()));
@@ -294,8 +332,8 @@ impl FileSystemManager {
     }
 
     pub fn copy_entry(&self, src: &str, dest: &str) -> Result<(), FileSystemError> {
-        validate_path(src)?;
-        validate_path(dest)?;
+        validate_mutation_path(src)?;
+        validate_mutation_path(dest)?;
         let src_path = Path::new(src);
         if !src_path.exists() {
             return Err(FileSystemError::NotFound(src.to_string()));
@@ -326,8 +364,8 @@ impl FileSystemManager {
     }
 
     pub fn move_entry(&self, src: &str, dest: &str) -> Result<(), FileSystemError> {
-        validate_path(src)?;
-        validate_path(dest)?;
+        validate_mutation_path(src)?;
+        validate_mutation_path(dest)?;
         let src_path = Path::new(src);
         if !src_path.exists() {
             return Err(FileSystemError::NotFound(src.to_string()));
@@ -346,7 +384,7 @@ pub async fn read_directory(
     let mgr = state.inner().clone();
     spawn_blocking(move || mgr.read_directory(&path))
         .await
-        .unwrap()
+        .map_err(|e| FileSystemError::TaskJoin(e.to_string()))?
 }
 
 #[tauri::command]
@@ -362,7 +400,7 @@ pub async fn read_directories(
             .collect::<Result<Vec<_>, _>>()
     })
     .await
-    .unwrap()
+    .map_err(|e| FileSystemError::TaskJoin(e.to_string()))?
 }
 
 #[tauri::command]
@@ -371,7 +409,9 @@ pub async fn read_file(
     path: String,
 ) -> Result<String, FileSystemError> {
     let mgr = state.inner().clone();
-    spawn_blocking(move || mgr.read_file(&path)).await.unwrap()
+    spawn_blocking(move || mgr.read_file(&path))
+        .await
+        .map_err(|e| FileSystemError::TaskJoin(e.to_string()))?
 }
 
 #[tauri::command]
@@ -382,7 +422,7 @@ pub async fn read_file_base64(
     let mgr = state.inner().clone();
     spawn_blocking(move || mgr.read_file_base64(&path))
         .await
-        .unwrap()
+        .map_err(|e| FileSystemError::TaskJoin(e.to_string()))?
 }
 
 #[tauri::command]
@@ -394,7 +434,7 @@ pub async fn write_file(
     let mgr = state.inner().clone();
     spawn_blocking(move || mgr.write_file(&path, &contents))
         .await
-        .unwrap()
+        .map_err(|e| FileSystemError::TaskJoin(e.to_string()))?
 }
 
 #[tauri::command]
@@ -410,7 +450,7 @@ pub async fn search_files(
     let my_gen = gen.next();
     spawn_blocking(move || mgr.search_files(&root_path, &query, search_content, &gen, my_gen))
         .await
-        .unwrap()
+        .map_err(|e| FileSystemError::TaskJoin(e.to_string()))?
 }
 
 #[tauri::command]
@@ -422,7 +462,7 @@ pub async fn rename_entry(
     let mgr = state.inner().clone();
     spawn_blocking(move || mgr.rename_entry(&old_path, &new_path))
         .await
-        .unwrap()
+        .map_err(|e| FileSystemError::TaskJoin(e.to_string()))?
 }
 
 #[tauri::command]
@@ -433,7 +473,7 @@ pub async fn delete_file(
     let mgr = state.inner().clone();
     spawn_blocking(move || mgr.delete_file(&path))
         .await
-        .unwrap()
+        .map_err(|e| FileSystemError::TaskJoin(e.to_string()))?
 }
 
 #[tauri::command]
@@ -444,7 +484,7 @@ pub async fn delete_directory(
     let mgr = state.inner().clone();
     spawn_blocking(move || mgr.delete_directory(&path))
         .await
-        .unwrap()
+        .map_err(|e| FileSystemError::TaskJoin(e.to_string()))?
 }
 
 #[tauri::command]
@@ -483,7 +523,7 @@ pub async fn reveal_in_file_manager(path: String) -> Result<(), FileSystemError>
         Ok(())
     })
     .await
-    .unwrap()
+    .map_err(|e| FileSystemError::TaskJoin(e.to_string()))?
 }
 
 #[tauri::command]
@@ -495,7 +535,7 @@ pub async fn copy_entry(
     let mgr = state.inner().clone();
     spawn_blocking(move || mgr.copy_entry(&src, &dest))
         .await
-        .unwrap()
+        .map_err(|e| FileSystemError::TaskJoin(e.to_string()))?
 }
 
 #[tauri::command]
@@ -507,7 +547,7 @@ pub async fn move_entry(
     let mgr = state.inner().clone();
     spawn_blocking(move || mgr.move_entry(&src, &dest))
         .await
-        .unwrap()
+        .map_err(|e| FileSystemError::TaskJoin(e.to_string()))?
 }
 
 #[tauri::command]
@@ -552,7 +592,7 @@ return paths as text
         }
     })
     .await
-    .unwrap()
+    .unwrap_or_default()
 }
 
 #[cfg(test)]
@@ -623,6 +663,88 @@ mod tests {
             // "." (current dir) is allowed, only ".." is blocked
             let result = validate_path("/home/./user");
             assert!(result.is_ok());
+        }
+    }
+
+    mod validate_mutation_path_tests {
+        use super::*;
+
+        #[test]
+        fn rejects_etc() {
+            let result = validate_mutation_path("/etc/passwd");
+            assert!(result.is_err());
+            match result.unwrap_err() {
+                FileSystemError::InvalidPath(msg) => {
+                    assert!(msg.contains("sensitive system path"));
+                }
+                other => panic!("Expected InvalidPath, got {:?}", other),
+            }
+        }
+
+        #[test]
+        fn rejects_system() {
+            assert!(validate_mutation_path("/System/Library/file").is_err());
+        }
+
+        #[test]
+        fn rejects_usr() {
+            assert!(validate_mutation_path("/usr/local/bin/tool").is_err());
+        }
+
+        #[test]
+        fn rejects_bin() {
+            assert!(validate_mutation_path("/bin/sh").is_err());
+        }
+
+        #[test]
+        fn rejects_sbin() {
+            assert!(validate_mutation_path("/sbin/mount").is_err());
+        }
+
+        #[test]
+        fn rejects_library() {
+            assert!(validate_mutation_path("/Library/Preferences/file").is_err());
+        }
+
+        #[test]
+        fn rejects_var() {
+            assert!(validate_mutation_path("/var/log/syslog").is_err());
+        }
+
+        #[test]
+        fn rejects_private_etc() {
+            assert!(validate_mutation_path("/private/etc/hosts").is_err());
+        }
+
+        #[test]
+        fn accepts_user_home_path() {
+            assert!(validate_mutation_path("/Users/dev/project/file.txt").is_ok());
+        }
+
+        #[test]
+        fn accepts_tmp_path() {
+            assert!(validate_mutation_path("/tmp/scratch/file.txt").is_ok());
+        }
+
+        #[test]
+        fn does_not_false_positive_on_prefix_substring() {
+            // "/etcetera" should NOT be blocked by "/etc" prefix
+            assert!(validate_mutation_path("/etcetera/file.txt").is_ok());
+        }
+
+        #[test]
+        fn rejects_exact_sensitive_dir() {
+            assert!(validate_mutation_path("/etc").is_err());
+        }
+
+        #[test]
+        fn still_rejects_traversal() {
+            assert!(validate_mutation_path("/home/user/../etc/passwd").is_err());
+        }
+
+        #[test]
+        fn still_rejects_relative() {
+            assert!(validate_mutation_path("relative/path").is_err());
         }
     }
 }

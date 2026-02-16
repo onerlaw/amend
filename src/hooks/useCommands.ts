@@ -2,10 +2,11 @@ import { useEffect, useCallback, RefObject } from 'react';
 import { useUIStore } from '@/stores/uiStore';
 import { useTerminalStore } from '@/stores/terminalStore';
 import { useFileStore } from '@/stores/fileStore';
-import { useCloseTerminal } from '@/hooks/useTerminal';
+import { useCloseTerminal } from '@/hooks/useTerminalLifecycle';
 import { useContextMenuStore } from '@/stores/contextMenuStore';
 import { useNotesStore } from '@/stores/notesStore';
 import { copyEntry, moveEntry, getClipboardFilePaths } from '@/lib/tauri';
+import { basename, join } from '@/lib/pathUtils';
 import type { TerminalTabsHandle } from '@/components/Terminal/TerminalTabs';
 import type { BrowseEditorTabsHandle } from '@/components/FileBrowser/BrowseEditorTabs';
 
@@ -149,7 +150,7 @@ function handlePasteFiles(e: KeyboardEvent, contextPath: string | null, panelMod
 
   // Priority 1: internal clipboard (cut/copy from context menu)
   if (clipboard.entry && clipboard.operation) {
-    const destPath = `${contextPath}/${clipboard.entry.name}`;
+    const destPath = join(contextPath, clipboard.entry.name);
     (async () => {
       try {
         if (clipboard.operation === 'cut') {
@@ -173,8 +174,8 @@ function handlePasteFiles(e: KeyboardEvent, contextPath: string | null, panelMod
       if (paths.length === 0) return;
 
       for (const srcPath of paths) {
-        const fileName = srcPath.split('/').pop() || 'file';
-        let destPath = `${contextPath}/${fileName}`;
+        const fileName = basename(srcPath) || 'file';
+        let destPath = join(contextPath, fileName);
 
         // Collision handling: name (1).ext, name (2).ext, etc.
         let counter = 1;
@@ -187,7 +188,7 @@ function handlePasteFiles(e: KeyboardEvent, contextPath: string | null, panelMod
             await copyEntry(srcPath, destPath);
             break;
           } catch {
-            destPath = `${contextPath}/${baseName} (${counter})${ext}`;
+            destPath = join(contextPath, `${baseName} (${counter})${ext}`);
             counter++;
             if (counter > 100) break;
           }

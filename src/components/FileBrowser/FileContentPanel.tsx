@@ -68,7 +68,8 @@ export function FileContentPanel({
       view.destroy();
       onEditorViewRef.current?.(null);
     };
-  }, [file.path, file.isImage, additionalExtensions]); // Recreate when file path or extensions change
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- file.content is handled by the sync effect below; file.language changes with file.path
+  }, [file.path, file.isImage, additionalExtensions]);
 
   // Update content when file content changes externally (not from typing)
   useEffect(() => {

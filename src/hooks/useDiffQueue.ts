@@ -9,7 +9,7 @@ export interface FileDiffData {
   error: string | null;
 }
 
-const CONCURRENCY_LIMIT = 15;
+const DEFAULT_CONCURRENCY = 15;
 
 /**
  * Reusable bounded async queue for loading file diffs with concurrency control.
@@ -17,7 +17,10 @@ const CONCURRENCY_LIMIT = 15;
  * (working-tree diff vs branch diff). Uses a generation ID to discard stale
  * responses after context changes.
  */
-export function useDiffQueue(fetchDiff: (filePath: string) => Promise<GitDiff>) {
+export function useDiffQueue(
+  fetchDiff: (filePath: string) => Promise<GitDiff>,
+  concurrency: number = DEFAULT_CONCURRENCY
+) {
   const [diffs, setDiffs] = useState<Map<string, FileDiffData>>(new Map());
   const loadingRef = useRef<Set<string>>(new Set());
   const loadedRef = useRef<Set<string>>(new Set());
@@ -28,7 +31,7 @@ export function useDiffQueue(fetchDiff: (filePath: string) => Promise<GitDiff>) 
   const processQueue = useCallback(async () => {
     const generation = generationRef.current;
 
-    while (queueRef.current.length > 0 && activeCountRef.current < CONCURRENCY_LIMIT) {
+    while (queueRef.current.length > 0 && activeCountRef.current < concurrency) {
       // Bail if generation changed (context switch happened)
       if (generationRef.current !== generation) return;
 
@@ -94,7 +97,7 @@ export function useDiffQueue(fetchDiff: (filePath: string) => Promise<GitDiff>) 
         }
       }
     }
-  }, [fetchDiff]);
+  }, [fetchDiff, concurrency]);
 
   const enqueue = useCallback(
     (filePath: string) => {

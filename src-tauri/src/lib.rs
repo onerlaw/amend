@@ -50,6 +50,7 @@ pub fn run() {
             git::get_git_status,
             git::get_file_diff,
             git::git_poll_data,
+            git::git_quick_check,
             git::list_worktrees,
             git::add_worktree,
             git::remove_worktree,
@@ -79,7 +80,7 @@ async fn index_project(root_path: String, index: State<'_, SymbolIndex>) -> Resu
     let idx = index.inner().clone();
     spawn_blocking(move || idx.index_project(&root_path))
         .await
-        .unwrap()
+        .map_err(|e| format!("Task failed: {}", e))?
 }
 
 #[tauri::command]
@@ -88,9 +89,10 @@ async fn find_definition(
     index: State<'_, SymbolIndex>,
 ) -> Result<Vec<SymbolDefinition>, String> {
     let idx = index.inner().clone();
-    Ok(spawn_blocking(move || idx.find_definition(&symbol))
+    let result = spawn_blocking(move || idx.find_definition(&symbol))
         .await
-        .unwrap())
+        .map_err(|e| format!("Task failed: {}", e))?;
+    Ok(result)
 }
 
 #[tauri::command]
@@ -100,9 +102,8 @@ async fn find_references(
     index: State<'_, SymbolIndex>,
 ) -> Result<Vec<SymbolReference>, String> {
     let idx = index.inner().clone();
-    Ok(
-        spawn_blocking(move || idx.find_references(&symbol, &root_path))
-            .await
-            .unwrap(),
-    )
+    let result = spawn_blocking(move || idx.find_references(&symbol, &root_path))
+        .await
+        .map_err(|e| format!("Task failed: {}", e))?;
+    Ok(result)
 }

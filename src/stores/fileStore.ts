@@ -8,6 +8,12 @@ export interface OpenFile {
   isDirty: boolean;
   language: string;
   isImage?: boolean;
+  /** Timestamp of the last in-memory edit (Date.now()) */
+  lastLocalEditAt?: number;
+  /** Timestamp when we last initiated a save to disk */
+  lastSaveCommittedAt?: number;
+  /** True when an external disk change was detected while the buffer is dirty */
+  hasExternalChange?: boolean;
 }
 
 // Internal tab helpers
@@ -35,15 +41,23 @@ function tabClose(
 }
 
 function tabUpdateContent(files: OpenFile[], path: string, content: string): OpenFile[] {
-  return files.map((f) => (f.path === path ? { ...f, content, isDirty: true } : f));
+  return files.map((f) =>
+    f.path === path ? { ...f, content, isDirty: true, lastLocalEditAt: Date.now() } : f
+  );
 }
 
 function tabMarkSaved(files: OpenFile[], path: string): OpenFile[] {
-  return files.map((f) => (f.path === path ? { ...f, isDirty: false } : f));
+  return files.map((f) =>
+    f.path === path
+      ? { ...f, isDirty: false, lastSaveCommittedAt: Date.now(), hasExternalChange: false }
+      : f
+  );
 }
 
 function tabRefreshContent(files: OpenFile[], path: string, content: string): OpenFile[] {
-  return files.map((f) => (f.path === path ? { ...f, content, isDirty: false } : f));
+  return files.map((f) =>
+    f.path === path ? { ...f, content, isDirty: false, hasExternalChange: false } : f
+  );
 }
 
 function tabOpenAtLine(
@@ -84,6 +98,8 @@ interface FileState {
   updateBrowseFileContent: (path: string, content: string) => void;
   markBrowseFileSaved: (path: string) => void;
   refreshBrowseFileContent: (path: string, content: string) => void;
+  markExternalChange: (path: string) => void;
+  dismissExternalChange: (path: string) => void;
   // Line navigation (for go-to-definition)
   pendingScrollToLine: number | null;
   pendingScrollToFile: string | null;
@@ -152,6 +168,20 @@ export const useFileStore = create<FileState>()((set, get) => ({
   },
   refreshBrowseFileContent: (path: string, content: string) => {
     set({ browseOpenFiles: tabRefreshContent(get().browseOpenFiles, path, content) });
+  },
+  markExternalChange: (path: string) => {
+    set({
+      browseOpenFiles: get().browseOpenFiles.map((f) =>
+        f.path === path ? { ...f, hasExternalChange: true } : f
+      ),
+    });
+  },
+  dismissExternalChange: (path: string) => {
+    set({
+      browseOpenFiles: get().browseOpenFiles.map((f) =>
+        f.path === path ? { ...f, hasExternalChange: false } : f
+      ),
+    });
   },
   // Line navigation (for go-to-definition)
   pendingScrollToLine: null,

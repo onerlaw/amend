@@ -10,7 +10,7 @@ import {
 import { findDefinition, SymbolDefinition, readFile } from '@/lib/tauri';
 import { OpenFile } from '@/stores/fileStore';
 import { getLanguageFromPath } from '@/lib/highlight';
-import { getFileName } from '@/lib/fileUtils';
+import { basename, dirname, join, normalize } from '@/lib/pathUtils';
 
 export interface GoToDefinitionConfig {
   currentFilePath: string;
@@ -111,7 +111,7 @@ async function handleNavigation(
       const targetDef = externalDefs[0];
       try {
         const content = await readFile(targetDef.filePath);
-        const fileName = getFileName(targetDef.filePath);
+        const fileName = basename(targetDef.filePath);
         const language = getLanguageFromPath(targetDef.filePath) || 'plaintext';
 
         onNavigate(
@@ -168,7 +168,7 @@ async function handleNavigation(
               targetLine = findSymbolLineInContent(content, symbolName);
             }
 
-            const fileName = getFileName(targetFile);
+            const fileName = basename(targetFile);
             const language = getLanguageFromPath(targetFile) || 'plaintext';
             onNavigate(
               { path: targetFile, name: fileName, content, isDirty: false, language },
@@ -181,7 +181,7 @@ async function handleNavigation(
               try {
                 const content = await readFile(resolved);
                 const targetLine = findSymbolLineInContent(content, symbolName);
-                const fileName = getFileName(resolved);
+                const fileName = basename(resolved);
                 const language = getLanguageFromPath(resolved) || 'plaintext';
                 onNavigate(
                   { path: resolved, name: fileName, content, isDirty: false, language },
@@ -218,7 +218,7 @@ async function handleImportPathNavigation(
     const resolved = await resolveImportOrAlias(importPath, currentFilePath, projectRoot);
     if (resolved) {
       const content = await readFile(resolved);
-      const fileName = getFileName(resolved);
+      const fileName = basename(resolved);
       const language = getLanguageFromPath(resolved) || 'plaintext';
       onNavigate({ path: resolved, name: fileName, content, isDirty: false, language }, 1);
     }
@@ -280,21 +280,7 @@ async function resolveImportPath(
   currentFilePath: string,
   importSource: string
 ): Promise<string | null> {
-  const lastSlash = currentFilePath.lastIndexOf('/');
-  const currentDir = lastSlash >= 0 ? currentFilePath.slice(0, lastSlash) : '';
-
-  const segments = `${currentDir}/${importSource}`.split('/');
-  const resolved: string[] = [];
-  for (const seg of segments) {
-    if (seg === '' || seg === '.') continue;
-    if (seg === '..') {
-      resolved.pop();
-    } else {
-      resolved.push(seg);
-    }
-  }
-  const basePath = '/' + resolved.join('/');
-
+  const basePath = normalize(join(dirname(currentFilePath), importSource));
   return tryResolveWithExtensions(basePath);
 }
 
@@ -304,7 +290,7 @@ async function resolveImportPath(
  */
 async function resolveAliasPath(importSource: string, projectRoot: string): Promise<string | null> {
   const relativePath = importSource.replace(/^@\//, '');
-  const basePath = `${projectRoot}/src/${relativePath}`;
+  const basePath = join(projectRoot, 'src', relativePath);
   return tryResolveWithExtensions(basePath);
 }
 
@@ -336,11 +322,11 @@ async function resolveNodeModulePath(
     }
   }
 
-  const packageDir = `${projectRoot}/node_modules/${packageName}`;
+  const packageDir = join(projectRoot, 'node_modules', packageName);
 
   // If there's a subpath, try to resolve it directly
   if (subpath) {
-    const basePath = `${packageDir}/${subpath}`;
+    const basePath = join(packageDir, subpath);
     const candidates = [basePath];
     for (const ext of RESOLVE_EXTENSIONS) {
       candidates.push(basePath + ext);
@@ -360,14 +346,14 @@ async function resolveNodeModulePath(
 
   // Try package.json to find the entry point
   try {
-    const pkgJsonStr = await readFile(`${packageDir}/package.json`);
+    const pkgJsonStr = await readFile(join(packageDir, 'package.json'));
     const pkgJson = JSON.parse(pkgJsonStr);
 
     // Prefer types/module/main in that order
     const entryFields = ['types', 'typings', 'module', 'main'];
     for (const field of entryFields) {
       if (pkgJson[field] && typeof pkgJson[field] === 'string') {
-        const entryPath = `${packageDir}/${pkgJson[field]}`;
+        const entryPath = join(packageDir, pkgJson[field]);
         try {
           await readFile(entryPath);
           return entryPath;
@@ -383,7 +369,7 @@ async function resolveNodeModulePath(
   // Last resort: try index files
   for (const ext of RESOLVE_EXTENSIONS) {
     try {
-      const candidate = `${packageDir}/index${ext}`;
+      const candidate = join(packageDir, `index${ext}`);
       await readFile(candidate);
       return candidate;
     } catch {
@@ -413,16 +399,16 @@ async function resolveTypesForPackage(
     packageName = slashIndex === -1 ? importSource : importSource.slice(0, slashIndex);
   }
 
-  const packageDir = `${projectRoot}/node_modules/${packageName}`;
+  const packageDir = join(projectRoot, 'node_modules', packageName);
 
   // 1. Check the package's own types/typings field
   try {
-    const pkgJsonStr = await readFile(`${packageDir}/package.json`);
+    const pkgJsonStr = await readFile(join(packageDir, 'package.json'));
     const pkgJson = JSON.parse(pkgJsonStr);
 
     for (const field of ['types', 'typings']) {
       if (pkgJson[field] && typeof pkgJson[field] === 'string') {
-        const typesPath = `${packageDir}/${pkgJson[field]}`;
+        const typesPath = join(packageDir, pkgJson[field]);
         try {
           await readFile(typesPath);
           return typesPath;
@@ -440,15 +426,15 @@ async function resolveTypesForPackage(
   const atTypesName = packageName.startsWith('@')
     ? packageName.slice(1).replace('/', '__')
     : packageName;
-  const atTypesDir = `${projectRoot}/node_modules/@types/${atTypesName}`;
+  const atTypesDir = join(projectRoot, 'node_modules', '@types', atTypesName);
 
   try {
-    const typesPkgStr = await readFile(`${atTypesDir}/package.json`);
+    const typesPkgStr = await readFile(join(atTypesDir, 'package.json'));
     const typesPkg = JSON.parse(typesPkgStr);
 
     for (const field of ['types', 'typings']) {
       if (typesPkg[field] && typeof typesPkg[field] === 'string') {
-        const typesPath = `${atTypesDir}/${typesPkg[field]}`;
+        const typesPath = join(atTypesDir, typesPkg[field]);
         try {
           await readFile(typesPath);
           return typesPath;
@@ -463,7 +449,7 @@ async function resolveTypesForPackage(
 
   // 3. Try index.d.ts directly
   try {
-    const candidate = `${atTypesDir}/index.d.ts`;
+    const candidate = join(atTypesDir, 'index.d.ts');
     await readFile(candidate);
     return candidate;
   } catch {

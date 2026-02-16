@@ -1,4 +1,5 @@
 import { readFile, readFileBase64 } from '@/lib/tauri';
+import { basename } from '@/lib/pathUtils';
 import { getLanguageFromPath } from '@/lib/highlight';
 import { useFileStore, OpenFile } from '@/stores/fileStore';
 
@@ -118,7 +119,7 @@ export async function openFileInBrowseMode(fullPath: string, displayName?: strin
  * Extract the file name from a path string.
  */
 export function getFileName(path: string): string {
-  return path.split('/').pop() || path;
+  return basename(path) || path;
 }
 
 /**

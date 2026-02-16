@@ -2,6 +2,7 @@ import { useMemo, useState, useEffect, useCallback, useRef, memo } from 'react';
 import * as Diff from 'diff';
 import { highlightCode, getLanguageFromPath } from '@/lib/highlight';
 import { getFileName, toggleSetItem, buildImageDataUrl } from '@/lib/fileUtils';
+import { dirname, join } from '@/lib/pathUtils';
 import { ChevronIcon } from '@/components/Icons';
 import {
   parseConflicts,
@@ -466,7 +467,7 @@ const ConflictContent = memo(function ConflictContent({
     async (conflictIndex: number, resolution: 'ours' | 'theirs' | 'both') => {
       if (!segments) return;
       const resolved = resolveConflict(segments, conflictIndex, resolution);
-      const fullPath = `${repoPath}/${filePath}`;
+      const fullPath = join(repoPath, filePath);
       await writeFile(fullPath, resolved);
       onRefresh();
     },
@@ -729,7 +730,7 @@ export const DiffFileSection = memo(function DiffFileSection({
   }, [oldContent, newContent, isLoading, error]);
 
   const fileName = getFileName(filePath);
-  const dirPath = filePath.includes('/') ? filePath.slice(0, filePath.lastIndexOf('/') + 1) : '';
+  const dirPath = filePath.includes('/') ? dirname(filePath) + '/' : '';
   const hasContent = !isLoading && !error && (oldContent || newContent);
 
   return (

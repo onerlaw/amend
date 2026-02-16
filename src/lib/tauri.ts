@@ -244,10 +244,15 @@ export async function getBranchFileDiff(
 export interface GitPollData {
   status: GitStatus;
   diffStats: DiffStats;
+  fingerprint: string;
 }
 
 export async function gitPollData(repoPath: string): Promise<GitPollData> {
   return invoke('git_poll_data', { repoPath });
+}
+
+export async function gitQuickCheck(repoPath: string, cachedFingerprint: string): Promise<boolean> {
+  return invoke('git_quick_check', { repoPath, cachedFingerprint });
 }
 
 // Symbol navigation types

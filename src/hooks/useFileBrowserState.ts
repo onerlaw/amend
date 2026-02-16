@@ -24,7 +24,6 @@ export function useFileBrowserState() {
     closeBrowseFile,
     updateBrowseFileContent,
     markBrowseFileSaved,
-    refreshBrowseFileContent,
   } = useFileStore();
 
   const [entries, setEntries] = useState<FileEntry[]>([]);
@@ -32,6 +31,10 @@ export function useFileBrowserState() {
   const [saveStatuses, setSaveStatuses] = useState<Map<string, SaveStatus>>(new Map());
 
   const autoSaveTimers = useRef<Map<string, NodeJS.Timeout>>(new Map());
+
+  // Track paths we recently wrote to, so the watcher can ignore self-originated changes.
+  // Maps file path -> timestamp of when we initiated the write.
+  const recentSelfWrites = useRef<Map<string, number>>(new Map());
 
   const initialLoadDone = useRef(false);
 
@@ -75,10 +78,6 @@ export function useFileBrowserState() {
 
     let unlisten: (() => void) | undefined;
     onFsChanged(() => {
-      // Cancel all pending auto-save timers to prevent stale content from being written back
-      autoSaveTimers.current.forEach((timer) => clearTimeout(timer));
-      autoSaveTimers.current.clear();
-
       // Debounce the UI refresh on the frontend side to coalesce rapid events
       // (e.g. npm install generating hundreds of fs-changed events)
       if (fsDebounceTimer.current) {
@@ -88,13 +87,43 @@ export function useFileBrowserState() {
         fsDebounceTimer.current = null;
         useFileStore.getState().invalidateFileTree();
 
-        // Re-read each open non-image file's content from disk
+        const now = Date.now();
+        // Expire self-write entries older than 5 seconds
+        const SELF_WRITE_WINDOW = 5000;
+        for (const [p, ts] of recentSelfWrites.current) {
+          if (now - ts > SELF_WRITE_WINDOW) {
+            recentSelfWrites.current.delete(p);
+          }
+        }
+
+        // Re-read each open non-image file's content from disk — but only
+        // if the buffer is not dirty and the change was not self-originated.
         const openFiles = useFileStore.getState().browseOpenFiles;
         for (const file of openFiles) {
           if (file.isImage) continue;
+
+          // Skip files we recently wrote ourselves
+          if (recentSelfWrites.current.has(file.path)) {
+            recentSelfWrites.current.delete(file.path);
+            continue;
+          }
+
+          // If the file has unsaved edits, don't overwrite — flag it instead
+          if (file.isDirty) {
+            useFileStore.getState().markExternalChange(file.path);
+            continue;
+          }
+
           readFile(file.path)
             .then((content) => {
-              refreshBrowseFileContent(file.path, content);
+              // Double-check the file is still clean before refreshing
+              // (user may have started editing while the read was in-flight)
+              const current = useFileStore
+                .getState()
+                .browseOpenFiles.find((f) => f.path === file.path);
+              if (current && !current.isDirty) {
+                useFileStore.getState().refreshBrowseFileContent(file.path, content);
+              }
             })
             .catch((err) => {
               console.error(`[FileWatcher] Failed to re-read ${file.path}:`, err);
@@ -118,9 +147,10 @@ export function useFileBrowserState() {
 
   // Cleanup timers on unmount
   useEffect(() => {
+    const timers = autoSaveTimers.current;
     return () => {
-      autoSaveTimers.current.forEach((timer) => clearTimeout(timer));
-      autoSaveTimers.current.clear();
+      timers.forEach((timer) => clearTimeout(timer));
+      timers.clear();
     };
   }, []);
 
@@ -179,10 +209,14 @@ export function useFileBrowserState() {
         setSaveStatus(path, 'saving');
 
         try {
+          // Record self-write so the watcher knows to ignore the resulting event
+          recentSelfWrites.current.set(path, Date.now());
           await writeFile(path, newContent);
           markBrowseFileSaved(path);
           setSaveStatus(path, 'idle');
         } catch (err) {
+          // If the write failed, remove from self-writes tracking
+          recentSelfWrites.current.delete(path);
           console.error('Failed to auto-save file:', err);
           setSaveStatus(path, 'error');
         }

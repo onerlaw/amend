@@ -17,6 +17,8 @@ pub enum GitError {
     CommandFailed(String),
     #[error("Invalid argument: {0}")]
     InvalidArgument(String),
+    #[error("Task failed: {0}")]
+    TaskJoin(String),
 }
 
 impl_serialize_as_string!(GitError);
@@ -125,7 +127,7 @@ pub async fn get_git_root(path: String) -> Result<Option<String>, GitError> {
         Err(_) => Ok(None),
     })
     .await
-    .unwrap()
+    .map_err(|e| GitError::TaskJoin(e.to_string()))?
 }
 
 #[tauri::command]
@@ -139,7 +141,7 @@ pub async fn is_git_repository(path: String) -> bool {
 pub async fn get_git_status(repo_path: String) -> Result<GitStatus, GitError> {
     spawn_blocking(move || get_git_status_sync(&repo_path))
         .await
-        .unwrap()
+        .map_err(|e| GitError::TaskJoin(e.to_string()))?
 }
 
 fn get_git_status_sync(repo_path: &str) -> Result<GitStatus, GitError> {
@@ -200,7 +202,7 @@ fn get_git_status_sync(repo_path: &str) -> Result<GitStatus, GitError> {
 pub async fn get_file_diff(repo_path: String, file_path: String) -> Result<GitDiff, GitError> {
     spawn_blocking(move || get_file_diff_sync(&repo_path, &file_path))
         .await
-        .unwrap()
+        .map_err(|e| GitError::TaskJoin(e.to_string()))?
 }
 
 fn get_file_diff_sync(repo_path: &str, file_path: &str) -> Result<GitDiff, GitError> {
@@ -280,7 +282,7 @@ fn get_file_diff_sync(repo_path: &str, file_path: &str) -> Result<GitDiff, GitEr
 pub async fn list_worktrees(repo_path: String) -> Result<Vec<GitWorktree>, GitError> {
     spawn_blocking(move || list_worktrees_sync(&repo_path))
         .await
-        .unwrap()
+        .map_err(|e| GitError::TaskJoin(e.to_string()))?
 }
 
 fn list_worktrees_sync(repo_path: &str) -> Result<Vec<GitWorktree>, GitError> {
@@ -389,7 +391,7 @@ pub async fn add_worktree(
         })
     })
     .await
-    .unwrap()
+    .map_err(|e| GitError::TaskJoin(e.to_string()))?
 }
 
 #[tauri::command]
@@ -411,7 +413,7 @@ pub async fn remove_worktree(
         Ok(())
     })
     .await
-    .unwrap()
+    .map_err(|e| GitError::TaskJoin(e.to_string()))?
 }
 
 #[tauri::command]
@@ -422,7 +424,7 @@ pub async fn restore_file(repo_path: String, file_path: String) -> Result<(), Gi
         Ok(())
     })
     .await
-    .unwrap()
+    .map_err(|e| GitError::TaskJoin(e.to_string()))?
 }
 
 #[tauri::command]
@@ -433,7 +435,7 @@ pub async fn unstage_file(repo_path: String, file_path: String) -> Result<(), Gi
         Ok(())
     })
     .await
-    .unwrap()
+    .map_err(|e| GitError::TaskJoin(e.to_string()))?
 }
 
 #[tauri::command]
@@ -444,7 +446,7 @@ pub async fn stage_file(repo_path: String, file_path: String) -> Result<(), GitE
         Ok(())
     })
     .await
-    .unwrap()
+    .map_err(|e| GitError::TaskJoin(e.to_string()))?
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -459,7 +461,7 @@ pub struct DiffStats {
 pub async fn get_diff_stats(repo_path: String) -> Result<DiffStats, GitError> {
     spawn_blocking(move || get_diff_stats_sync(&repo_path))
         .await
-        .unwrap()
+        .map_err(|e| GitError::TaskJoin(e.to_string()))?
 }
 
 fn get_diff_stats_sync(repo_path: &str) -> Result<DiffStats, GitError> {
@@ -515,16 +517,61 @@ fn get_diff_stats_sync(repo_path: &str) -> Result<DiffStats, GitError> {
 pub struct GitPollData {
     pub status: GitStatus,
     pub diff_stats: DiffStats,
+    /// Opaque fingerprint of .git/index mtime + HEAD ref. Callers can cache
+    /// this and pass it to `git_quick_check` to detect changes cheaply.
+    pub fingerprint: String,
+}
+
+/// Lightweight change-detection: checks .git/index mtime and HEAD ref
+/// without computing full status or diff stats. Returns true if the
+/// fingerprint differs from the caller's cached value.
+#[tauri::command]
+pub async fn git_quick_check(
+    repo_path: String,
+    cached_fingerprint: String,
+) -> Result<bool, GitError> {
+    spawn_blocking(move || {
+        let fp = compute_repo_fingerprint(&repo_path)?;
+        Ok(fp != cached_fingerprint)
+    })
+    .await
+    .map_err(|e| GitError::TaskJoin(e.to_string()))?
+}
+
+/// Build a fingerprint from .git/index mtime + HEAD target.
+fn compute_repo_fingerprint(repo_path: &str) -> Result<String, GitError> {
+    let repo = Repository::discover(repo_path)?;
+    let git_dir = repo.path(); // .git directory
+
+    // .git/index mtime (captures staging/unstaging/working-tree changes)
+    let index_mtime = std::fs::metadata(git_dir.join("index"))
+        .and_then(|m| m.modified())
+        .map(|t| {
+            t.duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_nanos()
+        })
+        .unwrap_or(0);
+
+    // HEAD target (captures commits, branch switches)
+    let head_target = repo
+        .head()
+        .ok()
+        .and_then(|h| h.target().map(|oid| oid.to_string()))
+        .unwrap_or_default();
+
+    Ok(format!("{}:{}", index_mtime, head_target))
 }
 
 #[tauri::command]
 pub async fn git_poll_data(repo_path: String) -> Result<GitPollData, GitError> {
     spawn_blocking(move || git_poll_data_sync(&repo_path))
         .await
-        .unwrap()
+        .map_err(|e| GitError::TaskJoin(e.to_string()))?
 }
 
 fn git_poll_data_sync(repo_path: &str) -> Result<GitPollData, GitError> {
+    let fingerprint = compute_repo_fingerprint(repo_path)?;
     let repo = Repository::discover(repo_path)?;
 
     // Single statuses() call to derive both GitStatus and DiffStats
@@ -611,7 +658,11 @@ fn git_poll_data_sync(repo_path: &str) -> Result<GitPollData, GitError> {
         files_changed: total_files,
     };
 
-    Ok(GitPollData { status, diff_stats })
+    Ok(GitPollData {
+        status,
+        diff_stats,
+        fingerprint,
+    })
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -640,7 +691,7 @@ pub async fn get_branch_diff_files(
     let br = base_ref.clone();
     spawn_blocking(move || get_branch_diff_files_sync(&rp, &br))
         .await
-        .unwrap()
+        .map_err(|e| GitError::TaskJoin(e.to_string()))?
 }
 
 fn get_branch_diff_files_sync(
@@ -719,7 +770,7 @@ pub async fn get_branch_file_diff(
     validate_no_flag(&file_path, "file path")?;
     spawn_blocking(move || get_branch_file_diff_sync(&repo_path, &base_ref, &file_path))
         .await
-        .unwrap()
+        .map_err(|e| GitError::TaskJoin(e.to_string()))?
 }
 
 fn get_branch_file_diff_sync(
@@ -839,7 +890,7 @@ pub async fn list_branches(repo_path: String) -> Result<Vec<GitBranch>, GitError
         Ok(branches)
     })
     .await
-    .unwrap()
+    .map_err(|e| GitError::TaskJoin(e.to_string()))?
 }
 
 #[cfg(test)]

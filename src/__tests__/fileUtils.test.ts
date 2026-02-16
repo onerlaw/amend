@@ -106,8 +106,7 @@ describe('getFileName', () => {
   });
 
   it('handles trailing slash edge case', () => {
-    // split('/').pop() returns '' for trailing slash
-    expect(getFileName('src/')).toBe('src/');
+    expect(getFileName('src/')).toBe('src');
   });
 
   it('handles empty string', () => {

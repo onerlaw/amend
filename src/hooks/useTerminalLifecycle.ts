@@ -1,0 +1,37 @@
+import { useCallback } from 'react';
+import { createTerminal as createTerminalBackend, closeTerminal } from '@/lib/tauri';
+import { useTerminalStore } from '@/stores/terminalStore';
+
+export function useCreateTerminal() {
+  const addTab = useTerminalStore((state) => state.addTab);
+
+  const create = useCallback(
+    async (cwd: string, afterTabId?: string) => {
+      try {
+        const id = await createTerminalBackend(cwd);
+        addTab(id, cwd, afterTabId);
+        return id;
+      } catch (err) {
+        console.error('Failed to create terminal:', err);
+        throw err;
+      }
+    },
+    [addTab]
+  );
+
+  return create;
+}
+
+export function useCloseTerminal() {
+  const removeTab = useTerminalStore((state) => state.removeTab);
+
+  const close = useCallback(
+    async (id: string) => {
+      await closeTerminal(id);
+      removeTab(id);
+    },
+    [removeTab]
+  );
+
+  return close;
+}

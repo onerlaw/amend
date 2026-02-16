@@ -5,7 +5,6 @@ import { WebglAddon } from '@xterm/addon-webgl';
 import { WebLinksAddon } from '@xterm/addon-web-links';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import {
-  createTerminal as createTerminalBackend,
   writeToTerminal,
   resizeTerminal,
   closeTerminal,
@@ -311,36 +310,5 @@ export function useTerminal(containerId: string | null) {
   };
 }
 
-export function useCreateTerminal() {
-  const addTab = useTerminalStore((state) => state.addTab);
-
-  const create = useCallback(
-    async (cwd: string, afterTabId?: string) => {
-      try {
-        const id = await createTerminalBackend(cwd);
-        addTab(id, cwd, afterTabId);
-        return id;
-      } catch (err) {
-        console.error('Failed to create terminal:', err);
-        throw err;
-      }
-    },
-    [addTab]
-  );
-
-  return create;
-}
-
-export function useCloseTerminal() {
-  const removeTab = useTerminalStore((state) => state.removeTab);
-
-  const close = useCallback(
-    async (id: string) => {
-      await closeTerminal(id);
-      removeTab(id);
-    },
-    [removeTab]
-  );
-
-  return close;
-}
+// Re-export lifecycle hooks that don't depend on xterm
+export { useCreateTerminal, useCloseTerminal } from './useTerminalLifecycle';

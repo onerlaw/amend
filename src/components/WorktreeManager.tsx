@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { ModalOverlay } from '@/components/ModalOverlay';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import {
@@ -24,7 +24,7 @@ export function WorktreeManager({ repoPath, onClose, createTerminal }: WorktreeM
   const [showAddForm, setShowAddForm] = useState(false);
   const [removing, setRemoving] = useState<GitWorktree | null>(null);
 
-  const refresh = async () => {
+  const refresh = useCallback(async () => {
     try {
       const wts = await listWorktrees(repoPath);
       setWorktrees(wts);
@@ -33,11 +33,11 @@ export function WorktreeManager({ repoPath, onClose, createTerminal }: WorktreeM
     } finally {
       setLoading(false);
     }
-  };
+  }, [repoPath]);
 
   useEffect(() => {
     refresh();
-  }, [repoPath]);
+  }, [refresh]);
 
   const handleRowClick = async (wt: GitWorktree) => {
     await createTerminal(wt.path);

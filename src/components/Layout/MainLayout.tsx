@@ -6,7 +6,7 @@ import { useFileStore } from '@/stores/fileStore';
 import { useGitPolling } from '@/hooks/useGit';
 import { useTheme } from '@/hooks/useTheme';
 import { useCommands } from '@/hooks/useCommands';
-import { TerminalTabs, TerminalTabsHandle } from '@/components/Terminal/TerminalTabs';
+import type { TerminalTabsHandle } from '@/components/Terminal/TerminalTabs';
 import { DiffViewerProvider } from '@/components/DiffViewer/DiffViewerContext';
 import type { BrowseEditorTabsHandle } from '@/components/FileBrowser/BrowseEditorTabs';
 import { GlobalSearch } from '@/components/GlobalSearch/GlobalSearch';
@@ -27,8 +27,13 @@ import {
 } from '@/components/Icons';
 import { useNotesStore } from '@/stores/notesStore';
 import { WorktreeManager } from '@/components/WorktreeManager';
-import { useCreateTerminal } from '@/hooks/useTerminal';
+import { useCreateTerminal } from '@/hooks/useTerminalLifecycle';
 
+const TerminalTabs = lazy(() =>
+  import('@/components/Terminal/TerminalTabs').then((m) => ({
+    default: m.TerminalTabs,
+  }))
+);
 const DiffContentPanel = lazy(() =>
   import('@/components/DiffViewer/DiffContentPanel').then((m) => ({
     default: m.DiffContentPanel,
@@ -311,7 +316,9 @@ export function MainLayout() {
           <PanelGroup direction="horizontal" autoSaveId="main-layout">
             {/* Terminal: ALWAYS mounted, never unmounts */}
             <Panel id="terminal" order={1} minSize={20}>
-              <TerminalTabs ref={terminalTabsRef} />
+              <Suspense fallback={<div className="h-full bg-terminal-bg" />}>
+                <TerminalTabs ref={terminalTabsRef} />
+              </Suspense>
             </Panel>
 
             {/* Diff mode: content + file list */}

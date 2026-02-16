@@ -1,12 +1,13 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useFileStore } from '@/stores/fileStore';
 import type { OpenFile } from '@/stores/fileStore';
+import { basename } from '@/lib/pathUtils';
 
 // Helper to create test files
 function makeFile(path: string, name?: string): OpenFile {
   return {
     path,
-    name: name ?? path.split('/').pop() ?? path,
+    name: name ?? (basename(path) || path),
     content: `content of ${path}`,
     isDirty: false,
     language: 'typescript',
