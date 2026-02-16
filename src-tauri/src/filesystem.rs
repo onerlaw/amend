@@ -114,20 +114,16 @@ fn validate_mutation_path(path: &str) -> Result<PathBuf, FileSystemError> {
     // Canonicalize to resolve symlinks and re-check. For paths that don't exist
     // yet (e.g. write to new file), canonicalize the parent directory.
     let canonical = if p.exists() {
-        p.canonicalize().map_err(|e| {
-            FileSystemError::InvalidPath(format!("failed to resolve path: {}", e))
-        })?
+        p.canonicalize()
+            .map_err(|e| FileSystemError::InvalidPath(format!("failed to resolve path: {}", e)))?
     } else if let Some(parent) = p.parent() {
         if parent.exists() {
             let canonical_parent = parent.canonicalize().map_err(|e| {
-                FileSystemError::InvalidPath(format!(
-                    "failed to resolve parent directory: {}",
-                    e
-                ))
+                FileSystemError::InvalidPath(format!("failed to resolve parent directory: {}", e))
             })?;
-            let file_name = p.file_name().ok_or_else(|| {
-                FileSystemError::InvalidPath(format!("invalid path: {}", path))
-            })?;
+            let file_name = p
+                .file_name()
+                .ok_or_else(|| FileSystemError::InvalidPath(format!("invalid path: {}", path)))?;
             canonical_parent.join(file_name)
         } else {
             // Parent doesn't exist either; literal path is fine since nothing to resolve

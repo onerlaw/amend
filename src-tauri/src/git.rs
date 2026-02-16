@@ -115,14 +115,14 @@ fn validate_repo_containment(repo: &Repository, file_path: &str) -> Result<PathB
 
     // Canonicalize both paths and verify containment.
     // For the target, if it doesn't exist yet (e.g. deleted file), canonicalize the parent.
-    let canonical_workdir = workdir.canonicalize().map_err(|e| {
-        GitError::InvalidArgument(format!("failed to resolve repo workdir: {}", e))
-    })?;
+    let canonical_workdir = workdir
+        .canonicalize()
+        .map_err(|e| GitError::InvalidArgument(format!("failed to resolve repo workdir: {}", e)))?;
 
     let canonical_target = if full_path.exists() {
-        full_path.canonicalize().map_err(|e| {
-            GitError::InvalidArgument(format!("failed to resolve file path: {}", e))
-        })?
+        full_path
+            .canonicalize()
+            .map_err(|e| GitError::InvalidArgument(format!("failed to resolve file path: {}", e)))?
     } else {
         // For non-existent files, canonicalize the parent and append the file name
         let parent = full_path.parent().ok_or_else(|| {
@@ -1141,7 +1141,11 @@ mod tests {
             let result = validate_repo_containment(&repo, "/etc/passwd");
             assert!(result.is_err());
             let err = result.unwrap_err().to_string();
-            assert!(err.contains("must be relative"), "unexpected error: {}", err);
+            assert!(
+                err.contains("must be relative"),
+                "unexpected error: {}",
+                err
+            );
         }
 
         #[test]
@@ -1184,8 +1188,7 @@ mod tests {
             let outside_file = std::path::Path::new("/tmp/amend_test_containment.txt");
             std::fs::write(outside_file, "secret").ok();
 
-            let result =
-                validate_repo_containment(&repo, "escape/amend_test_containment.txt");
+            let result = validate_repo_containment(&repo, "escape/amend_test_containment.txt");
             assert!(result.is_err());
             let err = result.unwrap_err().to_string();
             assert!(
@@ -1329,7 +1332,11 @@ mod tests {
             let result = get_branch_file_diff_sync(repo_path, "HEAD", "/etc/passwd");
             assert!(result.is_err());
             let err = result.unwrap_err().to_string();
-            assert!(err.contains("must be relative"), "unexpected error: {}", err);
+            assert!(
+                err.contains("must be relative"),
+                "unexpected error: {}",
+                err
+            );
         }
 
         #[test]

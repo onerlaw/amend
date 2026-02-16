@@ -15,9 +15,7 @@ function makeDiff(filePath: string): GitDiff {
 
 describe('useDiffQueue', () => {
   it('processes enqueued files and populates diffs', async () => {
-    const fetchDiff = vi.fn((filePath: string) =>
-      Promise.resolve(makeDiff(filePath))
-    );
+    const fetchDiff = vi.fn((filePath: string) => Promise.resolve(makeDiff(filePath)));
 
     const { result } = renderHook(() => useDiffQueue(fetchDiff, 5));
 
@@ -165,9 +163,7 @@ describe('useDiffQueue', () => {
   });
 
   it('Math.max guard prevents underflow even in edge cases', async () => {
-    const fetchDiff = vi.fn((filePath: string) =>
-      Promise.resolve(makeDiff(filePath))
-    );
+    const fetchDiff = vi.fn((filePath: string) => Promise.resolve(makeDiff(filePath)));
 
     const { result } = renderHook(() => useDiffQueue(fetchDiff, 5));
 
@@ -221,9 +217,7 @@ describe('useDiffQueue', () => {
   });
 
   it('enqueueBatch deduplicates already-loaded files', async () => {
-    const fetchDiff = vi.fn((filePath: string) =>
-      Promise.resolve(makeDiff(filePath))
-    );
+    const fetchDiff = vi.fn((filePath: string) => Promise.resolve(makeDiff(filePath)));
 
     const { result } = renderHook(() => useDiffQueue(fetchDiff, 5));
 

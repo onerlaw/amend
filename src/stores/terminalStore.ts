@@ -72,7 +72,8 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
       return;
     }
 
-    if (import.meta.env.DEV) console.log('[CWD] Store updated:', { tabId: id, from: tab.cwd, to: cwd });
+    if (import.meta.env.DEV)
+      console.log('[CWD] Store updated:', { tabId: id, from: tab.cwd, to: cwd });
     set({
       tabs: tabs.map((t) => (t.id === id ? { ...t, cwd } : t)),
     });
