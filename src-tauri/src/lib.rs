@@ -40,6 +40,7 @@ pub fn run() {
             filesystem::rename_entry,
             filesystem::delete_file,
             filesystem::delete_directory,
+            filesystem::create_directory,
             filesystem::reveal_in_file_manager,
             filesystem::copy_entry,
             filesystem::move_entry,

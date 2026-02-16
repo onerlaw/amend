@@ -13,6 +13,8 @@ import {
   revealInFileManager,
   moveEntry,
   copyEntry,
+  writeFile,
+  createDirectory,
 } from '@/lib/tauri';
 
 function RenameDialog() {
@@ -128,6 +130,88 @@ function ConfirmDeleteDialog() {
   );
 }
 
+function NewEntryDialog() {
+  const { newEntryTarget, closeNewEntryDialog } = useContextMenuStore();
+  const [name, setName] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (newEntryTarget) {
+      setName('');
+      requestAnimationFrame(() => {
+        inputRef.current?.focus();
+      });
+    }
+  }, [newEntryTarget]);
+
+  if (!newEntryTarget) return null;
+
+  const isFolder = newEntryTarget.kind === 'folder';
+  const label = isFolder ? 'New Folder' : 'New File';
+
+  const handleSubmit = async () => {
+    if (!name.trim()) {
+      closeNewEntryDialog();
+      return;
+    }
+
+    const newPath = join(newEntryTarget.dirPath, name.trim());
+
+    try {
+      if (isFolder) {
+        await createDirectory(newPath);
+      } else {
+        await writeFile(newPath, '');
+      }
+      useFileStore.getState().invalidateFileTree();
+    } catch (error) {
+      console.error(`Failed to create ${newEntryTarget.kind}:`, error);
+    }
+    closeNewEntryDialog();
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleSubmit();
+    } else if (e.key === 'Escape') {
+      closeNewEntryDialog();
+    }
+  };
+
+  return (
+    <ModalOverlay onClose={closeNewEntryDialog}>
+      <div className="w-72 rounded-lg border border-surface-3 bg-surface-2 p-4 shadow-xl">
+        <div className="mb-3 text-sm font-medium text-primary">{label}</div>
+        <input
+          ref={inputRef}
+          type="text"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder={isFolder ? 'Folder name' : 'File name'}
+          className="w-full rounded-md border border-surface-3 bg-surface-1 px-3 py-1.5 text-sm text-primary outline-none focus:border-accent"
+        />
+        <div className="mt-3 flex justify-end gap-2">
+          <button
+            onClick={closeNewEntryDialog}
+            className="rounded-md px-3 py-1 text-xs text-secondary hover:bg-surface-3"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={!name.trim()}
+            className="rounded-md bg-accent px-3 py-1 text-xs text-white hover:bg-accent-hover disabled:opacity-50"
+          >
+            Create
+          </button>
+        </div>
+      </div>
+    </ModalOverlay>
+  );
+}
+
 export function FileContextMenu() {
   const {
     isOpen,
@@ -140,6 +224,7 @@ export function FileContextMenu() {
     clearClipboard,
     openRenameDialog,
     openDeleteDialog,
+    openNewEntryDialog,
   } = useContextMenuStore();
   const { contextPath } = useFileStore();
 
@@ -216,10 +301,25 @@ export function FileContextMenu() {
     }
   }, [targetEntry]);
 
+  const handleNewFile = useCallback(() => {
+    if (!targetEntry) return;
+    const dirPath = targetEntry.isDirectory ? targetEntry.path : dirname(targetEntry.path);
+    openNewEntryDialog(dirPath, 'file');
+  }, [targetEntry, openNewEntryDialog]);
+
+  const handleNewFolder = useCallback(() => {
+    if (!targetEntry) return;
+    const dirPath = targetEntry.isDirectory ? targetEntry.path : dirname(targetEntry.path);
+    openNewEntryDialog(dirPath, 'folder');
+  }, [targetEntry, openNewEntryDialog]);
+
   const items: ContextMenuItem[] = useMemo(() => {
     if (!targetEntry) return [];
 
     const menuItems: ContextMenuItem[] = [
+      { label: 'New File', onClick: handleNewFile },
+      { label: 'New Folder', onClick: handleNewFolder },
+      { label: '', onClick: () => {}, separator: true },
       { label: 'Rename', onClick: handleRename },
       { label: 'Delete', onClick: handleDelete },
       { label: '', onClick: () => {}, separator: true },
@@ -246,6 +346,8 @@ export function FileContextMenu() {
   }, [
     targetEntry,
     clipboard,
+    handleNewFile,
+    handleNewFolder,
     handleRename,
     handleDelete,
     handleCut,
@@ -261,6 +363,7 @@ export function FileContextMenu() {
       <ContextMenu isOpen={isOpen} position={position} items={items} onClose={closeMenu} />
       <RenameDialog />
       <ConfirmDeleteDialog />
+      <NewEntryDialog />
     </>
   );
 }

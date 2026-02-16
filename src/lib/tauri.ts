@@ -92,6 +92,10 @@ export async function deleteDirectory(path: string): Promise<void> {
   return invoke('delete_directory', { path });
 }
 
+export async function createDirectory(path: string): Promise<void> {
+  return invoke('create_directory', { path });
+}
+
 export async function revealInFileManager(path: string): Promise<void> {
   return invoke('reveal_in_file_manager', { path });
 }

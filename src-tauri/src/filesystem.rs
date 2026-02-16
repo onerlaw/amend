@@ -453,6 +453,12 @@ impl FileSystemManager {
         Ok(())
     }
 
+    pub fn create_directory(&self, path: &str) -> Result<(), FileSystemError> {
+        validate_mutation_path(path)?;
+        fs::create_dir_all(path)?;
+        Ok(())
+    }
+
     pub fn move_entry(&self, src: &str, dest: &str) -> Result<(), FileSystemError> {
         validate_mutation_path(src)?;
         validate_mutation_path(dest)?;
@@ -573,6 +579,17 @@ pub async fn delete_directory(
 ) -> Result<(), FileSystemError> {
     let mgr = state.inner().clone();
     spawn_blocking(move || mgr.delete_directory(&path))
+        .await
+        .map_err(|e| FileSystemError::TaskJoin(e.to_string()))?
+}
+
+#[tauri::command]
+pub async fn create_directory(
+    state: tauri::State<'_, FileSystemManager>,
+    path: String,
+) -> Result<(), FileSystemError> {
+    let mgr = state.inner().clone();
+    spawn_blocking(move || mgr.create_directory(&path))
         .await
         .map_err(|e| FileSystemError::TaskJoin(e.to_string()))?
 }

@@ -6,6 +6,11 @@ interface ClipboardState {
   operation: 'cut' | 'copy' | null;
 }
 
+interface NewEntryTarget {
+  dirPath: string;
+  kind: 'file' | 'folder';
+}
+
 interface ContextMenuState {
   isOpen: boolean;
   position: { x: number; y: number };
@@ -13,6 +18,7 @@ interface ContextMenuState {
   clipboard: ClipboardState;
   renameTarget: FileEntry | null;
   deleteTarget: FileEntry | null;
+  newEntryTarget: NewEntryTarget | null;
   openMenu: (entry: FileEntry, x: number, y: number) => void;
   closeMenu: () => void;
   setCutEntry: (entry: FileEntry) => void;
@@ -22,6 +28,8 @@ interface ContextMenuState {
   closeRenameDialog: () => void;
   openDeleteDialog: (entry: FileEntry) => void;
   closeDeleteDialog: () => void;
+  openNewEntryDialog: (dirPath: string, kind: 'file' | 'folder') => void;
+  closeNewEntryDialog: () => void;
 }
 
 export const useContextMenuStore = create<ContextMenuState>((set) => ({
@@ -31,6 +39,7 @@ export const useContextMenuStore = create<ContextMenuState>((set) => ({
   clipboard: { entry: null, operation: null },
   renameTarget: null,
   deleteTarget: null,
+  newEntryTarget: null,
 
   openMenu: (entry, x, y) =>
     set({
@@ -82,5 +91,17 @@ export const useContextMenuStore = create<ContextMenuState>((set) => ({
   closeDeleteDialog: () =>
     set({
       deleteTarget: null,
+    }),
+
+  openNewEntryDialog: (dirPath, kind) =>
+    set({
+      newEntryTarget: { dirPath, kind },
+      isOpen: false,
+      targetEntry: null,
+    }),
+
+  closeNewEntryDialog: () =>
+    set({
+      newEntryTarget: null,
     }),
 }));
