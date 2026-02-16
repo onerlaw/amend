@@ -1,9 +1,10 @@
-import { useEffect, useRef, forwardRef, useImperativeHandle, useCallback } from 'react';
+import { useEffect, useRef, forwardRef, useImperativeHandle, useCallback, useMemo } from 'react';
 import { open } from '@tauri-apps/plugin-dialog';
 import { homeDir } from '@tauri-apps/api/path';
 import { useTerminalStore, TerminalTab } from '@/stores/terminalStore';
 import { useUIStore } from '@/stores/uiStore';
 import { useCreateTerminal, useCloseTerminal } from '@/hooks/useTerminalLifecycle';
+import { useTabGitRoots } from '@/hooks/useTabGitRoots';
 import { TerminalPane } from './TerminalPane';
 import { CloseIcon, FolderIcon } from '@/components/Icons';
 import { getFileName, formatShortcut } from '@/lib/fileUtils';
@@ -14,6 +15,49 @@ function TerminalTabLabel({ tab }: { tab: TerminalTab }) {
   const mainText = tab.title || dirName;
 
   return <span className="truncate max-w-[200px]">{mainText}</span>;
+}
+
+interface TabGroup {
+  projectName: string;
+  gitRoot: string | null;
+  tabs: TerminalTab[];
+  globalIndices: number[];
+}
+
+function groupTabsByProject(tabs: TerminalTab[]): TabGroup[] {
+  const groups: TabGroup[] = [];
+  const groupMap = new Map<string, TabGroup>();
+
+  for (let i = 0; i < tabs.length; i++) {
+    const tab = tabs[i];
+    // Treat undefined (not yet resolved) same as null (no repo)
+    const root = tab.gitRoot ?? null;
+    const key = root ?? '~';
+
+    let group = groupMap.get(key);
+    if (!group) {
+      group = {
+        projectName: root ? getFileName(root) : '~',
+        gitRoot: root,
+        tabs: [],
+        globalIndices: [],
+      };
+      groupMap.set(key, group);
+      groups.push(group);
+    }
+    group.tabs.push(tab);
+    group.globalIndices.push(i);
+  }
+
+  return groups;
+}
+
+function ProjectBadge({ name }: { name: string }) {
+  return (
+    <span className="flex items-center px-1.5 text-[10px] text-tertiary font-medium select-none shrink-0">
+      {name}
+    </span>
+  );
 }
 
 export interface TerminalTabsHandle {
@@ -31,6 +75,9 @@ export const TerminalTabs = forwardRef<TerminalTabsHandle>(function TerminalTabs
     itemCount: tabs.length,
     onReorder: reorderTabs,
   });
+
+  useTabGitRoots();
+  const groups = useMemo(() => groupTabsByProject(tabs), [tabs]);
 
   // Auto-create a terminal in home dir when none exist
   useEffect(() => {
@@ -97,31 +144,40 @@ export const TerminalTabs = forwardRef<TerminalTabsHandle>(function TerminalTabs
     >
       {/* Tab bar */}
       <div className="flex items-center bg-surface-2 px-1 pt-1 gap-0.5">
-        <div ref={containerRef} className="flex flex-1 overflow-x-auto gap-0.5">
-          {tabs.map((tab, index) => (
-            <div key={tab.id} className="relative flex">
-              {dropIndicatorIndex === index && (
-                <div className="absolute left-0 top-1 bottom-1 w-0.5 bg-accent rounded-full z-10 pointer-events-none" />
-              )}
-              <button
-                {...getTabDragProps(index)}
-                onClick={() => setActiveTab(tab.id)}
-                className={`group flex items-center gap-1.5 px-2 py-1 text-xs ${
-                  activeTabId === tab.id
-                    ? 'bg-terminal-bg text-primary'
-                    : 'text-secondary hover:bg-surface-1'
-                } ${dragFromIndex === index ? 'opacity-50' : ''}`}
-                title={tab.cwd}
-              >
-                <TerminalTabLabel tab={tab} />
-                <span
-                  onMouseDown={(e) => e.stopPropagation()}
-                  onClick={(e) => handleCloseTerminal(e, tab.id)}
-                  className="ml-1 rounded-full p-0.5 opacity-0 hover:bg-surface-3 group-hover:opacity-100"
-                >
-                  <CloseIcon />
-                </span>
-              </button>
+        <div ref={containerRef} className="flex flex-1 overflow-x-auto gap-0.5 items-center">
+          {groups.map((group, groupIdx) => (
+            <div key={group.gitRoot ?? '~'} className="contents">
+              {groupIdx > 0 && <div className="w-px h-4 bg-surface-3 shrink-0" />}
+              {groups.length > 1 && <ProjectBadge name={group.projectName} />}
+              {group.tabs.map((tab, tabIdx) => {
+                const globalIndex = group.globalIndices[tabIdx];
+                return (
+                  <div key={tab.id} className="relative flex">
+                    {dropIndicatorIndex === globalIndex && (
+                      <div className="absolute left-0 top-1 bottom-1 w-0.5 bg-accent rounded-full z-10 pointer-events-none" />
+                    )}
+                    <button
+                      {...getTabDragProps(globalIndex)}
+                      onClick={() => setActiveTab(tab.id)}
+                      className={`group flex items-center gap-1.5 px-2 py-1 text-xs ${
+                        activeTabId === tab.id
+                          ? 'bg-terminal-bg text-primary'
+                          : 'text-secondary hover:bg-surface-1'
+                      } ${dragFromIndex === globalIndex ? 'opacity-50' : ''}`}
+                      title={tab.cwd}
+                    >
+                      <TerminalTabLabel tab={tab} />
+                      <span
+                        onMouseDown={(e) => e.stopPropagation()}
+                        onClick={(e) => handleCloseTerminal(e, tab.id)}
+                        className="ml-1 rounded-full p-0.5 opacity-0 hover:bg-surface-3 group-hover:opacity-100"
+                      >
+                        <CloseIcon />
+                      </span>
+                    </button>
+                  </div>
+                );
+              })}
             </div>
           ))}
           {dropIndicatorIndex === tabs.length && (
