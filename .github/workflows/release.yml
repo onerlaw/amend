@@ -198,8 +198,10 @@ jobs:
       - name: Generate macOS icon with proper padding
         if: matrix.platform == 'macos-latest'
         run: |
-          pip3 install Pillow
-          python3 scripts/generate-macos-icon.py
+          python3 -m venv .venv
+          source .venv/bin/activate
+          pip install Pillow
+          python scripts/generate-macos-icon.py
 
       - name: Build and release
         uses: tauri-apps/tauri-action@v0
