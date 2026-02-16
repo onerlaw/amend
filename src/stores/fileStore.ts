@@ -121,11 +121,11 @@ export const useFileStore = create<FileState>()((set, get) => ({
   syncTabContext: (newContextPath: string | null) => {
     const state = get();
     if (state.contextPath === newContextPath) {
-      console.log('[CWD] syncTabContext: no change, skipping', { contextPath: newContextPath });
+      if (import.meta.env.DEV) console.log('[CWD] syncTabContext: no change, skipping', { contextPath: newContextPath });
       return;
     }
 
-    console.log('[CWD] syncTabContext:', { from: state.contextPath, to: newContextPath });
+    if (import.meta.env.DEV) console.log('[CWD] syncTabContext:', { from: state.contextPath, to: newContextPath });
 
     // Save current browse state for the old context
     const saved = { ...state.savedBrowseState };

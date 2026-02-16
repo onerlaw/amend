@@ -66,6 +66,7 @@ pub fn run() {
             watcher::stop_watching_directory,
             // Symbol navigation commands
             index_project,
+            remove_file_from_index,
             find_definition,
             find_references,
         ])
@@ -81,6 +82,11 @@ async fn index_project(root_path: String, index: State<'_, SymbolIndex>) -> Resu
     spawn_blocking(move || idx.index_project(&root_path))
         .await
         .map_err(|e| format!("Task failed: {}", e))?
+}
+
+#[tauri::command]
+fn remove_file_from_index(file_path: String, index: State<'_, SymbolIndex>) {
+    index.remove_file(&file_path);
 }
 
 #[tauri::command]

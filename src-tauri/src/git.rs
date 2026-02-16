@@ -2,7 +2,7 @@ use crate::error::impl_serialize_as_string;
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use git2::{DiffOptions, Repository, StatusOptions};
 use serde::{Deserialize, Serialize};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 use thiserror::Error;
 use tokio::task::spawn_blocking;
@@ -82,6 +82,69 @@ fn validate_no_flag(arg: &str, label: &str) -> Result<(), GitError> {
         )));
     }
     Ok(())
+}
+
+/// Validate that a file_path is contained within the repository working directory.
+/// Rejects absolute paths, parent traversal (`..`), and paths that escape via symlinks.
+fn validate_repo_containment(repo: &Repository, file_path: &str) -> Result<PathBuf, GitError> {
+    let path = Path::new(file_path);
+
+    // Reject absolute paths — file_path must be relative to the repo workdir
+    if path.is_absolute() {
+        return Err(GitError::InvalidArgument(format!(
+            "file path must be relative, not absolute: {}",
+            file_path
+        )));
+    }
+
+    // Reject any `..` components before joining (prevents traversal before canonicalize)
+    for component in path.components() {
+        if let std::path::Component::ParentDir = component {
+            return Err(GitError::InvalidArgument(format!(
+                "file path must not contain '..': {}",
+                file_path
+            )));
+        }
+    }
+
+    let workdir = repo
+        .workdir()
+        .ok_or_else(|| GitError::NotARepo("bare repository".to_string()))?;
+
+    let full_path = workdir.join(file_path);
+
+    // Canonicalize both paths and verify containment.
+    // For the target, if it doesn't exist yet (e.g. deleted file), canonicalize the parent.
+    let canonical_workdir = workdir.canonicalize().map_err(|e| {
+        GitError::InvalidArgument(format!("failed to resolve repo workdir: {}", e))
+    })?;
+
+    let canonical_target = if full_path.exists() {
+        full_path.canonicalize().map_err(|e| {
+            GitError::InvalidArgument(format!("failed to resolve file path: {}", e))
+        })?
+    } else {
+        // For non-existent files, canonicalize the parent and append the file name
+        let parent = full_path.parent().ok_or_else(|| {
+            GitError::InvalidArgument(format!("invalid file path: {}", file_path))
+        })?;
+        let file_name = full_path.file_name().ok_or_else(|| {
+            GitError::InvalidArgument(format!("invalid file path: {}", file_path))
+        })?;
+        let canonical_parent = parent.canonicalize().map_err(|e| {
+            GitError::InvalidArgument(format!("failed to resolve file path parent: {}", e))
+        })?;
+        canonical_parent.join(file_name)
+    };
+
+    if !canonical_target.starts_with(&canonical_workdir) {
+        return Err(GitError::InvalidArgument(format!(
+            "file path escapes repository: {}",
+            file_path
+        )));
+    }
+
+    Ok(full_path)
 }
 
 fn is_image_extension(path: &str) -> bool {
@@ -207,11 +270,7 @@ pub async fn get_file_diff(repo_path: String, file_path: String) -> Result<GitDi
 
 fn get_file_diff_sync(repo_path: &str, file_path: &str) -> Result<GitDiff, GitError> {
     let repo = Repository::discover(repo_path)?;
-    let workdir = repo
-        .workdir()
-        .ok_or_else(|| GitError::NotARepo(repo_path.to_string()))?;
-
-    let full_path = workdir.join(file_path);
+    let full_path = validate_repo_containment(&repo, file_path)?;
     let relative_path = Path::new(file_path);
 
     if is_image_extension(file_path) {
@@ -342,7 +401,8 @@ pub async fn add_worktree(
     branch: Option<String>,
     new_branch: Option<String>,
 ) -> Result<GitWorktree, GitError> {
-    // Validate branch names don't start with '-'
+    // Validate all user-provided arguments don't start with '-'
+    validate_no_flag(&worktree_path, "worktree path")?;
     if let Some(ref b) = branch {
         validate_no_flag(b, "branch name")?;
     }
@@ -361,6 +421,8 @@ pub async fn add_worktree(
             args.push(&new_branch_arg);
         }
 
+        // Use -- to separate options from positional arguments
+        args.push("--");
         args.push(&worktree_path);
 
         let branch_arg;
@@ -400,6 +462,7 @@ pub async fn remove_worktree(
     worktree_path: String,
     force: bool,
 ) -> Result<(), GitError> {
+    validate_no_flag(&worktree_path, "worktree path")?;
     spawn_blocking(move || {
         let mut args = vec!["worktree", "remove"];
 
@@ -407,6 +470,8 @@ pub async fn remove_worktree(
             args.push("--force");
         }
 
+        // Use -- to separate options from positional arguments
+        args.push("--");
         args.push(&worktree_path);
 
         run_git_command(&repo_path, &args)?;
@@ -779,11 +844,7 @@ fn get_branch_file_diff_sync(
     file_path: &str,
 ) -> Result<GitDiff, GitError> {
     let repo = Repository::discover(repo_path)?;
-    let workdir = repo
-        .workdir()
-        .ok_or_else(|| GitError::NotARepo(repo_path.to_string()))?;
-
-    let full_path = workdir.join(file_path);
+    let full_path = validate_repo_containment(&repo, file_path)?;
 
     if is_image_extension(file_path) {
         // Read current file as base64
@@ -1039,6 +1100,285 @@ mod tests {
         #[test]
         fn maps_wt_renamed() {
             assert_eq!(wt_status_to_string(git2::Status::WT_RENAMED), "renamed");
+        }
+    }
+
+    mod validate_repo_containment_tests {
+        use super::*;
+
+        /// Helper: create a temp dir with a git repo initialized in it.
+        fn setup_repo() -> (tempfile::TempDir, Repository) {
+            let dir = tempfile::tempdir().expect("failed to create temp dir");
+            let repo = Repository::init(dir.path()).expect("failed to init repo");
+            (dir, repo)
+        }
+
+        #[test]
+        fn accepts_simple_relative_path() {
+            let (dir, repo) = setup_repo();
+            // Create the file so canonicalize succeeds
+            let file = dir.path().join("hello.txt");
+            std::fs::write(&file, "content").unwrap();
+
+            let result = validate_repo_containment(&repo, "hello.txt");
+            assert!(result.is_ok(), "expected Ok, got {:?}", result);
+        }
+
+        #[test]
+        fn accepts_nested_relative_path() {
+            let (dir, repo) = setup_repo();
+            let sub = dir.path().join("src");
+            std::fs::create_dir(&sub).unwrap();
+            std::fs::write(sub.join("main.rs"), "fn main(){}").unwrap();
+
+            let result = validate_repo_containment(&repo, "src/main.rs");
+            assert!(result.is_ok());
+        }
+
+        #[test]
+        fn rejects_absolute_path() {
+            let (_dir, repo) = setup_repo();
+            let result = validate_repo_containment(&repo, "/etc/passwd");
+            assert!(result.is_err());
+            let err = result.unwrap_err().to_string();
+            assert!(err.contains("must be relative"), "unexpected error: {}", err);
+        }
+
+        #[test]
+        fn rejects_parent_traversal() {
+            let (_dir, repo) = setup_repo();
+            let result = validate_repo_containment(&repo, "../../../etc/passwd");
+            assert!(result.is_err());
+            let err = result.unwrap_err().to_string();
+            assert!(
+                err.contains("must not contain '..'"),
+                "unexpected error: {}",
+                err
+            );
+        }
+
+        #[test]
+        fn rejects_embedded_parent_traversal() {
+            let (_dir, repo) = setup_repo();
+            let result = validate_repo_containment(&repo, "src/../../etc/passwd");
+            assert!(result.is_err());
+            let err = result.unwrap_err().to_string();
+            assert!(
+                err.contains("must not contain '..'"),
+                "unexpected error: {}",
+                err
+            );
+        }
+
+        #[test]
+        fn rejects_symlink_escape() {
+            let (dir, repo) = setup_repo();
+            // Create a symlink inside the repo that points outside
+            let link_path = dir.path().join("escape");
+            #[cfg(unix)]
+            std::os::unix::fs::symlink("/tmp", &link_path).unwrap();
+            #[cfg(windows)]
+            std::os::windows::fs::symlink_dir("C:\\Windows", &link_path).unwrap();
+
+            // Create a target file outside the repo for the symlink to reach
+            let outside_file = std::path::Path::new("/tmp/amend_test_containment.txt");
+            std::fs::write(outside_file, "secret").ok();
+
+            let result =
+                validate_repo_containment(&repo, "escape/amend_test_containment.txt");
+            assert!(result.is_err());
+            let err = result.unwrap_err().to_string();
+            assert!(
+                err.contains("escapes repository"),
+                "unexpected error: {}",
+                err
+            );
+
+            // Clean up
+            std::fs::remove_file(outside_file).ok();
+        }
+
+        #[test]
+        fn allows_nonexistent_file_within_repo() {
+            let (_dir, repo) = setup_repo();
+            // File doesn't exist but parent (workdir root) does — should be OK
+            let result = validate_repo_containment(&repo, "new_file.txt");
+            assert!(result.is_ok(), "expected Ok, got {:?}", result);
+        }
+    }
+
+    mod get_file_diff_containment_tests {
+        use super::*;
+
+        fn setup_repo_with_commit() -> (tempfile::TempDir, Repository) {
+            let dir = tempfile::tempdir().expect("failed to create temp dir");
+            let repo = Repository::init(dir.path()).expect("failed to init repo");
+
+            // Create a file and make an initial commit so HEAD exists
+            let file = dir.path().join("readme.txt");
+            std::fs::write(&file, "initial content").unwrap();
+
+            let mut index = repo.index().unwrap();
+            index.add_path(std::path::Path::new("readme.txt")).unwrap();
+            index.write().unwrap();
+            let tree_oid = index.write_tree().unwrap();
+            {
+                let tree = repo.find_tree(tree_oid).unwrap();
+                let sig = git2::Signature::now("test", "test@test.com").unwrap();
+                repo.commit(Some("HEAD"), &sig, &sig, "init", &tree, &[])
+                    .unwrap();
+            }
+
+            (dir, repo)
+        }
+
+        #[test]
+        fn rejects_absolute_path_through_diff() {
+            let (dir, _repo) = setup_repo_with_commit();
+            let repo_path = dir.path().to_str().unwrap();
+            let result = get_file_diff_sync(repo_path, "/etc/passwd");
+            assert!(result.is_err());
+            let err = result.unwrap_err().to_string();
+            assert!(
+                err.contains("must be relative"),
+                "unexpected error: {}",
+                err
+            );
+        }
+
+        #[test]
+        fn rejects_parent_traversal_through_diff() {
+            let (dir, _repo) = setup_repo_with_commit();
+            let repo_path = dir.path().to_str().unwrap();
+            let result = get_file_diff_sync(repo_path, "../../../etc/passwd");
+            assert!(result.is_err());
+            let err = result.unwrap_err().to_string();
+            assert!(
+                err.contains("must not contain '..'"),
+                "unexpected error: {}",
+                err
+            );
+        }
+
+        #[test]
+        #[cfg(unix)]
+        fn rejects_symlink_escape_through_diff() {
+            let (dir, _repo) = setup_repo_with_commit();
+            let repo_path = dir.path().to_str().unwrap();
+
+            // Create a symlink inside the repo that points outside
+            let link_path = dir.path().join("escape");
+            std::os::unix::fs::symlink("/tmp", &link_path).unwrap();
+
+            let outside_file = std::path::Path::new("/tmp/amend_diff_test.txt");
+            std::fs::write(outside_file, "secret").ok();
+
+            let result = get_file_diff_sync(repo_path, "escape/amend_diff_test.txt");
+            assert!(result.is_err());
+            let err = result.unwrap_err().to_string();
+            assert!(
+                err.contains("escapes repository"),
+                "unexpected error: {}",
+                err
+            );
+
+            std::fs::remove_file(outside_file).ok();
+        }
+
+        #[test]
+        fn accepts_valid_file_through_diff() {
+            let (dir, _repo) = setup_repo_with_commit();
+            let repo_path = dir.path().to_str().unwrap();
+
+            // readme.txt was committed, so diff should succeed
+            let result = get_file_diff_sync(repo_path, "readme.txt");
+            assert!(result.is_ok(), "expected Ok, got {:?}", result);
+            let diff = result.unwrap();
+            assert_eq!(diff.new_content, "initial content");
+        }
+    }
+
+    mod get_branch_file_diff_containment_tests {
+        use super::*;
+
+        fn setup_repo_with_commit() -> (tempfile::TempDir, Repository) {
+            let dir = tempfile::tempdir().expect("failed to create temp dir");
+            let repo = Repository::init(dir.path()).expect("failed to init repo");
+
+            let file = dir.path().join("readme.txt");
+            std::fs::write(&file, "initial").unwrap();
+
+            let mut index = repo.index().unwrap();
+            index.add_path(std::path::Path::new("readme.txt")).unwrap();
+            index.write().unwrap();
+            let tree_oid = index.write_tree().unwrap();
+            {
+                let tree = repo.find_tree(tree_oid).unwrap();
+                let sig = git2::Signature::now("test", "test@test.com").unwrap();
+                repo.commit(Some("HEAD"), &sig, &sig, "init", &tree, &[])
+                    .unwrap();
+            }
+
+            (dir, repo)
+        }
+
+        #[test]
+        fn rejects_absolute_path_through_branch_diff() {
+            let (dir, _repo) = setup_repo_with_commit();
+            let repo_path = dir.path().to_str().unwrap();
+            let result = get_branch_file_diff_sync(repo_path, "HEAD", "/etc/passwd");
+            assert!(result.is_err());
+            let err = result.unwrap_err().to_string();
+            assert!(err.contains("must be relative"), "unexpected error: {}", err);
+        }
+
+        #[test]
+        fn rejects_parent_traversal_through_branch_diff() {
+            let (dir, _repo) = setup_repo_with_commit();
+            let repo_path = dir.path().to_str().unwrap();
+            let result = get_branch_file_diff_sync(repo_path, "HEAD", "../../etc/passwd");
+            assert!(result.is_err());
+            let err = result.unwrap_err().to_string();
+            assert!(
+                err.contains("must not contain '..'"),
+                "unexpected error: {}",
+                err
+            );
+        }
+    }
+
+    mod worktree_path_injection_tests {
+        use super::*;
+
+        #[test]
+        fn rejects_worktree_path_with_double_dash_flag() {
+            let result = validate_no_flag("--exec=evil", "worktree path");
+            assert!(result.is_err());
+            let err = result.unwrap_err().to_string();
+            assert!(
+                err.contains("must not start with '-'"),
+                "unexpected error: {}",
+                err
+            );
+        }
+
+        #[test]
+        fn rejects_worktree_path_with_single_dash_flag() {
+            let result = validate_no_flag("-b", "worktree path");
+            assert!(result.is_err());
+        }
+
+        #[test]
+        fn rejects_worktree_path_with_force_flag() {
+            let result = validate_no_flag("--force", "worktree path");
+            assert!(result.is_err());
+        }
+
+        #[test]
+        fn accepts_normal_worktree_path() {
+            assert!(validate_no_flag("/home/user/worktrees/feature", "worktree path").is_ok());
+            assert!(validate_no_flag("../worktrees/feature", "worktree path").is_ok());
+            assert!(validate_no_flag("my-worktree", "worktree path").is_ok());
         }
     }
 }

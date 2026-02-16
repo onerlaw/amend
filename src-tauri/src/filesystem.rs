@@ -83,22 +83,68 @@ const SENSITIVE_PREFIXES: &[&str] = &[
     "C:\\Program Files (x86)",
 ];
 
-/// Validate a path for mutation operations (write, delete, copy, move, rename).
-/// Rejects paths inside sensitive system directories in addition to the base checks.
-fn validate_mutation_path(path: &str) -> Result<PathBuf, FileSystemError> {
-    let p = validate_path(path)?;
+/// Check whether a path falls inside any sensitive system directory.
+fn is_sensitive_path(p: &Path) -> bool {
     let path_str = p.to_string_lossy();
     for prefix in SENSITIVE_PREFIXES {
         if path_str.starts_with(prefix)
             && (path_str.len() == prefix.len()
                 || path_str.as_bytes().get(prefix.len()) == Some(&b'/'))
         {
-            return Err(FileSystemError::InvalidPath(format!(
-                "refusing to mutate sensitive system path: {}",
-                path
-            )));
+            return true;
         }
     }
+    false
+}
+
+/// Validate a path for mutation operations (write, delete, copy, move, rename).
+/// Canonicalizes the path to resolve symlinks and then verifies it does not
+/// land inside a sensitive system directory.
+fn validate_mutation_path(path: &str) -> Result<PathBuf, FileSystemError> {
+    let p = validate_path(path)?;
+
+    // First, check the literal path against sensitive prefixes
+    if is_sensitive_path(&p) {
+        return Err(FileSystemError::InvalidPath(format!(
+            "refusing to mutate sensitive system path: {}",
+            path
+        )));
+    }
+
+    // Canonicalize to resolve symlinks and re-check. For paths that don't exist
+    // yet (e.g. write to new file), canonicalize the parent directory.
+    let canonical = if p.exists() {
+        p.canonicalize().map_err(|e| {
+            FileSystemError::InvalidPath(format!("failed to resolve path: {}", e))
+        })?
+    } else if let Some(parent) = p.parent() {
+        if parent.exists() {
+            let canonical_parent = parent.canonicalize().map_err(|e| {
+                FileSystemError::InvalidPath(format!(
+                    "failed to resolve parent directory: {}",
+                    e
+                ))
+            })?;
+            let file_name = p.file_name().ok_or_else(|| {
+                FileSystemError::InvalidPath(format!("invalid path: {}", path))
+            })?;
+            canonical_parent.join(file_name)
+        } else {
+            // Parent doesn't exist either; literal path is fine since nothing to resolve
+            p.clone()
+        }
+    } else {
+        p.clone()
+    };
+
+    if is_sensitive_path(&canonical) {
+        return Err(FileSystemError::InvalidPath(format!(
+            "refusing to mutate sensitive system path (resolves to {}): {}",
+            canonical.display(),
+            path
+        )));
+    }
+
     Ok(p)
 }
 
@@ -122,6 +168,29 @@ pub struct SearchResult {
     pub match_type: String,
     pub line_number: Option<u32>,
     pub line_content: Option<String>,
+}
+
+/// Case-insensitive substring search at the byte level.
+/// `needle` must already be lowercase ASCII. Avoids allocating a new
+/// lowercased String for every line we scan.
+#[inline]
+fn contains_case_insensitive(haystack: &[u8], needle: &[u8]) -> bool {
+    if needle.is_empty() {
+        return true;
+    }
+    if haystack.len() < needle.len() {
+        return false;
+    }
+    let limit = haystack.len() - needle.len();
+    'outer: for i in 0..=limit {
+        for j in 0..needle.len() {
+            if haystack[i + j].to_ascii_lowercase() != needle[j] {
+                continue 'outer;
+            }
+        }
+        return true;
+    }
+    false
 }
 
 #[derive(Default, Clone)]
@@ -221,9 +290,10 @@ impl FileSystemManager {
         }
 
         let query_lower = query.to_lowercase();
+        let query_lower_bytes = query_lower.as_bytes();
         let mut filename_matches = Vec::new();
         let mut content_matches = Vec::new();
-        const MAX_RESULTS: usize = 50;
+        const MAX_RESULTS: usize = 200;
 
         let walker = WalkBuilder::new(path)
             .hidden(false)
@@ -277,7 +347,7 @@ impl FileSystemManager {
                 }
                 if let Ok(content) = fs::read_to_string(entry_path) {
                     for (line_num, line) in content.lines().enumerate() {
-                        if line.to_lowercase().contains(&query_lower) {
+                        if contains_case_insensitive(line.as_bytes(), query_lower_bytes) {
                             content_matches.push(SearchResult {
                                 path: entry_path.display().to_string(),
                                 name: name.clone(),
@@ -354,7 +424,31 @@ impl FileSystemManager {
             let src_path = entry.path();
             let dest_path = dest.join(entry.file_name());
 
-            if src_path.is_dir() {
+            // Use symlink_metadata to detect symlinks without following them
+            let meta = fs::symlink_metadata(&src_path)?;
+            if meta.is_symlink() {
+                // Resolve the symlink target and verify it doesn't escape to a sensitive path
+                let resolved = src_path.canonicalize().map_err(|e| {
+                    FileSystemError::InvalidPath(format!(
+                        "failed to resolve symlink {}: {}",
+                        src_path.display(),
+                        e
+                    ))
+                })?;
+                if is_sensitive_path(&resolved) {
+                    return Err(FileSystemError::InvalidPath(format!(
+                        "symlink {} resolves to sensitive path {}",
+                        src_path.display(),
+                        resolved.display()
+                    )));
+                }
+                // Copy the resolved target, not the symlink itself
+                if resolved.is_dir() {
+                    self.copy_dir_recursive(&resolved, &dest_path)?;
+                } else {
+                    fs::copy(&resolved, &dest_path)?;
+                }
+            } else if meta.is_dir() {
                 self.copy_dir_recursive(&src_path, &dest_path)?;
             } else {
                 fs::copy(&src_path, &dest_path)?;
@@ -745,6 +839,198 @@ mod tests {
         #[test]
         fn still_rejects_relative() {
             assert!(validate_mutation_path("relative/path").is_err());
+        }
+
+        #[test]
+        #[cfg(unix)]
+        fn rejects_symlink_to_sensitive_path() {
+            // Create a symlink inside a temp dir that points to /usr/bin
+            let dir = tempfile::tempdir().expect("failed to create temp dir");
+            let link = dir.path().join("escape_link");
+            std::os::unix::fs::symlink("/usr/bin", &link).unwrap();
+
+            let link_str = link.to_string_lossy().to_string();
+            // The symlink itself exists, so canonicalize resolves it to /usr/bin
+            let result = validate_mutation_path(&link_str);
+            assert!(result.is_err(), "expected Err, got {:?}", result);
+            let err_msg = format!("{}", result.unwrap_err());
+            assert!(
+                err_msg.contains("sensitive system path"),
+                "unexpected error: {}",
+                err_msg
+            );
+        }
+
+        #[test]
+        #[cfg(unix)]
+        fn rejects_symlink_child_to_sensitive_path() {
+            // Create a symlink inside a temp dir that points to /etc
+            let dir = tempfile::tempdir().expect("failed to create temp dir");
+            let link = dir.path().join("etc_link");
+            std::os::unix::fs::symlink("/etc", &link).unwrap();
+
+            // Try to write through the symlink to a child path
+            let target = format!("{}/passwd", link.to_string_lossy());
+            let result = validate_mutation_path(&target);
+            assert!(result.is_err(), "expected Err, got {:?}", result);
+        }
+
+        #[test]
+        #[cfg(unix)]
+        fn accepts_symlink_to_safe_path() {
+            // Use a directory under the user home to avoid macOS /tmp -> /private/var resolution
+            let home = std::env::var("HOME").expect("HOME not set");
+            let test_base = PathBuf::from(&home).join(".amend_test_symlink_safe");
+            let _ = std::fs::remove_dir_all(&test_base);
+            std::fs::create_dir_all(&test_base).unwrap();
+
+            let safe_dir = test_base.join("safe_target");
+            std::fs::create_dir(&safe_dir).unwrap();
+
+            let link = test_base.join("safe_link");
+            std::os::unix::fs::symlink(&safe_dir, &link).unwrap();
+
+            let file_path = format!("{}/file.txt", link.to_string_lossy());
+            let result = validate_mutation_path(&file_path);
+
+            // Clean up before asserting
+            let _ = std::fs::remove_dir_all(&test_base);
+
+            assert!(result.is_ok(), "expected Ok, got {:?}", result);
+        }
+    }
+
+    mod copy_dir_symlink_tests {
+        use super::*;
+
+        #[test]
+        #[cfg(unix)]
+        fn copy_dir_recursive_rejects_symlink_to_sensitive_path() {
+            let mgr = FileSystemManager::new();
+            let dir = tempfile::tempdir().expect("failed to create temp dir");
+            let src = dir.path().join("src_dir");
+            std::fs::create_dir(&src).unwrap();
+
+            // Create a symlink inside src that points to /usr
+            let link = src.join("usr_link");
+            std::os::unix::fs::symlink("/usr", &link).unwrap();
+
+            let dest = dir.path().join("dest_dir");
+            let result = mgr.copy_dir_recursive(&src, &dest);
+            assert!(result.is_err(), "expected Err, got {:?}", result);
+            let err_msg = format!("{}", result.unwrap_err());
+            assert!(
+                err_msg.contains("sensitive path"),
+                "unexpected error: {}",
+                err_msg
+            );
+        }
+
+        #[test]
+        #[cfg(unix)]
+        fn copy_dir_recursive_follows_safe_symlink() {
+            let mgr = FileSystemManager::new();
+            // Use a directory under user home to avoid macOS /tmp -> /private/var resolution
+            let home = std::env::var("HOME").expect("HOME not set");
+            let test_base = PathBuf::from(&home).join(".amend_test_copy_symlink");
+            let _ = std::fs::remove_dir_all(&test_base);
+            std::fs::create_dir_all(&test_base).unwrap();
+
+            let src = test_base.join("src_dir");
+            std::fs::create_dir(&src).unwrap();
+
+            // Create a real file and a symlink to it (both safe)
+            let real_file = src.join("real.txt");
+            std::fs::write(&real_file, "hello").unwrap();
+
+            let safe_target = test_base.join("safe_target");
+            std::fs::create_dir(&safe_target).unwrap();
+            std::fs::write(safe_target.join("data.txt"), "world").unwrap();
+
+            let link = src.join("safe_link");
+            std::os::unix::fs::symlink(&safe_target, &link).unwrap();
+
+            let dest = test_base.join("dest_dir");
+            let result = mgr.copy_dir_recursive(&src, &dest);
+
+            // Verify before cleanup
+            let link_data_exists = dest.join("safe_link").join("data.txt").exists();
+            let real_exists = dest.join("real.txt").exists();
+
+            // Clean up
+            let _ = std::fs::remove_dir_all(&test_base);
+
+            assert!(result.is_ok(), "expected Ok, got {:?}", result);
+            assert!(link_data_exists, "linked content should be copied");
+            assert!(real_exists, "real file should be copied");
+        }
+    }
+
+    mod mutation_symlink_safety_tests {
+        use super::*;
+
+        #[test]
+        #[cfg(unix)]
+        fn write_file_rejects_symlink_to_sensitive_path() {
+            let dir = tempfile::tempdir().expect("failed to create temp dir");
+            let link = dir.path().join("etc_link");
+            std::os::unix::fs::symlink("/etc", &link).unwrap();
+
+            let mgr = FileSystemManager::new();
+            let target = format!("{}/evil.conf", link.to_string_lossy());
+            let result = mgr.write_file(&target, "malicious");
+            assert!(result.is_err(), "expected Err, got {:?}", result);
+            let err_msg = format!("{}", result.unwrap_err());
+            assert!(
+                err_msg.contains("sensitive system path"),
+                "unexpected error: {}",
+                err_msg
+            );
+        }
+
+        #[test]
+        #[cfg(unix)]
+        fn delete_file_rejects_symlink_to_sensitive_path() {
+            let dir = tempfile::tempdir().expect("failed to create temp dir");
+            let link = dir.path().join("usr_link");
+            std::os::unix::fs::symlink("/usr", &link).unwrap();
+
+            let mgr = FileSystemManager::new();
+            let target = format!("{}/bin/ls", link.to_string_lossy());
+            let result = mgr.delete_file(&target);
+            assert!(result.is_err(), "expected Err, got {:?}", result);
+        }
+
+        #[test]
+        #[cfg(unix)]
+        fn rename_entry_rejects_symlink_dest_to_sensitive_path() {
+            let dir = tempfile::tempdir().expect("failed to create temp dir");
+            let src = dir.path().join("safe.txt");
+            std::fs::write(&src, "data").unwrap();
+
+            let link = dir.path().join("etc_link");
+            std::os::unix::fs::symlink("/etc", &link).unwrap();
+
+            let mgr = FileSystemManager::new();
+            let dest = format!("{}/injected.conf", link.to_string_lossy());
+            let result = mgr.rename_entry(src.to_str().unwrap(), &dest);
+            assert!(result.is_err(), "expected Err, got {:?}", result);
+        }
+
+        #[test]
+        #[cfg(unix)]
+        fn move_entry_rejects_symlink_dest_to_sensitive_path() {
+            let dir = tempfile::tempdir().expect("failed to create temp dir");
+            let src = dir.path().join("safe.txt");
+            std::fs::write(&src, "data").unwrap();
+
+            let link = dir.path().join("var_link");
+            std::os::unix::fs::symlink("/var", &link).unwrap();
+
+            let mgr = FileSystemManager::new();
+            let dest = format!("{}/injected.log", link.to_string_lossy());
+            let result = mgr.move_entry(src.to_str().unwrap(), &dest);
+            assert!(result.is_err(), "expected Err, got {:?}", result);
         }
     }
 }

@@ -424,9 +424,11 @@ pub struct SymbolReference {
 }
 
 impl SymbolIndex {
-    /// Index all supported files in a project directory
+    /// Index all supported files in a project directory.
+    /// After indexing, removes stale entries for files that no longer exist on disk.
     pub fn index_project(&self, root_path: &str) -> Result<(), String> {
         use ignore::WalkBuilder;
+        use std::collections::HashSet;
 
         let walker = WalkBuilder::new(root_path)
             .hidden(false)
@@ -434,6 +436,8 @@ impl SymbolIndex {
             .git_global(true)
             .git_exclude(true)
             .build();
+
+        let mut seen_files = HashSet::new();
 
         for entry in walker {
             let entry = match entry {
@@ -461,7 +465,22 @@ impl SymbolIndex {
                 Err(_) => continue,
             };
 
+            seen_files.insert(path_str.clone());
             self.index_file(&path_str, &content, lang);
+        }
+
+        // Remove stale entries for files that were previously indexed but no longer exist
+        let stale_files: Vec<String> = {
+            let file_symbols = self.file_symbols.read();
+            file_symbols
+                .keys()
+                .filter(|path| !seen_files.contains(path.as_str()))
+                .cloned()
+                .collect()
+        };
+
+        for path in stale_files {
+            self.remove_file(&path);
         }
 
         Ok(())

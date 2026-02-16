@@ -10,11 +10,14 @@ import { SearchIcon, FileIcon, SpinnerIcon } from '@/components/Icons';
 export function GlobalSearch() {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState<SearchResult[]>([]);
+  const [filenameResults, setFilenameResults] = useState<SearchResult[]>([]);
+  const [contentResults, setContentResults] = useState<SearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
+
+  const results = [...filenameResults, ...contentResults];
 
   const { contextPath: searchRoot } = useFileStore();
   const { setPanelMode } = useUIStore();
@@ -22,7 +25,8 @@ export function GlobalSearch() {
   const resetSearch = useCallback((open: boolean) => {
     setIsOpen(open);
     setQuery('');
-    setResults([]);
+    setFilenameResults([]);
+    setContentResults([]);
     setSelectedIndex(0);
   }, []);
 
@@ -67,44 +71,79 @@ export function GlobalSearch() {
     }
   }, [isOpen]);
 
-  // Debounced search with stale-result handling.
-  // The backend uses a generation counter so that when a new search_files call is
-  // issued, any in-flight search aborts early with "Search cancelled". We track
-  // a local generation ID so we never apply results from a stale request.
-  const searchGenRef = useRef(0);
+  // Two-phase search with stale-result handling.
+  // Phase 1: Filename-only search fires quickly (50ms debounce).
+  // Phase 2: Content search fires after a longer debounce (400ms).
+  // The backend uses a generation counter so that when a new search_files call
+  // is issued, any in-flight search aborts early with "Search cancelled". We
+  // track local generation IDs so we never apply results from a stale request.
+  const filenameGenRef = useRef(0);
+  const contentGenRef = useRef(0);
 
+  // Phase 1: fast filename search
   useEffect(() => {
     if (!isOpen || !query.trim() || !searchRoot) {
-      setResults([]);
+      setFilenameResults([]);
       return;
     }
 
-    const gen = ++searchGenRef.current;
+    const gen = ++filenameGenRef.current;
 
     const timeoutId = setTimeout(async () => {
-      setIsSearching(true);
       try {
-        const searchResults = await searchFiles(searchRoot, query.trim(), true);
-        // Only apply results if this is still the latest search
-        if (searchGenRef.current === gen) {
-          setResults(searchResults);
+        const results = await searchFiles(searchRoot, query.trim(), false);
+        if (filenameGenRef.current === gen) {
+          setFilenameResults(results);
           setSelectedIndex(0);
         }
       } catch (err) {
-        // Ignore cancellation errors from the backend (stale search)
         const msg = String(err);
         if (!msg.includes('Search cancelled')) {
-          console.error('Search failed:', err);
+          console.error('Filename search failed:', err);
         }
-        if (searchGenRef.current === gen) {
-          setResults([]);
+        if (filenameGenRef.current === gen) {
+          setFilenameResults([]);
+        }
+      }
+    }, 50);
+
+    return () => clearTimeout(timeoutId);
+  }, [query, isOpen, searchRoot]);
+
+  // Phase 2: slower content search
+  useEffect(() => {
+    if (!isOpen || !query.trim() || !searchRoot) {
+      setContentResults([]);
+      setIsSearching(false);
+      return;
+    }
+
+    const gen = ++contentGenRef.current;
+    setIsSearching(true);
+
+    const timeoutId = setTimeout(async () => {
+      try {
+        const results = await searchFiles(searchRoot, query.trim(), true);
+        if (contentGenRef.current === gen) {
+          // Content search returns both filename and content matches;
+          // filter to content-only since filename results come from phase 1.
+          setContentResults(results.filter((r) => r.matchType === 'content'));
+          setSelectedIndex(0);
+        }
+      } catch (err) {
+        const msg = String(err);
+        if (!msg.includes('Search cancelled')) {
+          console.error('Content search failed:', err);
+        }
+        if (contentGenRef.current === gen) {
+          setContentResults([]);
         }
       } finally {
-        if (searchGenRef.current === gen) {
+        if (contentGenRef.current === gen) {
           setIsSearching(false);
         }
       }
-    }, 150);
+    }, 400);
 
     return () => clearTimeout(timeoutId);
   }, [query, isOpen, searchRoot]);

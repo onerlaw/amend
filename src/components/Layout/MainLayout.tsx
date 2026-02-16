@@ -11,7 +11,7 @@ import { DiffViewerProvider } from '@/components/DiffViewer/DiffViewerContext';
 import type { BrowseEditorTabsHandle } from '@/components/FileBrowser/BrowseEditorTabs';
 import { GlobalSearch } from '@/components/GlobalSearch/GlobalSearch';
 import { ModalOverlay } from '@/components/ModalOverlay';
-import { indexProject, getGitRoot } from '@/lib/tauri';
+import { indexProject, getGitRoot, onFsChanged } from '@/lib/tauri';
 import { formatShortcut } from '@/lib/fileUtils';
 import {
   PlusIcon,
@@ -168,12 +168,12 @@ export function MainLayout() {
 
   // Sync file tree context with active terminal's cwd via git root detection
   useEffect(() => {
-    console.log('[CWD] MainLayout effect fired:', { activeTabCwd });
+    if (import.meta.env.DEV) console.log('[CWD] MainLayout effect fired:', { activeTabCwd });
     if (!activeTabCwd) return;
     let cancelled = false;
 
     getGitRoot(activeTabCwd).then((gitRoot) => {
-      console.log('[CWD] getGitRoot resolved:', { activeTabCwd, gitRoot });
+      if (import.meta.env.DEV) console.log('[CWD] getGitRoot resolved:', { activeTabCwd, gitRoot });
       if (!cancelled) {
         syncTabContext(gitRoot);
       }
@@ -193,6 +193,30 @@ export function MainLayout() {
       });
     }, 2000);
     return () => clearTimeout(timer);
+  }, [contextPath]);
+
+  // Re-index symbols on file system changes (debounced) to clean up stale entries from deletes/renames
+  useEffect(() => {
+    if (!contextPath) return;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let unlisten: (() => void) | undefined;
+
+    onFsChanged(() => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        timer = null;
+        indexProject(contextPath).catch((err) => {
+          console.error('[MainLayout] Failed to re-index after fs change:', err);
+        });
+      }, 5000);
+    }).then((fn) => {
+      unlisten = fn;
+    });
+
+    return () => {
+      unlisten?.();
+      if (timer) clearTimeout(timer);
+    };
   }, [contextPath]);
 
   return (

@@ -90,8 +90,10 @@ export function useDiffQueue(
         });
       } finally {
         loadingRef.current.delete(filePath);
-        activeCountRef.current--;
-        // Continue processing queue only if still current generation
+        // Always decrement — the slot is freed regardless of generation.
+        // Math.max guards against underflow as an invariant safety net.
+        activeCountRef.current = Math.max(0, activeCountRef.current - 1);
+        // Only continue processing the queue if still on the same generation.
         if (generationRef.current === generation) {
           processQueue();
         }
@@ -135,14 +137,15 @@ export function useDiffQueue(
   );
 
   const clear = useCallback(() => {
-    // Bump generation to invalidate all in-flight requests
+    // Bump generation to invalidate all in-flight requests.
+    // Do NOT reset activeCountRef — in-flight requests will still decrement
+    // it in their finally blocks, naturally draining the count to zero.
     generationRef.current++;
     setDiffs(new Map());
     loadingRef.current.clear();
     loadedRef.current.clear();
     queueRef.current = [];
-    activeCountRef.current = 0;
   }, []);
 
-  return { diffs, enqueue, enqueueBatch, clear, generationRef };
+  return { diffs, enqueue, enqueueBatch, clear, generationRef, activeCountRef };
 }

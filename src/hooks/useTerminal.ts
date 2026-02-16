@@ -241,7 +241,7 @@ export function useTerminal(containerId: string | null) {
         try {
           const url = new URL(data);
           const cwd = decodeURIComponent(url.pathname);
-          console.log('[CWD] OSC 7 received:', { raw: data, parsed: cwd, tabId: containerId });
+          if (import.meta.env.DEV) console.log('[CWD] OSC 7 received:', { raw: data, parsed: cwd, tabId: containerId });
           if (cwd) {
             useTerminalStore.getState().updateTabCwd(containerId, cwd);
           }

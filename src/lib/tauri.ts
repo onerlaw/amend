@@ -277,6 +277,10 @@ export async function indexProject(rootPath: string): Promise<void> {
   return invoke('index_project', { rootPath });
 }
 
+export async function removeFileFromIndex(filePath: string): Promise<void> {
+  return invoke('remove_file_from_index', { filePath });
+}
+
 export async function findDefinition(symbol: string): Promise<SymbolDefinition[]> {
   return invoke('find_definition', { symbol });
 }
