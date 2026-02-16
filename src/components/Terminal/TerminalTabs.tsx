@@ -52,11 +52,11 @@ function groupTabsByProject(tabs: TerminalTab[]): TabGroup[] {
   return groups;
 }
 
-function ProjectBadge({ name }: { name: string }) {
+function ProjectLabel({ name }: { name: string }) {
   return (
-    <span className="flex items-center px-1.5 text-[10px] text-tertiary font-medium select-none shrink-0">
+    <div className="px-2 pb-0.5 text-[10px] text-tertiary font-medium select-none leading-none truncate">
       {name}
-    </span>
+    </div>
   );
 }
 
@@ -144,40 +144,44 @@ export const TerminalTabs = forwardRef<TerminalTabsHandle>(function TerminalTabs
     >
       {/* Tab bar */}
       <div className="flex items-center bg-surface-2 px-1 pt-1 gap-0.5">
-        <div ref={containerRef} className="flex flex-1 overflow-x-auto gap-0.5 items-center">
+        <div ref={containerRef} className="flex flex-1 overflow-x-auto gap-0.5 items-end">
           {groups.map((group, groupIdx) => (
-            <div key={group.gitRoot ?? '~'} className="contents">
-              {groupIdx > 0 && <div className="w-px h-4 bg-surface-3 shrink-0" />}
-              {groups.length > 1 && <ProjectBadge name={group.projectName} />}
-              {group.tabs.map((tab, tabIdx) => {
-                const globalIndex = group.globalIndices[tabIdx];
-                return (
-                  <div key={tab.id} className="relative flex">
-                    {dropIndicatorIndex === globalIndex && (
-                      <div className="absolute left-0 top-1 bottom-1 w-0.5 bg-accent rounded-full z-10 pointer-events-none" />
-                    )}
-                    <button
-                      {...getTabDragProps(globalIndex)}
-                      onClick={() => setActiveTab(tab.id)}
-                      className={`group flex items-center gap-1.5 px-2 py-1 text-xs ${
-                        activeTabId === tab.id
-                          ? 'bg-terminal-bg text-primary'
-                          : 'text-secondary hover:bg-surface-1'
-                      } ${dragFromIndex === globalIndex ? 'opacity-50' : ''}`}
-                      title={tab.cwd}
-                    >
-                      <TerminalTabLabel tab={tab} />
-                      <span
-                        onMouseDown={(e) => e.stopPropagation()}
-                        onClick={(e) => handleCloseTerminal(e, tab.id)}
-                        className="ml-1 rounded-full p-0.5 opacity-0 hover:bg-surface-3 group-hover:opacity-100"
-                      >
-                        <CloseIcon />
-                      </span>
-                    </button>
-                  </div>
-                );
-              })}
+            <div key={group.gitRoot ?? '~'} className="flex items-end shrink-0">
+              {groupIdx > 0 && <div className="w-px h-5 bg-surface-3 shrink-0 mb-0.5" />}
+              <div className="flex flex-col">
+                {groups.length > 1 && <ProjectLabel name={group.projectName} />}
+                <div className="flex gap-0.5">
+                  {group.tabs.map((tab, tabIdx) => {
+                    const globalIndex = group.globalIndices[tabIdx];
+                    return (
+                      <div key={tab.id} className="relative flex">
+                        {dropIndicatorIndex === globalIndex && (
+                          <div className="absolute left-0 top-1 bottom-1 w-0.5 bg-accent rounded-full z-10 pointer-events-none" />
+                        )}
+                        <button
+                          {...getTabDragProps(globalIndex)}
+                          onClick={() => setActiveTab(tab.id)}
+                          className={`group flex items-center gap-1.5 px-2 py-1 text-xs ${
+                            activeTabId === tab.id
+                              ? 'bg-terminal-bg text-primary'
+                              : 'text-secondary hover:bg-surface-1'
+                          } ${dragFromIndex === globalIndex ? 'opacity-50' : ''}`}
+                          title={tab.cwd}
+                        >
+                          <TerminalTabLabel tab={tab} />
+                          <span
+                            onMouseDown={(e) => e.stopPropagation()}
+                            onClick={(e) => handleCloseTerminal(e, tab.id)}
+                            className="ml-1 rounded-full p-0.5 opacity-0 hover:bg-surface-3 group-hover:opacity-100"
+                          >
+                            <CloseIcon />
+                          </span>
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
           ))}
           {dropIndicatorIndex === tabs.length && (
