@@ -55,13 +55,6 @@ export function useCommands({ terminalTabsRef, browseEditorTabsRef }: CommandRef
           return;
         }
 
-        // Cmd/Ctrl + D: Duplicate current terminal
-        case 'd': {
-          e.preventDefault();
-          terminalTabsRef.current?.duplicateTerminal();
-          return;
-        }
-
         // Cmd/Ctrl + F (without Shift): Find in file (browse mode)
         case 'f': {
           if (!e.shiftKey && panelMode === 'browse' && browseActiveFilePath) {

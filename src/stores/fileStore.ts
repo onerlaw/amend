@@ -74,7 +74,7 @@ interface FileState {
   contextPath: string | null;
   // Per-context browse state saved when switching tabs
   savedBrowseState: Record<string, SavedBrowseState>;
-  syncTabContext: (newContextPath: string) => void;
+  syncTabContext: (newContextPath: string | null) => void;
   // Browse mode files
   browseOpenFiles: OpenFile[];
   browseActiveFilePath: string | null;
@@ -102,9 +102,14 @@ interface FileState {
 export const useFileStore = create<FileState>()((set, get) => ({
   contextPath: null,
   savedBrowseState: {},
-  syncTabContext: (newContextPath: string) => {
+  syncTabContext: (newContextPath: string | null) => {
     const state = get();
-    if (state.contextPath === newContextPath) return;
+    if (state.contextPath === newContextPath) {
+      console.log('[CWD] syncTabContext: no change, skipping', { contextPath: newContextPath });
+      return;
+    }
+
+    console.log('[CWD] syncTabContext:', { from: state.contextPath, to: newContextPath });
 
     // Save current browse state for the old context
     const saved = { ...state.savedBrowseState };
@@ -115,8 +120,8 @@ export const useFileStore = create<FileState>()((set, get) => ({
       };
     }
 
-    // Restore browse state for the new context (or start empty)
-    const restored = saved[newContextPath];
+    // Restore browse state for the new context (or clear if null)
+    const restored = newContextPath ? saved[newContextPath] : undefined;
 
     set({
       contextPath: newContextPath,
@@ -136,11 +141,7 @@ export const useFileStore = create<FileState>()((set, get) => ({
     set({ browseActiveFilePath: path });
   },
   closeBrowseFile: (path: string) => {
-    const { files, activePath } = tabClose(
-      get().browseOpenFiles,
-      get().browseActiveFilePath,
-      path
-    );
+    const { files, activePath } = tabClose(get().browseOpenFiles, get().browseActiveFilePath, path);
     set({ browseOpenFiles: files, browseActiveFilePath: activePath });
   },
   updateBrowseFileContent: (path: string, content: string) => {

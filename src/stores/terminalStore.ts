@@ -67,8 +67,12 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
   updateTabCwd: (id: string, cwd: string) => {
     const tabs = get().tabs;
     const tab = tabs.find((t) => t.id === id);
-    if (!tab || tab.cwd === cwd) return;
+    if (!tab || tab.cwd === cwd) {
+      if (!tab) console.warn('[CWD] updateTabCwd: tab not found', { id });
+      return;
+    }
 
+    console.log('[CWD] Store updated:', { tabId: id, from: tab.cwd, to: cwd });
     set({
       tabs: tabs.map((t) => (t.id === id ? { ...t, cwd } : t)),
     });

@@ -22,8 +22,12 @@ import {
   MonitorIcon,
   SidebarIcon,
   NotesIcon,
+  BranchIcon,
+  FolderIcon,
 } from '@/components/Icons';
 import { useNotesStore } from '@/stores/notesStore';
+import { WorktreeManager } from '@/components/WorktreeManager';
+import { useCreateTerminal } from '@/hooks/useTerminal';
 
 const DiffContentPanel = lazy(() =>
   import('@/components/DiffViewer/DiffContentPanel').then((m) => ({
@@ -79,11 +83,13 @@ function ShortcutsModal({ onClose }: { onClose: () => void }) {
           {[
             ['New Terminal', formatShortcut('Mod+T')],
             ['Open Folder', formatShortcut('Mod+O')],
-            ['Duplicate Terminal', formatShortcut('Mod+D')],
             ['Cycle Terminals', formatShortcut('Mod+`')],
             ['Close Tab', formatShortcut('Mod+W')],
             ['Search', `${formatShortcut('Mod+P')} / ${formatShortcut('Mod+Shift+F')}`],
             ['Find in File', formatShortcut('Mod+F')],
+            ['Go to Line', formatShortcut('Mod+G')],
+            ['Fold Code', formatShortcut('Mod+Shift+[')],
+            ['Unfold Code', formatShortcut('Mod+Shift+]')],
             ['Paste Files', formatShortcut('Mod+V')],
             ['Toggle Notes', formatShortcut('Mod+Shift+N')],
             ['Increase Font Size', formatShortcut('Mod+=')],
@@ -116,6 +122,8 @@ export function MainLayout() {
   const { browseOpenFiles, syncTabContext, contextPath } = useFileStore();
   const { tabs, activeTabId } = useTerminalStore();
   const [showShortcuts, setShowShortcuts] = useState(false);
+  const [showWorktrees, setShowWorktrees] = useState(false);
+  const createTerminal = useCreateTerminal();
   const terminalTabsRef = useRef<TerminalTabsHandle>(null);
   const browseEditorTabsRef = useRef<BrowseEditorTabsHandle>(null);
   const gitPolling = useGitPolling(contextPath);
@@ -135,12 +143,14 @@ export function MainLayout() {
 
   // Sync file tree context with active terminal's cwd via git root detection
   useEffect(() => {
+    console.log('[CWD] MainLayout effect fired:', { activeTabCwd });
     if (!activeTabCwd) return;
     let cancelled = false;
 
     getGitRoot(activeTabCwd).then((gitRoot) => {
+      console.log('[CWD] getGitRoot resolved:', { activeTabCwd, gitRoot });
       if (!cancelled) {
-        syncTabContext(gitRoot ?? activeTabCwd);
+        syncTabContext(gitRoot);
       }
     });
 
@@ -185,9 +195,30 @@ export function MainLayout() {
             <NotesIcon />
           </button>
           <button
+            onClick={() => contextPath && setShowWorktrees(true)}
+            disabled={!contextPath}
+            className={`rounded-md p-1.5 ${
+              showWorktrees
+                ? 'bg-accent text-white'
+                : contextPath
+                  ? 'text-secondary hover:bg-surface-3'
+                  : 'cursor-not-allowed text-tertiary opacity-50'
+            }`}
+            title="Worktrees"
+          >
+            <BranchIcon />
+          </button>
+          <button
+            onClick={() => terminalTabsRef.current?.openFolder()}
+            className="rounded-md p-1.5 text-secondary hover:bg-surface-3"
+            title={`Open Folder (${formatShortcut('Mod+O')})`}
+          >
+            <FolderIcon />
+          </button>
+          <button
             onClick={() => terminalTabsRef.current?.openNewTerminal()}
             className="rounded-md p-1.5 text-secondary hover:bg-surface-3"
-            title="New Terminal"
+            title={`New Terminal (${formatShortcut('Mod+T')})`}
           >
             <PlusIcon />
           </button>
@@ -307,6 +338,15 @@ export function MainLayout() {
 
       {/* Keyboard Shortcuts Modal */}
       {showShortcuts && <ShortcutsModal onClose={() => setShowShortcuts(false)} />}
+
+      {/* Worktree Manager Modal */}
+      {showWorktrees && contextPath && (
+        <WorktreeManager
+          repoPath={contextPath}
+          onClose={() => setShowWorktrees(false)}
+          createTerminal={createTerminal}
+        />
+      )}
 
       {/* Floating Notes Panel */}
       <Suspense fallback={null}>

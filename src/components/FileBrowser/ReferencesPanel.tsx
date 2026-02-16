@@ -12,12 +12,8 @@ interface ReferencesByFile {
 }
 
 export function ReferencesPanel() {
-  const {
-    referencesSymbol,
-    hideReferencesPanel,
-    contextPath,
-    openBrowseFileAtLine,
-  } = useFileStore();
+  const { referencesSymbol, hideReferencesPanel, contextPath, openBrowseFileAtLine } =
+    useFileStore();
   const [results, setResults] = useState<ReferencesByFile[]>([]);
   const [loading, setLoading] = useState(true);
   const [totalCount, setTotalCount] = useState(0);

@@ -5,11 +5,23 @@ import {
   lineNumbers,
   highlightActiveLine,
   tooltips,
+  drawSelection,
+  dropCursor,
 } from '@codemirror/view';
-import { HighlightStyle, StreamLanguage, syntaxHighlighting } from '@codemirror/language';
+import {
+  HighlightStyle,
+  StreamLanguage,
+  syntaxHighlighting,
+  bracketMatching,
+  foldGutter,
+  foldKeymap,
+  indentOnInput,
+} from '@codemirror/language';
+import { closeBrackets, closeBracketsKeymap } from '@codemirror/autocomplete';
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
-import { search, searchKeymap, highlightSelectionMatches } from '@codemirror/search';
+import { search, searchKeymap, highlightSelectionMatches, gotoLine } from '@codemirror/search';
 import { tags } from '@lezer/highlight';
+import { indentationMarkers } from '@replit/codemirror-indentation-markers';
 import { javascript } from '@codemirror/lang-javascript';
 import { rust } from '@codemirror/lang-rust';
 import { python } from '@codemirror/lang-python';
@@ -267,6 +279,73 @@ const darkTheme = EditorView.theme(
     '.cm-searchMatch-selected': {
       backgroundColor: 'rgba(250, 204, 21, 0.6)',
     },
+    // Bracket matching
+    '&.cm-focused .cm-matchingBracket': {
+      backgroundColor: 'rgba(59, 130, 246, 0.15)',
+      outline: '1px solid rgba(59, 130, 246, 0.4)',
+      borderRadius: '2px',
+    },
+    '&.cm-focused .cm-nonmatchingBracket': {
+      backgroundColor: 'rgba(239, 68, 68, 0.15)',
+      outline: '1px solid rgba(239, 68, 68, 0.4)',
+      borderRadius: '2px',
+    },
+    // Fold gutter
+    '.cm-foldGutter': {
+      width: '12px',
+    },
+    '.cm-foldGutter .cm-gutterElement': {
+      color: 'var(--text-tertiary)',
+      cursor: 'pointer',
+      textAlign: 'center',
+      lineHeight: 'inherit',
+    },
+    '.cm-foldGutter .cm-gutterElement:hover': {
+      color: 'var(--text-primary)',
+    },
+    '.cm-foldPlaceholder': {
+      backgroundColor: 'var(--surface-2)',
+      border: '1px solid var(--border)',
+      borderRadius: '3px',
+      padding: '0 4px',
+      margin: '0 2px',
+      color: 'var(--text-tertiary)',
+      cursor: 'pointer',
+    },
+    // Go-to-line dialog (reuses search panel container)
+    '.cm-gotoLine': {
+      padding: '4px 8px',
+      fontSize: '12px',
+    },
+    '.cm-gotoLine input': {
+      backgroundColor: 'var(--surface-0)',
+      border: '1px solid var(--border)',
+      borderRadius: '4px',
+      color: 'var(--text-primary)',
+      padding: '2px 6px',
+      fontSize: '12px',
+      outline: 'none',
+    },
+    '.cm-gotoLine input:focus': {
+      borderColor: 'var(--accent)',
+    },
+    '.cm-gotoLine button': {
+      backgroundColor: 'var(--surface-2)',
+      border: '1px solid var(--border)',
+      borderRadius: '4px',
+      color: 'var(--text-secondary)',
+      padding: '2px 8px',
+      fontSize: '12px',
+      cursor: 'pointer',
+    },
+    '.cm-gotoLine button:hover': {
+      backgroundColor: 'var(--surface-3)',
+      color: 'var(--text-primary)',
+    },
+    '.cm-gotoLine label': {
+      color: 'var(--text-secondary)',
+      fontSize: '12px',
+    },
   },
   { dark: false } // Set to false so it adapts to CSS variables
 );
@@ -359,12 +438,29 @@ const stickyGutters = ViewPlugin.fromClass(
  */
 export function createBaseExtensions(language: string | undefined): Extension[] {
   return [
+    foldGutter(),
     lineNumbers(),
     highlightActiveLine(),
     history(),
     search(),
     highlightSelectionMatches(),
-    keymap.of([...defaultKeymap, ...historyKeymap, ...searchKeymap]),
+    closeBrackets(),
+    bracketMatching(),
+    indentOnInput(),
+    drawSelection(),
+    dropCursor(),
+    indentationMarkers({ highlightActiveBlock: true }),
+
+    // High-priority keymap: Mod-g → gotoLine (overrides searchKeymap's findNext)
+    keymap.of([{ key: 'Mod-g', run: gotoLine }]),
+    keymap.of([
+      ...closeBracketsKeymap,
+      ...defaultKeymap,
+      ...historyKeymap,
+      ...searchKeymap,
+      ...foldKeymap,
+    ]),
+
     darkTheme,
     stickyGutters,
     syntaxHighlighting(customHighlightStyle),

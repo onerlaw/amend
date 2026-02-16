@@ -4,9 +4,10 @@ use parking_lot::Mutex;
 use portable_pty::{native_pty_system, CommandBuilder, MasterPty, PtySize};
 use std::collections::HashMap;
 use std::io::{Read, Write};
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::thread;
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -29,6 +30,33 @@ struct TerminalSession {
 
 pub struct TerminalManager {
     sessions: Arc<Mutex<HashMap<String, TerminalSession>>>,
+}
+
+/// Writes a .zshenv shell integration file that emits OSC 7 CWD sequences.
+/// Returns the directory path on success, or None on failure (best-effort).
+fn setup_shell_integration(app_handle: &AppHandle) -> Option<PathBuf> {
+    let app_data = app_handle.path().app_data_dir().ok()?;
+    let integration_dir = app_data.join("shell-integration").join("zsh");
+    std::fs::create_dir_all(&integration_dir).ok()?;
+
+    let zshenv_content = r#"# Restore original ZDOTDIR so user dotfiles load normally
+if [[ -n "${_AMEND_ORIG_ZDOTDIR+x}" ]]; then
+  ZDOTDIR="$_AMEND_ORIG_ZDOTDIR"
+  unset _AMEND_ORIG_ZDOTDIR
+else
+  unset ZDOTDIR
+fi
+[[ -f "${ZDOTDIR:-$HOME}/.zshenv" ]] && source "${ZDOTDIR:-$HOME}/.zshenv"
+
+# OSC 7 CWD reporting
+autoload -Uz add-zsh-hook
+_amend_report_cwd() { printf '\e]7;file://%s%s\e\\' "${HOST}" "${PWD}" }
+add-zsh-hook precmd _amend_report_cwd
+add-zsh-hook chpwd _amend_report_cwd
+"#;
+
+    std::fs::write(integration_dir.join(".zshenv"), zshenv_content).ok()?;
+    Some(integration_dir)
 }
 
 impl Default for TerminalManager {
@@ -68,6 +96,9 @@ impl TerminalManager {
             }
         });
 
+        let is_zsh = shell.ends_with("/zsh") || shell == "zsh";
+        let is_bash = shell.ends_with("/bash") || shell == "bash";
+
         let mut cmd = CommandBuilder::new(&shell);
 
         // Set terminal type
@@ -79,6 +110,17 @@ impl TerminalManager {
         }
         if std::env::var("LC_ALL").is_err() {
             cmd.env("LC_ALL", "en_US.UTF-8");
+        }
+
+        // Shell integration: zsh uses ZDOTDIR override
+        if is_zsh {
+            if let Some(integration_dir) = setup_shell_integration(app_handle) {
+                // Preserve original ZDOTDIR so our .zshenv can restore it
+                if let Ok(orig) = std::env::var("ZDOTDIR") {
+                    cmd.env("_AMEND_ORIG_ZDOTDIR", orig);
+                }
+                cmd.env("ZDOTDIR", integration_dir.to_string_lossy().as_ref());
+            }
         }
 
         // Login shell (sources .zprofile/.bash_profile)
@@ -96,10 +138,20 @@ impl TerminalManager {
             .map_err(|e| TerminalError::Pty(e.to_string()))?;
 
         let id = uuid::Uuid::new_v4().to_string();
-        let writer = pair
+        let mut writer = pair
             .master
             .take_writer()
             .map_err(|e| TerminalError::Pty(e.to_string()))?;
+
+        // Shell integration: bash uses stdin injection
+        if is_bash {
+            let bash_init = concat!(
+                r#"PROMPT_COMMAND='printf "\e]7;file://%s%s\e\\" "${HOSTNAME}" "${PWD}"'"#,
+                "; clear\n"
+            );
+            let _ = writer.write_all(bash_init.as_bytes());
+            let _ = writer.flush();
+        }
 
         let mut reader = pair
             .master

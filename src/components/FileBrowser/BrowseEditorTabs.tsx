@@ -1,4 +1,12 @@
-import { forwardRef, useImperativeHandle, useRef, useCallback, useMemo, useEffect } from 'react';
+import {
+  forwardRef,
+  useImperativeHandle,
+  useRef,
+  useCallback,
+  useMemo,
+  useEffect,
+  useState,
+} from 'react';
 import { EditorView } from '@codemirror/view';
 import { openSearchPanel } from '@codemirror/search';
 import { useFileBrowserState, SaveStatus } from '@/hooks/useFileBrowserState';
@@ -14,6 +22,7 @@ import {
 import { symbolHoverTooltip } from '@/extensions/hoverTooltip';
 import { useDraggableTabs } from '@/hooks/useDraggableTabs';
 import { ReferencesPanel } from './ReferencesPanel';
+import { EditorStatusBar, type EditorInfo } from './EditorStatusBar';
 
 export interface BrowseEditorTabsHandle {
   openSearch: () => void;
@@ -54,6 +63,7 @@ export const BrowseEditorTabs = forwardRef<BrowseEditorTabsHandle>(
       showReferencesPanel,
     } = useFileStore();
     const editorViewRef = useRef<EditorView | null>(null);
+    const [editorInfo, setEditorInfo] = useState<EditorInfo | null>(null);
     const { getTabDragProps, containerRef, dropIndicatorIndex, dragFromIndex } = useDraggableTabs({
       itemCount: browseOpenFiles.length,
       onReorder: reorderBrowseFiles,
@@ -79,13 +89,31 @@ export const BrowseEditorTabs = forwardRef<BrowseEditorTabsHandle>(
         }),
         symbolHoverTooltip({ currentFilePath }),
         cmdHeldCursorExtension(),
+        EditorView.updateListener.of((update) => {
+          if (update.selectionSet || update.docChanged) {
+            const state = update.state;
+            const primary = state.selection.main;
+            const line = state.doc.lineAt(primary.head);
+            const selectedChars = state.selection.ranges.reduce(
+              (sum, r) => sum + Math.abs(r.to - r.from),
+              0
+            );
+            const selectedLines =
+              selectedChars > 0
+                ? state.doc.lineAt(primary.to).number - state.doc.lineAt(primary.from).number + 1
+                : 0;
+            setEditorInfo({
+              line: line.number,
+              col: primary.head - line.from + 1,
+              selectedChars,
+              selectedLines,
+              cursors: state.selection.ranges.length,
+              totalLines: state.doc.lines,
+            });
+          }
+        }),
       ];
-    }, [
-      activeFile?.path,
-      openBrowseFileAtLine,
-      contextPath,
-      showReferencesPanel,
-    ]);
+    }, [activeFile?.path, openBrowseFileAtLine, contextPath, showReferencesPanel]);
 
     // Consume pending scroll-to-line state
     useEffect(() => {
@@ -208,13 +236,9 @@ export const BrowseEditorTabs = forwardRef<BrowseEditorTabsHandle>(
           )}
         </div>
 
-        {/* File path bar */}
+        {/* Status bar */}
         {activeFile && (
-          <div className="flex items-center px-2 py-0.5 bg-surface-2 text-tertiary text-xs border-t border-border truncate select-text">
-            {contextPath && activeFile.path.startsWith(contextPath)
-              ? activeFile.path.slice(contextPath.length + 1)
-              : activeFile.path}
-          </div>
+          <EditorStatusBar file={activeFile} contextPath={contextPath} editorInfo={editorInfo} />
         )}
       </div>
     );

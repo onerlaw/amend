@@ -5,7 +5,7 @@ import { useTerminalStore, TerminalTab } from '@/stores/terminalStore';
 import { useUIStore } from '@/stores/uiStore';
 import { useCreateTerminal, useCloseTerminal } from '@/hooks/useTerminal';
 import { TerminalPane } from './TerminalPane';
-import { CloseIcon, FolderIcon, DuplicateIcon, PlusIcon } from '@/components/Icons';
+import { CloseIcon, FolderIcon } from '@/components/Icons';
 import { getFileName, formatShortcut } from '@/lib/fileUtils';
 import { useDraggableTabs } from '@/hooks/useDraggableTabs';
 
@@ -13,15 +13,12 @@ function TerminalTabLabel({ tab }: { tab: TerminalTab }) {
   const dirName = getFileName(tab.cwd);
   const mainText = tab.title || dirName;
 
-  return (
-    <span className="truncate max-w-[200px]">{mainText}</span>
-  );
+  return <span className="truncate max-w-[200px]">{mainText}</span>;
 }
 
 export interface TerminalTabsHandle {
   openNewTerminal: () => void;
   openFolder: () => void;
-  duplicateTerminal: () => void;
 }
 
 export const TerminalTabs = forwardRef<TerminalTabsHandle>(function TerminalTabs(_, ref) {
@@ -52,20 +49,19 @@ export const TerminalTabs = forwardRef<TerminalTabsHandle>(function TerminalTabs
     }
   }, [tabs.length, createTerminal]);
 
-  const handleDuplicateTerminal = useCallback(() => {
-    const activeTab = tabs.find((t) => t.id === activeTabId);
-    if (!activeTab) return;
-    createTerminal(activeTab.cwd, activeTabId ?? undefined);
-  }, [tabs, activeTabId, createTerminal]);
-
   const handleNewTerminal = useCallback(async () => {
-    try {
-      const home = await homeDir();
-      createTerminal(home);
-    } catch (err) {
-      console.error('Failed to create terminal:', err);
+    const activeTab = tabs.find((t) => t.id === activeTabId);
+    if (activeTab) {
+      createTerminal(activeTab.cwd, activeTabId ?? undefined);
+    } else {
+      try {
+        const home = await homeDir();
+        createTerminal(home);
+      } catch (err) {
+        console.error('Failed to create terminal:', err);
+      }
     }
-  }, [createTerminal]);
+  }, [tabs, activeTabId, createTerminal]);
 
   const handleOpenFolder = useCallback(async () => {
     const selected = await open({
@@ -85,9 +81,8 @@ export const TerminalTabs = forwardRef<TerminalTabsHandle>(function TerminalTabs
     () => ({
       openNewTerminal: handleNewTerminal,
       openFolder: handleOpenFolder,
-      duplicateTerminal: handleDuplicateTerminal,
     }),
-    [handleNewTerminal, handleOpenFolder, handleDuplicateTerminal]
+    [handleNewTerminal, handleOpenFolder]
   );
 
   const handleCloseTerminal = (e: React.MouseEvent, id: string) => {
@@ -134,31 +129,6 @@ export const TerminalTabs = forwardRef<TerminalTabsHandle>(function TerminalTabs
               <div className="absolute left-0 top-1 bottom-1 w-0.5 bg-accent rounded-full z-10 pointer-events-none" />
             </div>
           )}
-        </div>
-        <div className="flex items-center gap-0.5 px-1">
-          {activeTabId && (
-            <button
-              onClick={handleDuplicateTerminal}
-              className="flex items-center justify-center rounded-md p-1 text-secondary hover:bg-surface-3 hover:text-primary"
-              title="Duplicate Terminal"
-            >
-              <DuplicateIcon />
-            </button>
-          )}
-          <button
-            onClick={handleOpenFolder}
-            className="flex items-center justify-center rounded-md p-1 text-secondary hover:bg-surface-3 hover:text-primary"
-            title={`Open Folder (${formatShortcut('Mod+O')})`}
-          >
-            <FolderIcon className="h-3.5 w-3.5" />
-          </button>
-          <button
-            onClick={handleNewTerminal}
-            className="flex items-center justify-center rounded-md p-1 text-secondary hover:bg-surface-3 hover:text-primary"
-            title={`New Terminal (${formatShortcut('Mod+T')})`}
-          >
-            <PlusIcon className="h-3.5 w-3.5" />
-          </button>
         </div>
       </div>
 
