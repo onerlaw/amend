@@ -99,6 +99,19 @@ const darkTheme = EditorView.theme(
     '.cm-cursor': {
       borderLeftColor: 'var(--text-primary)',
     },
+    // The stickyGutters plugin inserts a wrapper between .cm-editor and
+    // .cm-scroller, breaking CodeMirror's direct-child selectors for
+    // cursor/selection visibility. Re-declare them without `>`.
+    '&.cm-focused .cm-cursorLayer': {
+      animation: 'steps(1) cm-blink 1.2s infinite',
+    },
+    '&.cm-focused .cm-cursorLayer .cm-cursor': {
+      display: 'block',
+    },
+    '&.cm-focused .cm-selectionLayer .cm-selectionBackground': {
+      background: 'var(--accent)',
+      opacity: '0.3',
+    },
     '.cm-activeLine': {
       backgroundColor: 'var(--surface-1)',
     },

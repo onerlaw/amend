@@ -72,6 +72,7 @@ export function useCommands({ terminalTabsRef, browseEditorTabsRef }: CommandRef
         }
 
         // Cmd/Ctrl + Shift + N: Toggle notes panel
+        case 'n':
         case 'N': {
           if (e.shiftKey) {
             e.preventDefault();
@@ -102,9 +103,17 @@ export function useCommands({ terminalTabsRef, browseEditorTabsRef }: CommandRef
           return;
         }
 
-        // Cmd/Ctrl + W: Close current tab
+        // Cmd/Ctrl + W: Close current tab or notes panel
         case 'w': {
           e.preventDefault();
+
+          // Close notes panel if it's focused
+          const notesPanel = document.querySelector('[data-notes-panel]');
+          if (notesPanel && notesPanel.contains(document.activeElement)) {
+            useNotesStore.getState().toggleNotes();
+            return;
+          }
+
           const { focusedPanel } = useUIStore.getState();
 
           if (focusedPanel === 'terminal') {

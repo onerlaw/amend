@@ -182,6 +182,7 @@ export function NotesPanel() {
 
   return createPortal(
     <div
+      data-notes-panel
       className="fixed z-40 flex flex-col overflow-hidden rounded-lg border border-border bg-surface-0 shadow-xl"
       style={{
         left: currentPos.x,

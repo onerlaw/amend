@@ -16,7 +16,6 @@ function App() {
     document.addEventListener('contextmenu', handleContextMenu);
     return () => document.removeEventListener('contextmenu', handleContextMenu);
   }, []);
-  // test
 
   return (
     <>
