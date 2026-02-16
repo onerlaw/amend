@@ -188,6 +188,14 @@ export function NotesIcon({ className = 'h-4 w-4' }: IconProps) {
   );
 }
 
+export function SettingsIcon({ className = 'h-4 w-4' }: IconProps) {
+  return (
+    <svg className={className} viewBox="0 0 16 16" fill="currentColor">
+      <path d="M9.1 4.4L8.6 2H7.4l-.5 2.4-.7.3-2-1.3-.9.8 1.3 2-.3.7-2.4.5v1.2l2.4.5.3.7-1.3 2 .8.8 2-1.3.7.3.5 2.4h1.2l.5-2.4.7-.3 2 1.3.8-.8-1.3-2 .3-.7 2.4-.5V6.8l-2.4-.5-.3-.7 1.3-2-.8-.8-2 1.3-.7-.3zM9.4 1l.5 2.4L12 2.1l2 2-1.4 2.1 2.4.5v2.8l-2.4.5L14 12l-2 2-2.1-1.4-.5 2.4H6.6l-.5-2.4L4 14l-2-2 1.4-2.1L1 9.4V6.6l2.4-.5L2 4l2-2 2.1 1.4L6.6 1h2.8zM8 11a3 3 0 1 1 0-6 3 3 0 0 1 0 6zm0-1a2 2 0 1 0 0-4 2 2 0 0 0 0 4z" />
+    </svg>
+  );
+}
+
 export function SpinnerIcon({ className = 'h-4 w-4' }: IconProps) {
   return (
     <svg className={className} viewBox="0 0 24 24">

@@ -16,7 +16,7 @@ import { formatShortcut } from '@/lib/fileUtils';
 import {
   PlusIcon,
   CloseIcon,
-  InfoIcon,
+  SettingsIcon,
   SunIcon,
   MoonIcon,
   MonitorIcon,
@@ -53,56 +53,76 @@ const NotesPanel = lazy(() =>
   import('@/components/NotesPanel').then((m) => ({ default: m.NotesPanel }))
 );
 
-function ThemeToggle() {
-  const { themeMode, cycleTheme } = useTheme();
+function SettingsPanel({ onClose }: { onClose: () => void }) {
+  const { themeMode, setThemeMode } = useTheme();
 
-  return (
-    <button
-      onClick={cycleTheme}
-      className="rounded-md p-1.5 text-secondary hover:bg-surface-3"
-      title={`Theme: ${themeMode}`}
-    >
-      {themeMode === 'light' && <SunIcon />}
-      {themeMode === 'dark' && <MoonIcon />}
-      {themeMode === 'system' && <MonitorIcon />}
-    </button>
-  );
-}
+  const themes = [
+    { mode: 'light' as const, label: 'Light', icon: <SunIcon className="h-3.5 w-3.5" /> },
+    { mode: 'dark' as const, label: 'Dark', icon: <MoonIcon className="h-3.5 w-3.5" /> },
+    { mode: 'system' as const, label: 'System', icon: <MonitorIcon className="h-3.5 w-3.5" /> },
+  ];
 
-function ShortcutsModal({ onClose }: { onClose: () => void }) {
   return (
     <ModalOverlay onClose={onClose}>
       <div className="w-80 rounded-xl bg-surface-2 p-4 shadow-xl">
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-primary">Keyboard Shortcuts</h2>
+          <h2 className="text-sm font-semibold text-primary">Settings</h2>
           <button onClick={onClose} className="rounded-md p-1 text-secondary hover:bg-surface-3">
             <CloseIcon className="h-4 w-4" />
           </button>
         </div>
-        <div className="space-y-2 text-xs">
-          {[
-            ['New Terminal', formatShortcut('Mod+T')],
-            ['Open Folder', formatShortcut('Mod+O')],
-            ['Cycle Terminals', formatShortcut('Mod+`')],
-            ['Close Tab', formatShortcut('Mod+W')],
-            ['Search', `${formatShortcut('Mod+P')} / ${formatShortcut('Mod+Shift+F')}`],
-            ['Find in File', formatShortcut('Mod+F')],
-            ['Go to Line', formatShortcut('Mod+G')],
-            ['Fold Code', formatShortcut('Mod+Shift+[')],
-            ['Unfold Code', formatShortcut('Mod+Shift+]')],
-            ['Paste Files', formatShortcut('Mod+V')],
-            ['Toggle Notes', formatShortcut('Mod+Shift+N')],
-            ['Increase Font Size', formatShortcut('Mod+=')],
-            ['Decrease Font Size', formatShortcut('Mod+-')],
-            ['Reset Font Size', formatShortcut('Mod+0')],
-          ].map(([label, keys]) => (
-            <div key={label} className="flex items-center justify-between py-1">
-              <span className="text-primary">{label}</span>
-              <kbd className="rounded-md bg-surface-1 px-2 py-0.5 font-mono text-secondary">
-                {keys}
-              </kbd>
-            </div>
-          ))}
+
+        {/* Appearance */}
+        <div className="mb-3">
+          <h3 className="mb-2 text-xs font-medium text-secondary">Appearance</h3>
+          <div className="flex gap-2">
+            {themes.map(({ mode, label, icon }) => (
+              <button
+                key={mode}
+                onClick={() => setThemeMode(mode)}
+                className={`flex flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-xs ${
+                  themeMode === mode
+                    ? 'bg-accent text-white'
+                    : 'bg-surface-3 text-secondary hover:text-primary'
+                }`}
+              >
+                {icon}
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="border-t border-surface-3" />
+
+        {/* Keyboard Shortcuts */}
+        <div className="mt-3">
+          <h3 className="mb-2 text-xs font-medium text-secondary">Keyboard Shortcuts</h3>
+          <div className="space-y-2 text-xs">
+            {[
+              ['New Terminal', formatShortcut('Mod+T')],
+              ['Open Folder', formatShortcut('Mod+O')],
+              ['Cycle Terminals', formatShortcut('Mod+`')],
+              ['Close Tab', formatShortcut('Mod+W')],
+              ['Search', `${formatShortcut('Mod+P')} / ${formatShortcut('Mod+Shift+F')}`],
+              ['Find in File', formatShortcut('Mod+F')],
+              ['Go to Line', formatShortcut('Mod+G')],
+              ['Fold Code', formatShortcut('Mod+Shift+[')],
+              ['Unfold Code', formatShortcut('Mod+Shift+]')],
+              ['Paste Files', formatShortcut('Mod+V')],
+              ['Toggle Notes', formatShortcut('Mod+Shift+N')],
+              ['Increase Font Size', formatShortcut('Mod+=')],
+              ['Decrease Font Size', formatShortcut('Mod+-')],
+              ['Reset Font Size', formatShortcut('Mod+0')],
+            ].map(([label, keys]) => (
+              <div key={label} className="flex items-center justify-between py-1">
+                <span className="text-primary">{label}</span>
+                <kbd className="rounded-md bg-surface-1 px-2 py-0.5 font-mono text-secondary">
+                  {keys}
+                </kbd>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </ModalOverlay>
@@ -121,7 +141,7 @@ export function MainLayout() {
   const { isOpen: notesOpen, toggleNotes } = useNotesStore();
   const { browseOpenFiles, syncTabContext, contextPath } = useFileStore();
   const { tabs, activeTabId } = useTerminalStore();
-  const [showShortcuts, setShowShortcuts] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const [showWorktrees, setShowWorktrees] = useState(false);
   const createTerminal = useCreateTerminal();
   const terminalTabsRef = useRef<TerminalTabsHandle>(null);
@@ -176,15 +196,14 @@ export function MainLayout() {
       <div className="flex h-14 items-center bg-surface-2 px-4">
         <div className="w-10" />
         <div className="flex flex-1 items-center justify-center gap-3">
-          {/* Info/Help and Theme Toggle */}
+          {/* Settings */}
           <button
-            onClick={() => setShowShortcuts(true)}
+            onClick={() => setShowSettings(true)}
             className="rounded-md p-1.5 text-secondary hover:bg-surface-3"
-            title="Keyboard Shortcuts"
+            title="Settings"
           >
-            <InfoIcon />
+            <SettingsIcon />
           </button>
-          <ThemeToggle />
           <button
             onClick={toggleNotes}
             className={`rounded-md p-1.5 ${
@@ -336,8 +355,8 @@ export function MainLayout() {
         </DiffViewerProvider>
       </div>
 
-      {/* Keyboard Shortcuts Modal */}
-      {showShortcuts && <ShortcutsModal onClose={() => setShowShortcuts(false)} />}
+      {/* Settings Panel */}
+      {showSettings && <SettingsPanel onClose={() => setShowSettings(false)} />}
 
       {/* Worktree Manager Modal */}
       {showWorktrees && contextPath && (
