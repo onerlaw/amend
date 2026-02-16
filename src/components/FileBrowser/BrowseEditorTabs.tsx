@@ -188,10 +188,10 @@ export const BrowseEditorTabs = forwardRef<BrowseEditorTabsHandle>(
                 <button
                   {...getTabDragProps(index)}
                   onClick={() => setBrowseActiveFile(file.path)}
-                  className={`group flex items-center gap-1.5 px-2 py-1 text-xs rounded-t-md ${
+                  className={`group flex items-center gap-1.5 px-2 py-1 text-xs ${
                     browseActiveFilePath === file.path
                       ? 'bg-surface-0 text-primary'
-                      : 'text-secondary hover:bg-surface-1 rounded-md'
+                      : 'text-secondary hover:bg-surface-1'
                   } ${dragFromIndex === index ? 'opacity-50' : ''}`}
                 >
                   <StatusIndicator status={status} />

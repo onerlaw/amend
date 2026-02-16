@@ -106,10 +106,10 @@ export const TerminalTabs = forwardRef<TerminalTabsHandle>(function TerminalTabs
               <button
                 {...getTabDragProps(index)}
                 onClick={() => setActiveTab(tab.id)}
-                className={`group flex items-center gap-1.5 px-2 py-1 text-xs rounded-t-md ${
+                className={`group flex items-center gap-1.5 px-2 py-1 text-xs ${
                   activeTabId === tab.id
                     ? 'bg-terminal-bg text-primary'
-                    : 'text-secondary hover:bg-surface-1 rounded-md'
+                    : 'text-secondary hover:bg-surface-1'
                 } ${dragFromIndex === index ? 'opacity-50' : ''}`}
                 title={tab.cwd}
               >
