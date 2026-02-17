@@ -76,6 +76,7 @@ export function NotesPanel() {
     });
 
     viewRef.current = view;
+    view.focus();
 
     return () => {
       // Flush pending content on unmount
