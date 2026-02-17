@@ -30,7 +30,12 @@ import { html } from '@codemirror/lang-html';
 import { css } from '@codemirror/lang-css';
 import { markdown } from '@codemirror/lang-markdown';
 import { java } from '@codemirror/lang-java';
+import { go } from '@codemirror/lang-go';
+import { sql } from '@codemirror/lang-sql';
+import { yaml } from '@codemirror/lang-yaml';
+import { cpp } from '@codemirror/lang-cpp';
 import { scala } from '@codemirror/legacy-modes/mode/clike';
+import { shell } from '@codemirror/legacy-modes/mode/shell';
 import { Extension } from '@codemirror/state';
 
 // Custom syntax highlighting theme - colors stay consistent across light/dark
@@ -509,13 +514,17 @@ function getLanguageExtension(language: string | undefined): Extension {
       return java();
     case 'scala':
       return StreamLanguage.define(scala);
-    // Languages without CodeMirror support fall through to plain text
-    case 'yaml':
-    case 'bash':
-    case 'sql':
     case 'go':
+      return go();
+    case 'sql':
+      return sql();
+    case 'yaml':
+      return yaml();
     case 'c':
     case 'cpp':
+      return cpp();
+    case 'bash':
+      return StreamLanguage.define(shell);
     default:
       return [];
   }
