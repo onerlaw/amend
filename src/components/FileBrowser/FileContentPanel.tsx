@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { EditorState, Extension } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
 import { OpenFile } from '@/stores/fileStore';
-import { createBaseExtensions } from '@/lib/codemirror';
+import { createBaseExtensions, loadLanguageExtension } from '@/lib/codemirror';
 import { buildImageDataUrl } from '@/lib/fileUtils';
 
 interface FileContentPanelProps {
@@ -63,6 +63,7 @@ export function FileContentPanel({
 
     viewRef.current = view;
     onEditorViewRef.current?.(view);
+    loadLanguageExtension(view, file.language);
 
     return () => {
       view.destroy();
