@@ -27,15 +27,100 @@ import { rust } from '@codemirror/lang-rust';
 import { python } from '@codemirror/lang-python';
 import { json } from '@codemirror/lang-json';
 import { html } from '@codemirror/lang-html';
+import { xml } from '@codemirror/lang-xml';
 import { css } from '@codemirror/lang-css';
+import { less } from '@codemirror/lang-less';
 import { markdown } from '@codemirror/lang-markdown';
 import { java } from '@codemirror/lang-java';
 import { go } from '@codemirror/lang-go';
 import { sql } from '@codemirror/lang-sql';
 import { yaml } from '@codemirror/lang-yaml';
 import { cpp } from '@codemirror/lang-cpp';
-import { scala } from '@codemirror/legacy-modes/mode/clike';
+import { php } from '@codemirror/lang-php';
+import { vue } from '@codemirror/lang-vue';
+import { wast } from '@codemirror/lang-wast';
+import { liquid } from '@codemirror/lang-liquid';
+
+// Legacy modes (languages without native CodeMirror packages)
+import { scala, kotlin, csharp, dart, objectiveC, objectiveCpp } from '@codemirror/legacy-modes/mode/clike';
 import { shell } from '@codemirror/legacy-modes/mode/shell';
+import { ruby } from '@codemirror/legacy-modes/mode/ruby';
+import { swift } from '@codemirror/legacy-modes/mode/swift';
+import { lua } from '@codemirror/legacy-modes/mode/lua';
+import { perl } from '@codemirror/legacy-modes/mode/perl';
+import { r } from '@codemirror/legacy-modes/mode/r';
+import { julia } from '@codemirror/legacy-modes/mode/julia';
+import { haskell } from '@codemirror/legacy-modes/mode/haskell';
+import { erlang } from '@codemirror/legacy-modes/mode/erlang';
+import { clojure } from '@codemirror/legacy-modes/mode/clojure';
+import { scheme } from '@codemirror/legacy-modes/mode/scheme';
+import { commonLisp } from '@codemirror/legacy-modes/mode/commonlisp';
+import { oCaml, fSharp, sml } from '@codemirror/legacy-modes/mode/mllike';
+import { elm } from '@codemirror/legacy-modes/mode/elm';
+import { coffeeScript } from '@codemirror/legacy-modes/mode/coffeescript';
+import { liveScript } from '@codemirror/legacy-modes/mode/livescript';
+import { groovy } from '@codemirror/legacy-modes/mode/groovy';
+import { crystal } from '@codemirror/legacy-modes/mode/crystal';
+import { d as dLang } from '@codemirror/legacy-modes/mode/d';
+import { fortran } from '@codemirror/legacy-modes/mode/fortran';
+import { pascal } from '@codemirror/legacy-modes/mode/pascal';
+import { dockerFile } from '@codemirror/legacy-modes/mode/dockerfile';
+import { nginx } from '@codemirror/legacy-modes/mode/nginx';
+import { cmake } from '@codemirror/legacy-modes/mode/cmake';
+import { powerShell } from '@codemirror/legacy-modes/mode/powershell';
+import { properties } from '@codemirror/legacy-modes/mode/properties';
+import { toml } from '@codemirror/legacy-modes/mode/toml';
+import { protobuf } from '@codemirror/legacy-modes/mode/protobuf';
+import { verilog } from '@codemirror/legacy-modes/mode/verilog';
+import { vhdl } from '@codemirror/legacy-modes/mode/vhdl';
+import { gas } from '@codemirror/legacy-modes/mode/gas';
+import { z80 } from '@codemirror/legacy-modes/mode/z80';
+import { diff } from '@codemirror/legacy-modes/mode/diff';
+import { stex } from '@codemirror/legacy-modes/mode/stex';
+import { troff } from '@codemirror/legacy-modes/mode/troff';
+import { sass } from '@codemirror/legacy-modes/mode/sass';
+import { stylus } from '@codemirror/legacy-modes/mode/stylus';
+import { pug } from '@codemirror/legacy-modes/mode/pug';
+import { jinja2 } from '@codemirror/legacy-modes/mode/jinja2';
+import { velocity } from '@codemirror/legacy-modes/mode/velocity';
+import { textile } from '@codemirror/legacy-modes/mode/textile';
+import { xQuery } from '@codemirror/legacy-modes/mode/xquery';
+import { sparql } from '@codemirror/legacy-modes/mode/sparql';
+import { turtle } from '@codemirror/legacy-modes/mode/turtle';
+import { ntriples } from '@codemirror/legacy-modes/mode/ntriples';
+import { cypher } from '@codemirror/legacy-modes/mode/cypher';
+import { gherkin } from '@codemirror/legacy-modes/mode/gherkin';
+import { http } from '@codemirror/legacy-modes/mode/http';
+import { apl } from '@codemirror/legacy-modes/mode/apl';
+import { brainfuck } from '@codemirror/legacy-modes/mode/brainfuck';
+import { cobol } from '@codemirror/legacy-modes/mode/cobol';
+import { eiffel } from '@codemirror/legacy-modes/mode/eiffel';
+import { factor } from '@codemirror/legacy-modes/mode/factor';
+import { forth } from '@codemirror/legacy-modes/mode/forth';
+import { mathematica } from '@codemirror/legacy-modes/mode/mathematica';
+import { modelica } from '@codemirror/legacy-modes/mode/modelica';
+import { mumps } from '@codemirror/legacy-modes/mode/mumps';
+import { smalltalk } from '@codemirror/legacy-modes/mode/smalltalk';
+import { tcl } from '@codemirror/legacy-modes/mode/tcl';
+import { vb } from '@codemirror/legacy-modes/mode/vb';
+import { vbScript } from '@codemirror/legacy-modes/mode/vbscript';
+import { sas } from '@codemirror/legacy-modes/mode/sas';
+import { puppet } from '@codemirror/legacy-modes/mode/puppet';
+import { octave } from '@codemirror/legacy-modes/mode/octave';
+import { dylan } from '@codemirror/legacy-modes/mode/dylan';
+import { oz } from '@codemirror/legacy-modes/mode/oz';
+import { yacas } from '@codemirror/legacy-modes/mode/yacas';
+import { webIDL } from '@codemirror/legacy-modes/mode/webidl';
+import { idl } from '@codemirror/legacy-modes/mode/idl';
+import { solr } from '@codemirror/legacy-modes/mode/solr';
+import { sieve } from '@codemirror/legacy-modes/mode/sieve';
+import { nsis } from '@codemirror/legacy-modes/mode/nsis';
+import { pig } from '@codemirror/legacy-modes/mode/pig';
+import { q } from '@codemirror/legacy-modes/mode/q';
+import { ecl } from '@codemirror/legacy-modes/mode/ecl';
+import { fcl } from '@codemirror/legacy-modes/mode/fcl';
+import { ebnf } from '@codemirror/legacy-modes/mode/ebnf';
+
 import { Extension } from '@codemirror/state';
 
 // Custom syntax highlighting theme - colors stay consistent across light/dark
@@ -487,12 +572,13 @@ export function createBaseExtensions(language: string | undefined): Extension[] 
   ];
 }
 
-// Map language names to CodeMirror language extensions
-// Supports languages from getLanguageFromPath() in highlight.ts
+// Map language names to CodeMirror language extensions.
+// Language names come from getLanguageFromPath() in highlight.ts.
 function getLanguageExtension(language: string | undefined): Extension {
   if (!language) return [];
 
   switch (language) {
+    // --- Native CodeMirror packages ---
     case 'javascript':
       return javascript({ jsx: true });
     case 'typescript':
@@ -504,16 +590,17 @@ function getLanguageExtension(language: string | undefined): Extension {
     case 'json':
       return json();
     case 'html':
-    case 'xml':
       return html();
+    case 'xml':
+      return xml();
     case 'css':
       return css();
+    case 'less':
+      return less();
     case 'markdown':
       return markdown();
     case 'java':
       return java();
-    case 'scala':
-      return StreamLanguage.define(scala);
     case 'go':
       return go();
     case 'sql':
@@ -523,8 +610,205 @@ function getLanguageExtension(language: string | undefined): Extension {
     case 'c':
     case 'cpp':
       return cpp();
+    case 'php':
+      return php();
+    case 'vue':
+      return vue();
+    case 'wast':
+      return wast();
+    case 'liquid':
+      return liquid();
+
+    // --- Legacy modes (clike family) ---
+    case 'scala':
+      return StreamLanguage.define(scala);
+    case 'kotlin':
+      return StreamLanguage.define(kotlin);
+    case 'csharp':
+      return StreamLanguage.define(csharp);
+    case 'dart':
+      return StreamLanguage.define(dart);
+    case 'objectivec':
+      return StreamLanguage.define(objectiveC);
+    case 'objectivecpp':
+      return StreamLanguage.define(objectiveCpp);
+
+    // --- Legacy modes (scripting) ---
     case 'bash':
       return StreamLanguage.define(shell);
+    case 'ruby':
+      return StreamLanguage.define(ruby);
+    case 'swift':
+      return StreamLanguage.define(swift);
+    case 'lua':
+      return StreamLanguage.define(lua);
+    case 'perl':
+      return StreamLanguage.define(perl);
+    case 'r':
+      return StreamLanguage.define(r);
+    case 'julia':
+      return StreamLanguage.define(julia);
+    case 'groovy':
+      return StreamLanguage.define(groovy);
+    case 'coffeescript':
+      return StreamLanguage.define(coffeeScript);
+    case 'livescript':
+      return StreamLanguage.define(liveScript);
+    case 'crystal':
+      return StreamLanguage.define(crystal);
+    case 'tcl':
+      return StreamLanguage.define(tcl);
+    case 'puppet':
+      return StreamLanguage.define(puppet);
+
+    // --- Legacy modes (functional) ---
+    case 'haskell':
+      return StreamLanguage.define(haskell);
+    case 'erlang':
+      return StreamLanguage.define(erlang);
+    case 'clojure':
+      return StreamLanguage.define(clojure);
+    case 'scheme':
+      return StreamLanguage.define(scheme);
+    case 'commonlisp':
+      return StreamLanguage.define(commonLisp);
+    case 'ocaml':
+      return StreamLanguage.define(oCaml);
+    case 'fsharp':
+      return StreamLanguage.define(fSharp);
+    case 'sml':
+      return StreamLanguage.define(sml);
+    case 'elm':
+      return StreamLanguage.define(elm);
+    case 'factor':
+      return StreamLanguage.define(factor);
+    case 'forth':
+      return StreamLanguage.define(forth);
+    case 'smalltalk':
+      return StreamLanguage.define(smalltalk);
+    case 'apl':
+      return StreamLanguage.define(apl);
+    case 'oz':
+      return StreamLanguage.define(oz);
+
+    // --- Legacy modes (systems/compiled) ---
+    case 'd':
+      return StreamLanguage.define(dLang);
+    case 'fortran':
+      return StreamLanguage.define(fortran);
+    case 'pascal':
+      return StreamLanguage.define(pascal);
+    case 'verilog':
+      return StreamLanguage.define(verilog);
+    case 'vhdl':
+      return StreamLanguage.define(vhdl);
+    case 'gas':
+      return StreamLanguage.define(gas);
+    case 'z80':
+      return StreamLanguage.define(z80);
+    case 'cobol':
+      return StreamLanguage.define(cobol);
+    case 'eiffel':
+      return StreamLanguage.define(eiffel);
+    case 'modelica':
+      return StreamLanguage.define(modelica);
+
+    // --- Legacy modes (DevOps/config) ---
+    case 'dockerfile':
+      return StreamLanguage.define(dockerFile);
+    case 'nginx':
+      return StreamLanguage.define(nginx);
+    case 'cmake':
+      return StreamLanguage.define(cmake);
+    case 'powershell':
+      return StreamLanguage.define(powerShell);
+    case 'properties':
+      return StreamLanguage.define(properties);
+    case 'toml':
+      return StreamLanguage.define(toml);
+    case 'protobuf':
+      return StreamLanguage.define(protobuf);
+    case 'nsis':
+      return StreamLanguage.define(nsis);
+
+    // --- Legacy modes (web/template) ---
+    case 'sass':
+      return StreamLanguage.define(sass);
+    case 'stylus':
+      return StreamLanguage.define(stylus);
+    case 'pug':
+      return StreamLanguage.define(pug);
+    case 'jinja2':
+      return StreamLanguage.define(jinja2);
+    case 'velocity':
+      return StreamLanguage.define(velocity);
+    case 'textile':
+      return StreamLanguage.define(textile);
+
+    // --- Legacy modes (data/query) ---
+    case 'xquery':
+      return StreamLanguage.define(xQuery);
+    case 'sparql':
+      return StreamLanguage.define(sparql);
+    case 'turtle':
+      return StreamLanguage.define(turtle);
+    case 'ntriples':
+      return StreamLanguage.define(ntriples);
+    case 'cypher':
+      return StreamLanguage.define(cypher);
+    case 'solr':
+      return StreamLanguage.define(solr);
+    case 'pig':
+      return StreamLanguage.define(pig);
+    case 'q':
+      return StreamLanguage.define(q);
+    case 'ecl':
+      return StreamLanguage.define(ecl);
+
+    // --- Legacy modes (document/markup) ---
+    case 'diff':
+      return StreamLanguage.define(diff);
+    case 'latex':
+      return StreamLanguage.define(stex);
+    case 'troff':
+      return StreamLanguage.define(troff);
+    case 'gherkin':
+      return StreamLanguage.define(gherkin);
+    case 'http':
+      return StreamLanguage.define(http);
+
+    // --- Legacy modes (math/science) ---
+    case 'mathematica':
+      return StreamLanguage.define(mathematica);
+    case 'octave':
+      return StreamLanguage.define(octave);
+    case 'sas':
+      return StreamLanguage.define(sas);
+    case 'dylan':
+      return StreamLanguage.define(dylan);
+    case 'yacas':
+      return StreamLanguage.define(yacas);
+    case 'fcl':
+      return StreamLanguage.define(fcl);
+
+    // --- Legacy modes (other) ---
+    case 'brainfuck':
+      return StreamLanguage.define(brainfuck);
+    case 'mumps':
+      return StreamLanguage.define(mumps);
+    case 'vb':
+      return StreamLanguage.define(vb);
+    case 'vbscript':
+      return StreamLanguage.define(vbScript);
+    case 'webidl':
+      return StreamLanguage.define(webIDL);
+    case 'idl':
+      return StreamLanguage.define(idl);
+    case 'sieve':
+      return StreamLanguage.define(sieve);
+    case 'ebnf':
+      return StreamLanguage.define(ebnf);
+
     default:
       return [];
   }

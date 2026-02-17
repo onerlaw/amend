@@ -37,7 +37,8 @@ hljs.registerLanguage('c', c);
 hljs.registerLanguage('cpp', cpp);
 hljs.registerLanguage('scala', scala);
 
-// Map file extensions to highlight.js language names
+// Map file extensions to language names used by both highlight.js (diff viewer)
+// and CodeMirror (editor). Names must match getLanguageExtension() in codemirror.ts.
 const extensionMap: Record<string, string> = {
   // JavaScript/TypeScript
   js: 'javascript',
@@ -47,21 +48,43 @@ const extensionMap: Record<string, string> = {
   mjs: 'javascript',
   cjs: 'javascript',
 
-  // Web
+  // Web markup/style
   html: 'html',
   htm: 'html',
   css: 'css',
   scss: 'css',
-  sass: 'css',
-  less: 'css',
+  sass: 'sass',
+  less: 'less',
+  styl: 'stylus',
+  pug: 'pug',
+  jade: 'pug',
+  vue: 'vue',
+  liquid: 'liquid',
 
   // Data formats
   json: 'json',
+  json5: 'json',
+  jsonc: 'json',
   yaml: 'yaml',
   yml: 'yaml',
-  toml: 'yaml',
+  toml: 'toml',
   xml: 'xml',
   svg: 'xml',
+  xsl: 'xml',
+  xslt: 'xml',
+  properties: 'properties',
+  ini: 'properties',
+  conf: 'properties',
+
+  // Documentation/markup
+  md: 'markdown',
+  markdown: 'markdown',
+  tex: 'latex',
+  latex: 'latex',
+  sty: 'latex',
+  textile: 'textile',
+  diff: 'diff',
+  patch: 'diff',
 
   // Systems languages
   rs: 'rust',
@@ -73,31 +96,161 @@ const extensionMap: Record<string, string> = {
   cxx: 'cpp',
   hpp: 'cpp',
   hxx: 'cpp',
+  d: 'd',
+  f: 'fortran',
+  f90: 'fortran',
+  f95: 'fortran',
+  for: 'fortran',
+  pas: 'pascal',
+  pp: 'pascal',
+  v: 'verilog',
+  sv: 'verilog',
+  vhd: 'vhdl',
+  vhdl: 'vhdl',
+  s: 'gas',
+  asm: 'gas',
+  z80: 'z80',
 
   // Scripting
   py: 'python',
-  rb: 'python', // Ruby uses similar syntax
+  pyw: 'python',
+  rb: 'ruby',
+  erb: 'ruby',
   sh: 'bash',
   bash: 'bash',
   zsh: 'bash',
+  fish: 'bash',
+  lua: 'lua',
+  pl: 'perl',
+  pm: 'perl',
+  r: 'r',
+  R: 'r',
+  jl: 'julia',
+  tcl: 'tcl',
+  coffee: 'coffeescript',
+  ls: 'livescript',
+  cr: 'crystal',
+  pp2: 'puppet',
 
   // JVM
   java: 'java',
-  kt: 'java', // Kotlin
+  kt: 'kotlin',
+  kts: 'kotlin',
   scala: 'scala',
   sc: 'scala',
+  groovy: 'groovy',
+  gradle: 'groovy',
+  clj: 'clojure',
+  cljs: 'clojure',
+  cljc: 'clojure',
+  edn: 'clojure',
 
-  // Database
+  // .NET / Microsoft
+  cs: 'csharp',
+  vb: 'vb',
+  vbs: 'vbscript',
+  ps1: 'powershell',
+  psm1: 'powershell',
+  psd1: 'powershell',
+
+  // Apple / Mobile
+  swift: 'swift',
+  m: 'objectivec',
+  mm: 'objectivecpp',
+  dart: 'dart',
+
+  // Functional
+  hs: 'haskell',
+  lhs: 'haskell',
+  erl: 'erlang',
+  hrl: 'erlang',
+  ex: 'erlang',
+  exs: 'erlang',
+  elm: 'elm',
+  ml: 'ocaml',
+  mli: 'ocaml',
+  fs: 'fsharp',
+  fsi: 'fsharp',
+  fsx: 'fsharp',
+  sml: 'sml',
+  sig: 'sml',
+  scm: 'scheme',
+  rkt: 'scheme',
+  ss: 'scheme',
+  lisp: 'commonlisp',
+  cl: 'commonlisp',
+  el: 'commonlisp',
+
+  // Web server / PHP
+  php: 'php',
+
+  // Database / query
   sql: 'sql',
+  xq: 'xquery',
+  xquery: 'xquery',
+  sparql: 'sparql',
+  rq: 'sparql',
+  ttl: 'turtle',
+  nt: 'ntriples',
+  cypher: 'cypher',
+  cql: 'cypher',
 
-  // Documentation
-  md: 'markdown',
-  markdown: 'markdown',
+  // DevOps / config
+  dockerfile: 'dockerfile',
+  cmake: 'cmake',
+  proto: 'protobuf',
+  nginx: 'nginx',
+  feature: 'gherkin',
+
+  // WebAssembly
+  wast: 'wast',
+  wat: 'wast',
+
+  // Math / science
+  m2: 'mathematica',
+  wl: 'mathematica',
+  nb: 'mathematica',
+  mat: 'octave',
+  sas: 'sas',
+
+  // Other
+  cob: 'cobol',
+  cbl: 'cobol',
+  bf: 'brainfuck',
+  apl: 'apl',
+  e: 'eiffel',
+  factor: 'factor',
+  fth: 'forth',
+  '4th': 'forth',
+  mo: 'modelica',
+  st: 'smalltalk',
+  nsi: 'nsis',
+  nsh: 'nsis',
+  ebnf: 'ebnf',
+  dyl: 'dylan',
+};
+
+// Map full filenames (no extension) to language names
+const filenameMap: Record<string, string> = {
+  Dockerfile: 'dockerfile',
+  'docker-compose.yml': 'yaml',
+  'docker-compose.yaml': 'yaml',
+  Makefile: 'bash',
+  'CMakeLists.txt': 'cmake',
+  Gemfile: 'ruby',
+  Rakefile: 'ruby',
+  Vagrantfile: 'ruby',
+  Podfile: 'ruby',
 };
 
 export function getLanguageFromPath(filePath: string): string | undefined {
-  const ext = filePath.split('.').pop()?.toLowerCase();
-  if (!ext) return undefined;
+  // Check full filename first (for extensionless files like Dockerfile)
+  const filename = filePath.split('/').pop() ?? '';
+  const byName = filenameMap[filename];
+  if (byName) return byName;
+
+  const ext = filename.split('.').pop()?.toLowerCase();
+  if (!ext || ext === filename.toLowerCase()) return undefined;
   return extensionMap[ext];
 }
 

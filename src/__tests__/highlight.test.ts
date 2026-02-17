@@ -54,7 +54,10 @@ describe('getLanguageFromPath', () => {
 
   it('returns undefined for unknown extensions', () => {
     expect(getLanguageFromPath('file.xyz')).toBeUndefined();
-    expect(getLanguageFromPath('Makefile')).toBeUndefined();
+  });
+
+  it('maps known filenames without extensions', () => {
+    expect(getLanguageFromPath('Makefile')).toBe('bash');
   });
 
   it('handles paths with directories', () => {
@@ -62,7 +65,11 @@ describe('getLanguageFromPath', () => {
     expect(getLanguageFromPath('/home/user/project/main.rs')).toBe('rust');
   });
 
-  it('returns undefined for files with no extension', () => {
-    expect(getLanguageFromPath('Dockerfile')).toBeUndefined();
+  it('returns language for known extensionless filenames', () => {
+    expect(getLanguageFromPath('Dockerfile')).toBe('dockerfile');
+  });
+
+  it('returns undefined for unknown extensionless files', () => {
+    expect(getLanguageFromPath('LICENSE')).toBeUndefined();
   });
 });
