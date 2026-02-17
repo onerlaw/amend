@@ -149,7 +149,7 @@ export const TerminalTabs = forwardRef<TerminalTabsHandle>(function TerminalTabs
             <div key={group.gitRoot ?? '~'} className="flex items-end shrink-0">
               {groupIdx > 0 && <div className="w-px h-5 bg-surface-3 shrink-0 mb-0.5" />}
               <div className="flex flex-col">
-                {groups.length > 1 && <ProjectLabel name={group.projectName} />}
+                <ProjectLabel name={group.projectName} />
                 <div className="flex gap-0.5">
                   {group.tabs.map((tab, tabIdx) => {
                     const globalIndex = group.globalIndices[tabIdx];
