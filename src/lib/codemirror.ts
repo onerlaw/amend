@@ -17,7 +17,7 @@ import {
   indentOnInput,
 } from '@codemirror/language';
 import { closeBrackets, closeBracketsKeymap } from '@codemirror/autocomplete';
-import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
+import { defaultKeymap, history, historyKeymap, toggleComment } from '@codemirror/commands';
 import { search, searchKeymap, highlightSelectionMatches, gotoLine } from '@codemirror/search';
 import { tags } from '@lezer/highlight';
 import { indentationMarkers } from '@replit/codemirror-indentation-markers';
@@ -473,6 +473,7 @@ export function createBaseExtensions(language: string | undefined): Extension[] 
 
     // High-priority keymap: Mod-g → gotoLine (overrides searchKeymap's findNext)
     keymap.of([{ key: 'Mod-g', run: gotoLine }]),
+    keymap.of([{ key: 'Mod-/', run: toggleComment }]),
     keymap.of([
       ...closeBracketsKeymap,
       ...defaultKeymap,
