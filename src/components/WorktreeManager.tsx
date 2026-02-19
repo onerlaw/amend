@@ -3,11 +3,9 @@ import { ModalOverlay } from '@/components/ModalOverlay';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import {
   listWorktrees,
-  addWorktree,
+  openOrCreateWorktree,
   removeWorktree,
-  listBranches,
   GitWorktree,
-  GitBranch,
 } from '@/lib/tauri';
 import { BranchIcon, CloseIcon, PlusIcon, TrashIcon, SpinnerIcon } from '@/components/Icons';
 import { getFileName } from '@/lib/fileUtils';
@@ -43,6 +41,12 @@ export function WorktreeManager({ repoPath, onClose, createTerminal }: WorktreeM
     await createTerminal(wt.path);
     onClose();
   };
+
+  const handleWorktreeOpenedOrCreated = useCallback(async (wt: GitWorktree) => {
+    setShowAddForm(false);
+    await createTerminal(wt.path);
+    onClose();
+  }, [createTerminal, onClose]);
 
   const handleRemove = async () => {
     if (!removing) return;
@@ -97,10 +101,7 @@ export function WorktreeManager({ repoPath, onClose, createTerminal }: WorktreeM
         {showAddForm && (
           <AddWorktreeForm
             repoPath={repoPath}
-            onAdded={() => {
-              setShowAddForm(false);
-              refresh();
-            }}
+            onOpenedOrCreated={handleWorktreeOpenedOrCreated}
             onCancel={() => setShowAddForm(false)}
           />
         )}
@@ -169,108 +170,47 @@ function WorktreeRow({ worktree, onClick, onRemove }: WorktreeRowProps) {
 
 interface AddWorktreeFormProps {
   repoPath: string;
-  onAdded: () => void;
+  onOpenedOrCreated: (wt: GitWorktree) => void;
   onCancel: () => void;
 }
 
-function AddWorktreeForm({ repoPath, onAdded, onCancel }: AddWorktreeFormProps) {
-  const [path, setPath] = useState('');
-  const [branchMode, setBranchMode] = useState<'new' | 'existing'>('new');
-  const [newBranchName, setNewBranchName] = useState('');
-  const [existingBranch, setExistingBranch] = useState('');
-  const [branches, setBranches] = useState<GitBranch[]>([]);
-  const [creating, setCreating] = useState(false);
+function AddWorktreeForm({ repoPath, onOpenedOrCreated, onCancel }: AddWorktreeFormProps) {
+  const [branchName, setBranchName] = useState('');
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    listBranches(repoPath).then((bs) => {
-      const local = bs.filter((b) => !b.isRemote);
-      setBranches(local);
-      if (local.length > 0) setExistingBranch(local[0].name);
-    });
-  }, [repoPath]);
-
-  const handleCreate = async () => {
-    if (!path.trim()) return;
-    setCreating(true);
+  const handleSubmit = async () => {
+    const trimmed = branchName.trim();
+    if (!trimmed) return;
+    setLoading(true);
     setError(null);
     try {
-      if (branchMode === 'new') {
-        await addWorktree(repoPath, path.trim(), undefined, newBranchName.trim() || undefined);
-      } else {
-        await addWorktree(repoPath, path.trim(), existingBranch || undefined);
-      }
-      onAdded();
+      const wt = await openOrCreateWorktree(repoPath, trimmed);
+      onOpenedOrCreated(wt);
     } catch (err) {
       setError(String(err));
     } finally {
-      setCreating(false);
+      setLoading(false);
     }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') handleSubmit();
+    if (e.key === 'Escape') onCancel();
   };
 
   return (
     <div className="mt-3 border-t border-surface-3 pt-3">
-      {/* Path input */}
       <input
         type="text"
-        value={path}
-        onChange={(e) => setPath(e.target.value)}
-        placeholder="../my-feature"
+        value={branchName}
+        onChange={(e) => setBranchName(e.target.value)}
+        onKeyDown={handleKeyDown}
+        placeholder="Branch name"
         className="mb-2 w-full rounded-md border border-surface-3 bg-surface-1 px-2 py-1 text-xs text-primary placeholder:text-tertiary focus:border-accent focus:outline-none"
         autoFocus
       />
-
-      {/* Branch mode toggle */}
-      <div className="mb-2 flex gap-1">
-        <button
-          onClick={() => setBranchMode('new')}
-          className={`rounded-full px-2.5 py-0.5 text-[11px] ${
-            branchMode === 'new'
-              ? 'bg-accent text-white'
-              : 'bg-surface-3 text-secondary hover:text-primary'
-          }`}
-        >
-          New Branch
-        </button>
-        <button
-          onClick={() => setBranchMode('existing')}
-          className={`rounded-full px-2.5 py-0.5 text-[11px] ${
-            branchMode === 'existing'
-              ? 'bg-accent text-white'
-              : 'bg-surface-3 text-secondary hover:text-primary'
-          }`}
-        >
-          Existing Branch
-        </button>
-      </div>
-
-      {/* Branch input */}
-      {branchMode === 'new' ? (
-        <input
-          type="text"
-          value={newBranchName}
-          onChange={(e) => setNewBranchName(e.target.value)}
-          placeholder="Branch name (optional)"
-          className="mb-2 w-full rounded-md border border-surface-3 bg-surface-1 px-2 py-1 text-xs text-primary placeholder:text-tertiary focus:border-accent focus:outline-none"
-        />
-      ) : (
-        <select
-          value={existingBranch}
-          onChange={(e) => setExistingBranch(e.target.value)}
-          className="mb-2 w-full rounded-md border border-surface-3 bg-surface-1 px-2 py-1 text-xs text-primary focus:border-accent focus:outline-none"
-        >
-          {branches.map((b) => (
-            <option key={b.name} value={b.name}>
-              {b.name}
-            </option>
-          ))}
-        </select>
-      )}
-
-      {/* Error */}
       {error && <div className="mb-2 text-[11px] text-red-400">{error}</div>}
-
-      {/* Actions */}
       <div className="flex justify-end gap-2">
         <button
           onClick={onCancel}
@@ -279,11 +219,11 @@ function AddWorktreeForm({ repoPath, onAdded, onCancel }: AddWorktreeFormProps) 
           Cancel
         </button>
         <button
-          onClick={handleCreate}
-          disabled={creating || !path.trim()}
+          onClick={handleSubmit}
+          disabled={loading || !branchName.trim()}
           className="rounded-md bg-accent px-2.5 py-1 text-xs text-white hover:bg-accent/90 disabled:opacity-50"
         >
-          {creating ? <SpinnerIcon className="h-3 w-3 animate-spin" /> : 'Create'}
+          {loading ? <SpinnerIcon className="h-3 w-3 animate-spin" /> : 'Open'}
         </button>
       </div>
     </div>

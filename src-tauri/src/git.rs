@@ -456,6 +456,70 @@ pub async fn add_worktree(
     .map_err(|e| GitError::TaskJoin(e.to_string()))?
 }
 
+fn sanitize_branch_for_path(branch: &str) -> String {
+    branch.replace('/', "-")
+}
+
+fn branch_exists_locally(repo_path: &str, branch_name: &str) -> Result<bool, GitError> {
+    let output = run_git_command(repo_path, &["branch", "--list", "--", branch_name])?;
+    Ok(!output.trim().is_empty())
+}
+
+#[tauri::command]
+pub async fn open_or_create_worktree(
+    repo_path: String,
+    branch_name: String,
+) -> Result<GitWorktree, GitError> {
+    validate_no_flag(&branch_name, "branch name")?;
+    if branch_name.trim().is_empty() {
+        return Err(GitError::InvalidArgument(
+            "branch name must not be empty".to_string(),
+        ));
+    }
+
+    spawn_blocking(move || {
+        // Return existing worktree if branch already has one
+        let existing = list_worktrees_sync(&repo_path)?;
+        if let Some(wt) = existing.iter().find(|w| w.branch == branch_name) {
+            return Ok(wt.clone());
+        }
+
+        // Determine destination: <repo_path>/.amend/<sanitized_branch>
+        let dir_name = sanitize_branch_for_path(&branch_name);
+        let worktree_path = Path::new(&repo_path)
+            .join(".amend")
+            .join(&dir_name);
+
+        // Ensure .amend/ parent directory exists
+        std::fs::create_dir_all(Path::new(&repo_path).join(".amend"))
+            .map_err(|e| GitError::CommandFailed(e.to_string()))?;
+
+        let worktree_path_str = worktree_path.to_string_lossy().to_string();
+
+        if branch_exists_locally(&repo_path, &branch_name)? {
+            // Check out existing branch into new worktree
+            run_git_command(
+                &repo_path,
+                &["worktree", "add", "--", &worktree_path_str, &branch_name],
+            )?;
+        } else {
+            // Create new branch and worktree
+            run_git_command(
+                &repo_path,
+                &["worktree", "add", "-b", &branch_name, "--", &worktree_path_str],
+            )?;
+        }
+
+        Ok(GitWorktree {
+            path: worktree_path_str,
+            branch: branch_name,
+            is_main: false,
+        })
+    })
+    .await
+    .map_err(|e| GitError::TaskJoin(e.to_string()))?
+}
+
 #[tauri::command]
 pub async fn remove_worktree(
     repo_path: String,
