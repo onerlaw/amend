@@ -12,9 +12,18 @@ import { useDraggableTabs } from '@/hooks/useDraggableTabs';
 
 function TerminalTabLabel({ tab }: { tab: TerminalTab }) {
   const dirName = getFileName(tab.cwd);
-  const mainText = tab.title || dirName;
-
-  return <span className="truncate max-w-[200px]">{mainText}</span>;
+  if (tab.worktreeName) {
+    const subtitle = tab.title || dirName;
+    return (
+      <span className="flex flex-col leading-tight max-w-[160px]">
+        <span className="truncate">{tab.worktreeName}</span>
+        {subtitle !== tab.worktreeName && (
+          <span className="truncate text-[10px] opacity-60">{subtitle}</span>
+        )}
+      </span>
+    );
+  }
+  return <span className="truncate max-w-[200px]">{tab.title || dirName}</span>;
 }
 
 interface TabGroup {
@@ -30,14 +39,15 @@ function groupTabsByProject(tabs: TerminalTab[]): TabGroup[] {
 
   for (let i = 0; i < tabs.length; i++) {
     const tab = tabs[i];
-    // Treat undefined (not yet resolved) same as null (no repo)
     const root = tab.gitRoot ?? null;
-    const key = root ?? '~';
+    // Group by mainRepoRoot so all worktrees of the same repo are together
+    const mainRoot = tab.mainRepoRoot ?? root;
+    const key = mainRoot ?? '~';
 
     let group = groupMap.get(key);
     if (!group) {
       group = {
-        projectName: root ? getFileName(root) : '~',
+        projectName: tab.repoName ?? (root ? getFileName(root) : '~'),
         gitRoot: root,
         tabs: [],
         globalIndices: [],
@@ -146,7 +156,7 @@ export const TerminalTabs = forwardRef<TerminalTabsHandle>(function TerminalTabs
       <div className="flex items-center bg-surface-2 px-1 pt-1 gap-0.5">
         <div ref={containerRef} className="flex flex-1 overflow-x-auto gap-0.5 items-end">
           {groups.map((group, groupIdx) => (
-            <div key={group.gitRoot ?? '~'} className="flex items-end shrink-0">
+            <div key={group.projectName + (group.gitRoot ?? '~')} className="flex items-end shrink-0">
               {groupIdx > 0 && <div className="w-px h-5 bg-surface-3 shrink-0 mb-0.5" />}
               <div className="flex flex-col">
                 <ProjectLabel name={group.projectName} />

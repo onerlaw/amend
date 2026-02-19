@@ -6,6 +6,9 @@ export interface TerminalTab {
   cwd: string;
   title?: string;
   gitRoot?: string | null; // undefined = not resolved, null = not in a repo, string = git root
+  repoName?: string | null;
+  mainRepoRoot?: string | null;
+  worktreeName?: string | null;
 }
 
 interface TerminalState {
@@ -16,7 +19,15 @@ interface TerminalState {
   setActiveTab: (id: string) => void;
   setTabTitle: (id: string, title: string) => void;
   updateTabCwd: (id: string, cwd: string) => void;
-  setTabGitRoot: (id: string, gitRoot: string | null) => void;
+  setTabRepoInfo: (
+    id: string,
+    info: {
+      gitRoot: string | null;
+      repoName?: string | null;
+      mainRepoRoot?: string | null;
+      worktreeName?: string | null;
+    }
+  ) => void;
   reorderTabs: (fromIndex: number, toIndex: number) => void;
 }
 
@@ -77,13 +88,34 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
     if (import.meta.env.DEV)
       console.log('[CWD] Store updated:', { tabId: id, from: tab.cwd, to: cwd });
     set({
-      tabs: tabs.map((t) => (t.id === id ? { ...t, cwd, gitRoot: undefined } : t)),
+      tabs: tabs.map((t) =>
+        t.id === id
+          ? {
+              ...t,
+              cwd,
+              gitRoot: undefined,
+              repoName: undefined,
+              mainRepoRoot: undefined,
+              worktreeName: undefined,
+            }
+          : t
+      ),
     });
   },
 
-  setTabGitRoot: (id: string, gitRoot: string | null) => {
+  setTabRepoInfo: (id, info) => {
     set({
-      tabs: get().tabs.map((t) => (t.id === id ? { ...t, gitRoot } : t)),
+      tabs: get().tabs.map((t) =>
+        t.id === id
+          ? {
+              ...t,
+              gitRoot: info.gitRoot,
+              repoName: info.repoName ?? null,
+              mainRepoRoot: info.mainRepoRoot ?? null,
+              worktreeName: info.worktreeName ?? null,
+            }
+          : t
+      ),
     });
   },
 

@@ -159,6 +159,17 @@ export async function getGitRoot(path: string): Promise<string | null> {
   return invoke('get_git_root', { path });
 }
 
+export interface GitRepoInfo {
+  gitRoot: string;
+  repoName: string;
+  mainRepoRoot: string;
+  worktreeName: string | null;
+}
+
+export async function getGitRepoInfo(path: string): Promise<GitRepoInfo | null> {
+  return invoke('get_git_repo_info', { path });
+}
+
 export async function getGitStatus(repoPath: string): Promise<GitStatus> {
   return invoke('get_git_status', { repoPath });
 }

@@ -1,23 +1,28 @@
 import { useEffect } from 'react';
 import { useTerminalStore } from '@/stores/terminalStore';
-import { getGitRoot } from '@/lib/tauri';
+import { getGitRepoInfo } from '@/lib/tauri';
 
 /**
- * Resolves git roots for all terminal tabs that haven't been resolved yet.
+ * Resolves git repo info for all terminal tabs that haven't been resolved yet.
  * Watches the tabs array and triggers resolution when gitRoot is undefined.
  */
 export function useTabGitRoots() {
   const tabs = useTerminalStore((s) => s.tabs);
-  const setTabGitRoot = useTerminalStore((s) => s.setTabGitRoot);
+  const setTabRepoInfo = useTerminalStore((s) => s.setTabRepoInfo);
 
   useEffect(() => {
     let cancelled = false;
 
     const unresolvedTabs = tabs.filter((t) => t.gitRoot === undefined);
     for (const tab of unresolvedTabs) {
-      getGitRoot(tab.cwd).then((root) => {
+      getGitRepoInfo(tab.cwd).then((info) => {
         if (!cancelled) {
-          setTabGitRoot(tab.id, root);
+          setTabRepoInfo(tab.id, {
+            gitRoot: info?.gitRoot ?? null,
+            repoName: info?.repoName ?? null,
+            mainRepoRoot: info?.mainRepoRoot ?? null,
+            worktreeName: info?.worktreeName ?? null,
+          });
         }
       });
     }
@@ -25,5 +30,5 @@ export function useTabGitRoots() {
     return () => {
       cancelled = true;
     };
-  }, [tabs, setTabGitRoot]);
+  }, [tabs, setTabRepoInfo]);
 }

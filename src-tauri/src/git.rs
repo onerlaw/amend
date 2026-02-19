@@ -193,6 +193,69 @@ pub async fn get_git_root(path: String) -> Result<Option<String>, GitError> {
     .map_err(|e| GitError::TaskJoin(e.to_string()))?
 }
 
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct GitRepoInfo {
+    pub git_root: String,
+    pub repo_name: String,
+    pub main_repo_root: String,
+    pub worktree_name: Option<String>,
+}
+
+#[tauri::command]
+pub async fn get_git_repo_info(path: String) -> Result<Option<GitRepoInfo>, GitError> {
+    spawn_blocking(move || {
+        let repo = match Repository::discover(&path) {
+            Ok(r) => r,
+            Err(_) => return Ok(None),
+        };
+        let git_root = match repo.workdir() {
+            Some(p) => p.to_string_lossy().to_string(),
+            None => return Ok(None),
+        };
+        let git_root_normalized = git_root.trim_end_matches('/').to_string();
+
+        // --git-common-dir returns ".git" (relative) in main worktree, or
+        // absolute /path/to/main/.git in a linked worktree
+        let common_dir = run_git_command(&git_root_normalized, &["rev-parse", "--git-common-dir"])?;
+        let common_dir = common_dir.trim();
+
+        let main_repo_root = if Path::new(common_dir).is_absolute() {
+            Path::new(common_dir)
+                .parent()
+                .map(|p| p.to_string_lossy().to_string())
+                .unwrap_or_else(|| git_root_normalized.clone())
+        } else {
+            git_root_normalized.clone()
+        };
+
+        let repo_name = Path::new(&main_repo_root)
+            .file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_default();
+
+        let worktree_name = if git_root_normalized != main_repo_root {
+            Some(
+                Path::new(&git_root_normalized)
+                    .file_name()
+                    .map(|n| n.to_string_lossy().to_string())
+                    .unwrap_or_default(),
+            )
+        } else {
+            None
+        };
+
+        Ok(Some(GitRepoInfo {
+            git_root,
+            repo_name,
+            main_repo_root,
+            worktree_name,
+        }))
+    })
+    .await
+    .map_err(|e| GitError::TaskJoin(e.to_string()))?
+}
+
 #[tauri::command]
 pub async fn is_git_repository(path: String) -> bool {
     spawn_blocking(move || Repository::discover(&path).is_ok())

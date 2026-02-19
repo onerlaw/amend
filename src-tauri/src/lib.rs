@@ -47,6 +47,7 @@ pub fn run() {
             filesystem::get_clipboard_file_paths,
             // Git commands
             git::get_git_root,
+            git::get_git_repo_info,
             git::is_git_repository,
             git::get_git_status,
             git::get_file_diff,
