@@ -3,7 +3,6 @@ import {
   ViewPlugin,
   keymap,
   lineNumbers,
-  highlightActiveLine,
   tooltips,
   drawSelection,
   dropCursor,
@@ -123,9 +122,6 @@ const darkTheme = EditorView.theme(
     '&.cm-focused .cm-selectionLayer .cm-selectionBackground': {
       background: 'var(--accent)',
       opacity: '0.3',
-    },
-    '.cm-activeLine': {
-      backgroundColor: 'var(--surface-1)',
     },
     '&.cm-focused .cm-selectionBackground, .cm-selectionBackground': {
       backgroundColor: 'var(--accent)',
@@ -465,7 +461,6 @@ export function createBaseExtensions(language: string | undefined): Extension[] 
   return [
     foldGutter(),
     lineNumbers(),
-    highlightActiveLine(),
     history(),
     search(),
     highlightSelectionMatches(),
