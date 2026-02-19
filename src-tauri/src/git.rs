@@ -486,9 +486,7 @@ pub async fn open_or_create_worktree(
 
         // Determine destination: <repo_path>/.amend/<sanitized_branch>
         let dir_name = sanitize_branch_for_path(&branch_name);
-        let worktree_path = Path::new(&repo_path)
-            .join(".amend")
-            .join(&dir_name);
+        let worktree_path = Path::new(&repo_path).join(".amend").join(&dir_name);
 
         // Ensure .amend/ parent directory exists
         std::fs::create_dir_all(Path::new(&repo_path).join(".amend"))
@@ -506,7 +504,14 @@ pub async fn open_or_create_worktree(
             // Create new branch and worktree
             run_git_command(
                 &repo_path,
-                &["worktree", "add", "-b", &branch_name, "--", &worktree_path_str],
+                &[
+                    "worktree",
+                    "add",
+                    "-b",
+                    &branch_name,
+                    "--",
+                    &worktree_path_str,
+                ],
             )?;
         }
 

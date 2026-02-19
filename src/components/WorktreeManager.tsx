@@ -1,12 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { ModalOverlay } from '@/components/ModalOverlay';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
-import {
-  listWorktrees,
-  openOrCreateWorktree,
-  removeWorktree,
-  GitWorktree,
-} from '@/lib/tauri';
+import { listWorktrees, openOrCreateWorktree, removeWorktree, GitWorktree } from '@/lib/tauri';
 import { BranchIcon, CloseIcon, PlusIcon, TrashIcon, SpinnerIcon } from '@/components/Icons';
 import { getFileName } from '@/lib/fileUtils';
 
@@ -42,11 +37,14 @@ export function WorktreeManager({ repoPath, onClose, createTerminal }: WorktreeM
     onClose();
   };
 
-  const handleWorktreeOpenedOrCreated = useCallback(async (wt: GitWorktree) => {
-    setShowAddForm(false);
-    await createTerminal(wt.path);
-    onClose();
-  }, [createTerminal, onClose]);
+  const handleWorktreeOpenedOrCreated = useCallback(
+    async (wt: GitWorktree) => {
+      setShowAddForm(false);
+      await createTerminal(wt.path);
+      onClose();
+    },
+    [createTerminal, onClose]
+  );
 
   const handleRemove = async () => {
     if (!removing) return;
