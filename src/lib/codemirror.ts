@@ -17,7 +17,7 @@ import {
   indentOnInput,
 } from '@codemirror/language';
 import { closeBrackets, closeBracketsKeymap } from '@codemirror/autocomplete';
-import { defaultKeymap, history, historyKeymap, toggleComment } from '@codemirror/commands';
+import { defaultKeymap, history, historyKeymap, indentMore, indentLess, toggleComment } from '@codemirror/commands';
 import { search, searchKeymap, highlightSelectionMatches, gotoLine } from '@codemirror/search';
 import { tags } from '@lezer/highlight';
 import { indentationMarkers } from '@replit/codemirror-indentation-markers';
@@ -454,6 +454,16 @@ const stickyGutters = ViewPlugin.fromClass(
   }
 );
 
+function tabIndentIfMultiline(view: EditorView): boolean {
+  const { state } = view;
+  const hasMultiLineSelection = state.selection.ranges.some(range => {
+    if (range.empty) return false;
+    return state.doc.lineAt(range.from).number < state.doc.lineAt(range.to).number;
+  });
+  if (hasMultiLineSelection) return indentMore(view);
+  return false; // fall through to defaultKeymap's insertTab
+}
+
 /**
  * Creates the base set of CodeMirror extensions shared across all editor instances.
  */
@@ -471,6 +481,11 @@ export function createBaseExtensions(language: string | undefined): Extension[] 
     dropCursor(),
     indentationMarkers({ highlightActiveBlock: true }),
 
+    // Tab indents multi-line selections; Shift+Tab always dedents
+    keymap.of([
+      { key: 'Tab', run: tabIndentIfMultiline },
+      { key: 'Shift-Tab', run: indentLess },
+    ]),
     // High-priority keymap: Mod-g → gotoLine (overrides searchKeymap's findNext)
     keymap.of([{ key: 'Mod-g', run: gotoLine }]),
     keymap.of([{ key: 'Mod-/', run: toggleComment }]),
