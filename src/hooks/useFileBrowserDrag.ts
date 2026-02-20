@@ -12,12 +12,20 @@ interface UseFileBrowserDragOptions {
   flatRows: FlatRow[];
   expandedDirs: Set<string>;
   onExpand: (path: string) => void;
+  selectedPaths: Set<string>;
+  onClearSelection: () => void;
+}
+
+function filterTopLevelPaths(paths: string[]): string[] {
+  return paths.filter((p) => !paths.some((other) => other !== p && p.startsWith(other + '/')));
 }
 
 export function useFileBrowserDrag({
   flatRows,
   expandedDirs,
   onExpand,
+  selectedPaths,
+  onClearSelection,
 }: UseFileBrowserDragOptions) {
   // Refs — never cause re-renders (same pattern as useDraggableTabs)
   const flatRowsRef = useRef(flatRows);
@@ -26,6 +34,11 @@ export function useFileBrowserDrag({
   flatRowsRef.current = flatRows;
   expandedDirsRef.current = expandedDirs;
   onExpandRef.current = onExpand;
+
+  const selectedPathsRef = useRef(selectedPaths);
+  selectedPathsRef.current = selectedPaths;
+  const onClearSelectionRef = useRef(onClearSelection);
+  onClearSelectionRef.current = onClearSelection;
 
   const dragEntryRef = useRef<FileEntry | null>(null);
   const isDraggingRef = useRef(false);
@@ -115,14 +128,23 @@ export function useFileBrowserDrag({
       }
       const src = dragEntryRef.current;
       const destDir = dropTargetPathRef.current;
+      const sel = selectedPathsRef.current;
+      const isMultiDrag = sel.has(src.path) && sel.size > 1;
+      const pathsToMove = isMultiDrag ? filterTopLevelPaths(Array.from(sel)) : [src.path];
       reset();
 
-      if (destDir && isValidDrop(src.path, destDir)) {
-        try {
-          await moveEntry(src.path, join(destDir, basename(src.path)));
-          useFileStore.getState().invalidateFileTree();
-        } catch (err) {
-          console.error('Failed to move entry:', err);
+      if (destDir) {
+        const moves = pathsToMove
+          .filter((p) => isValidDrop(p, destDir))
+          .map((p) => moveEntry(p, join(destDir, basename(p))));
+        if (moves.length) {
+          try {
+            await Promise.all(moves);
+            useFileStore.getState().invalidateFileTree();
+            if (isMultiDrag) onClearSelectionRef.current();
+          } catch (err) {
+            console.error('Failed to move entry:', err);
+          }
         }
       }
     }
@@ -144,24 +166,35 @@ export function useFileBrowserDrag({
   }, []);
 
   const getDragProps = useCallback(
-    (entry: FileEntry) => ({
-      onMouseDown: (e: React.MouseEvent) => {
-        if (e.button !== 0) return;
-        e.preventDefault();
-        wasDragRef.current = false;
-        dragEntryRef.current = entry;
-        startXRef.current = e.clientX;
-        startYRef.current = e.clientY;
-      },
-      isDragging: dragPath === entry.path,
-      isDropTarget: dropTargetPath === entry.path,
-    }),
+    (entry: FileEntry) => {
+      const sel = selectedPathsRef.current;
+      return {
+        onMouseDown: (e: React.MouseEvent) => {
+          if (e.button !== 0) return;
+          e.preventDefault();
+          wasDragRef.current = false;
+          dragEntryRef.current = entry;
+          startXRef.current = e.clientX;
+          startYRef.current = e.clientY;
+        },
+        isDragging:
+          dragPath !== null &&
+          (dragPath === entry.path || (sel.has(dragPath) && sel.has(entry.path))),
+        isDropTarget: dropTargetPath === entry.path,
+      };
+    },
     [dragPath, dropTargetPath]
   );
+
+  const sel = selectedPathsRef.current;
+  const count = dragPath && sel.has(dragPath) ? sel.size : 1;
 
   return {
     getDragProps,
     wasDragRef,
-    ghost: ghostPos && dragPath ? { name: basename(dragPath), x: ghostPos.x, y: ghostPos.y } : null,
+    ghost:
+      ghostPos && dragPath
+        ? { name: basename(dragPath), count, x: ghostPos.x, y: ghostPos.y }
+        : null,
   };
 }

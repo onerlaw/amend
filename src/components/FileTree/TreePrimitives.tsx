@@ -8,7 +8,7 @@ interface TreeRowProps {
   isDragging?: boolean;
   isDropTarget?: boolean;
   className?: string;
-  onClick: () => void;
+  onClick: (e: React.MouseEvent) => void;
   onContextMenu?: (e: React.MouseEvent) => void;
   onMouseDown?: (e: React.MouseEvent) => void;
   dragPath?: string;

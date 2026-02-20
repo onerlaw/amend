@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useState, useRef, useMemo, useCallback, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Virtuoso } from 'react-virtuoso';
 import { useFileBrowserState } from '@/hooks/useFileBrowserState';
@@ -51,6 +51,9 @@ function BrowseFileList({
   const toggleBrowseExpandedDir = useUIStore((s) => s.toggleBrowseExpandedDir);
   const fileTreeVersion = useFileStore((s) => s.fileTreeVersion);
   const [cacheVersion, setCacheVersion] = useState(0);
+
+  const [selectedPaths, setSelectedPaths] = useState<Set<string>>(new Set());
+  const lastClickedPathRef = useRef<string | null>(null);
 
   // Re-fetch expanded directory contents when file tree version changes
   useEffect(() => {
@@ -108,6 +111,8 @@ function BrowseFileList({
     flatRows,
     expandedDirs,
     onExpand: toggleDir,
+    selectedPaths,
+    onClearSelection: () => setSelectedPaths(new Set()),
   });
 
   if (isLoading) {
@@ -136,16 +141,47 @@ function BrowseFileList({
           return (
             <TreeRow
               depth={depth}
-              isSelected={isActive || isContextTarget}
+              isSelected={isActive || isContextTarget || selectedPaths.has(entry.path)}
               isSubtle={isOpen && !isActive && !isContextTarget}
               isDragging={rowIsDragging}
               isDropTarget={isDropTarget}
               dragPath={entry.path}
               className={`pr-2 text-left ${entry.isGitignored ? 'opacity-50' : ''}`}
               onMouseDown={onMouseDown}
-              onClick={() => {
+              onClick={(e) => {
                 if (wasDragRef.current) return;
-                entry.isDirectory ? toggleDir(entry.path) : onSelectFile(entry.path);
+
+                if (e.shiftKey && lastClickedPathRef.current) {
+                  const lastIdx = flatRows.findIndex(
+                    (r) => r.entry.path === lastClickedPathRef.current
+                  );
+                  const currIdx = flatRows.findIndex((r) => r.entry.path === entry.path);
+                  if (lastIdx !== -1) {
+                    const [start, end] =
+                      lastIdx <= currIdx ? [lastIdx, currIdx] : [currIdx, lastIdx];
+                    const next = new Set(selectedPaths);
+                    for (let i = start; i <= end; i++) next.add(flatRows[i].entry.path);
+                    setSelectedPaths(next);
+                  }
+                  return;
+                }
+
+                if (e.metaKey || e.ctrlKey) {
+                  const next = new Set(selectedPaths);
+                  next.has(entry.path) ? next.delete(entry.path) : next.add(entry.path);
+                  setSelectedPaths(next);
+                  lastClickedPathRef.current = entry.path;
+                  return;
+                }
+
+                // Regular click
+                if (entry.isDirectory) {
+                  toggleDir(entry.path);
+                  return;
+                }
+                setSelectedPaths(new Set([entry.path]));
+                lastClickedPathRef.current = entry.path;
+                onSelectFile(entry.path);
               }}
               onContextMenu={(e) => {
                 e.preventDefault();
@@ -173,7 +209,9 @@ function BrowseFileList({
             style={{ left: ghost.x + 12, top: ghost.y + 4 }}
           >
             <div className="flex items-center rounded-md bg-surface-2 border border-surface-3 px-2 py-1 text-xs text-primary shadow-lg opacity-90">
-              <span className="truncate max-w-[200px]">{ghost.name}</span>
+              <span className="truncate max-w-[200px]">
+                {ghost.count > 1 ? `${ghost.count} items` : ghost.name}
+              </span>
             </div>
           </div>,
           document.body
