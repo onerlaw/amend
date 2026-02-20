@@ -13,7 +13,8 @@ import { useFileBrowserState, SaveStatus } from '@/hooks/useFileBrowserState';
 import { useFileStore } from '@/stores/fileStore';
 import { useUIStore } from '@/stores/uiStore';
 import { FileContentPanel } from './FileContentPanel';
-import { CloseIcon, DocumentIcon } from '@/components/Icons';
+import { MarkdownPreview } from './MarkdownPreview';
+import { CloseIcon, DocumentIcon, EyeIcon, EditIcon } from '@/components/Icons';
 import {
   goToDefinitionExtension,
   scrollToLine,
@@ -64,6 +65,14 @@ export const BrowseEditorTabs = forwardRef<BrowseEditorTabsHandle>(
     } = useFileStore();
     const editorViewRef = useRef<EditorView | null>(null);
     const [editorInfo, setEditorInfo] = useState<EditorInfo | null>(null);
+    const [isMarkdownPreview, setIsMarkdownPreview] = useState(false);
+
+    // Reset preview mode when switching to a non-markdown file
+    useEffect(() => {
+      if (activeFile?.language !== 'markdown') {
+        setIsMarkdownPreview(false);
+      }
+    }, [browseActiveFilePath, activeFile?.language]);
     const { getTabDragProps, containerRef, dropIndicatorIndex, dragFromIndex } = useDraggableTabs({
       itemCount: browseOpenFiles.length,
       onReorder: reorderBrowseFiles,
@@ -177,7 +186,7 @@ export const BrowseEditorTabs = forwardRef<BrowseEditorTabsHandle>(
     return (
       <div className="flex h-full flex-col bg-surface-0" onClick={() => setFocusedPanel('editor')}>
         {/* Tab bar */}
-        <div ref={containerRef} className="flex bg-surface-2 overflow-x-auto px-1 pt-1 gap-0.5">
+        <div ref={containerRef} className="flex bg-surface-2 overflow-x-auto px-1 pt-1 gap-0.5 items-end">
           {browseOpenFiles.map((file, index) => {
             const status = getSaveStatus(file.path);
             return (
@@ -219,6 +228,26 @@ export const BrowseEditorTabs = forwardRef<BrowseEditorTabsHandle>(
               <div className="absolute left-0 top-1 bottom-1 w-0.5 bg-accent rounded-full z-10 pointer-events-none" />
             </div>
           )}
+          {activeFile?.language === 'markdown' && (
+            <div className="ml-auto flex-shrink-0 flex items-center px-2 pb-1">
+              <button
+                onClick={() => setIsMarkdownPreview((v) => !v)}
+                className="flex items-center gap-1 px-2 py-0.5 rounded text-xs text-secondary hover:text-primary hover:bg-surface-3 transition-colors"
+              >
+                {isMarkdownPreview ? (
+                  <>
+                    <EditIcon className="h-3 w-3" />
+                    Edit
+                  </>
+                ) : (
+                  <>
+                    <EyeIcon className="h-3 w-3" />
+                    Preview
+                  </>
+                )}
+              </button>
+            </div>
+          )}
         </div>
 
         {/* References panel */}
@@ -227,12 +256,14 @@ export const BrowseEditorTabs = forwardRef<BrowseEditorTabsHandle>(
         {/* Editor content */}
         <div className="flex-1 min-h-0">
           {activeFile && (
-            <FileContentPanel
-              file={activeFile}
-              onContentChange={(content) => handleContentChange(activeFile.path, content)}
-              onEditorView={handleEditorView}
-              additionalExtensions={additionalExtensions}
-            />
+            isMarkdownPreview && activeFile.language === 'markdown'
+              ? <MarkdownPreview content={activeFile.content} />
+              : <FileContentPanel
+                  file={activeFile}
+                  onContentChange={(content) => handleContentChange(activeFile.path, content)}
+                  onEditorView={handleEditorView}
+                  additionalExtensions={additionalExtensions}
+                />
           )}
         </div>
 
