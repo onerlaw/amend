@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { ModalOverlay } from '@/components/ModalOverlay';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
-import { listWorktrees, openOrCreateWorktree, removeWorktree, GitWorktree } from '@/lib/tauri';
+import { listWorktrees, openOrCreateWorktree, removeWorktree, listBranches, GitWorktree, GitBranch } from '@/lib/tauri';
 import { BranchIcon, CloseIcon, PlusIcon, TrashIcon, SpinnerIcon } from '@/components/Icons';
 import { getFileName } from '@/lib/fileUtils';
 
@@ -176,10 +176,48 @@ function AddWorktreeForm({ repoPath, onOpenedOrCreated, onCancel }: AddWorktreeF
   const [branchName, setBranchName] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [branches, setBranches] = useState<GitBranch[]>([]);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    listBranches(repoPath).then(setBranches).catch(() => setBranches([]));
+  }, [repoPath]);
+
+  useEffect(() => {
+    if (!showDropdown) return;
+    const handler = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setShowDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showDropdown]);
+
+  const filtered = useMemo(() => {
+    const lower = branchName.toLowerCase();
+    return branches
+      .filter((b) => !b.isCurrent && b.name.toLowerCase().includes(lower))
+      .sort((a, b) => {
+        if (a.isRemote !== b.isRemote) return a.isRemote ? 1 : -1;
+        return a.name.localeCompare(b.name);
+      });
+  }, [branches, branchName]);
+
+  const handleSelect = (branch: GitBranch) => {
+    // For remote branches strip the remote prefix (e.g. "origin/foo" → "foo")
+    const name = branch.isRemote ? branch.name.replace(/^[^/]+\//, '') : branch.name;
+    setBranchName(name);
+    setShowDropdown(false);
+    inputRef.current?.focus();
+  };
 
   const handleSubmit = async () => {
     const trimmed = branchName.trim();
     if (!trimmed) return;
+    setShowDropdown(false);
     setLoading(true);
     setError(null);
     try {
@@ -194,20 +232,45 @@ function AddWorktreeForm({ repoPath, onOpenedOrCreated, onCancel }: AddWorktreeF
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') handleSubmit();
-    if (e.key === 'Escape') onCancel();
+    if (e.key === 'Escape') {
+      if (showDropdown) setShowDropdown(false);
+      else onCancel();
+    }
   };
 
   return (
-    <div className="mt-3 border-t border-surface-3 pt-3">
-      <input
-        type="text"
-        value={branchName}
-        onChange={(e) => setBranchName(e.target.value)}
-        onKeyDown={handleKeyDown}
-        placeholder="Branch name"
-        className="mb-2 w-full rounded-md border border-surface-3 bg-surface-1 px-2 py-1 text-xs text-primary placeholder:text-tertiary focus:border-accent focus:outline-none"
-        autoFocus
-      />
+    <div className="mt-3 border-t border-surface-3 pt-3" ref={containerRef}>
+      <div className="relative mb-2">
+        <input
+          ref={inputRef}
+          type="text"
+          value={branchName}
+          onChange={(e) => { setBranchName(e.target.value); setShowDropdown(true); }}
+          onFocus={() => setShowDropdown(true)}
+          onKeyDown={handleKeyDown}
+          placeholder="Branch name"
+          className="w-full rounded-md border border-surface-3 bg-surface-1 px-2 py-1 text-xs text-primary placeholder:text-tertiary focus:border-accent focus:outline-none"
+          autoFocus
+        />
+        {showDropdown && filtered.length > 0 && (
+          <div className="absolute top-full left-0 z-50 mt-1 w-full overflow-hidden rounded-md border border-surface-3 bg-surface-1 shadow-lg">
+            <div className="max-h-40 overflow-y-auto">
+              {filtered.map((branch) => (
+                <button
+                  key={branch.name}
+                  onMouseDown={(e) => { e.preventDefault(); handleSelect(branch); }}
+                  className="flex w-full items-center gap-1.5 px-3 py-1.5 text-left text-xs text-primary hover:bg-surface-3"
+                >
+                  {branch.isRemote && (
+                    <span className="flex-shrink-0 text-tertiary">remote</span>
+                  )}
+                  <span className="truncate">{branch.name}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
       {error && <div className="mb-2 text-[11px] text-red-400">{error}</div>}
       <div className="flex justify-end gap-2">
         <button
