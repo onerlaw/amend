@@ -1,6 +1,8 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Virtuoso } from 'react-virtuoso';
 import { useFileBrowserState } from '@/hooks/useFileBrowserState';
+import { useFileBrowserDrag } from '@/hooks/useFileBrowserDrag';
 import { readDirectories, FileEntry } from '@/lib/tauri';
 import { useContextMenuStore } from '@/stores/contextMenuStore';
 import { useFileStore } from '@/stores/fileStore';
@@ -102,6 +104,12 @@ function BrowseFileList({
     [entries, expandedDirs, cacheVersion]
   );
 
+  const { getDragProps, wasDragRef, ghost } = useFileBrowserDrag({
+    flatRows,
+    expandedDirs,
+    onExpand: toggleDir,
+  });
+
   if (isLoading) {
     return <div className="flex items-center justify-center h-full text-tertiary">Loading...</div>;
   }
@@ -113,42 +121,64 @@ function BrowseFileList({
   }
 
   return (
-    <Virtuoso
-      className="h-full"
-      data={flatRows}
-      overscan={200}
-      itemContent={(_index, { entry, depth }) => {
-        const isExpanded = expandedDirs.has(entry.path);
-        const isOpen = openFilePaths.has(entry.path);
-        const isActive = activeFilePath === entry.path;
-        const isContextTarget = contextMenuOpen && contextTargetPath === entry.path;
+    <>
+      <Virtuoso
+        className="h-full"
+        data={flatRows}
+        overscan={200}
+        itemContent={(_index, { entry, depth }) => {
+          const isExpanded = expandedDirs.has(entry.path);
+          const isOpen = openFilePaths.has(entry.path);
+          const isActive = activeFilePath === entry.path;
+          const isContextTarget = contextMenuOpen && contextTargetPath === entry.path;
+          const { onMouseDown, isDragging: rowIsDragging, isDropTarget } = getDragProps(entry);
 
-        return (
-          <TreeRow
-            depth={depth}
-            isSelected={isActive || isContextTarget}
-            isSubtle={isOpen && !isActive && !isContextTarget}
-            className={`pr-2 text-left ${entry.isGitignored ? 'opacity-50' : ''}`}
-            onClick={() => (entry.isDirectory ? toggleDir(entry.path) : onSelectFile(entry.path))}
-            onContextMenu={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              openMenu(entry, e.clientX, e.clientY);
-            }}
+          return (
+            <TreeRow
+              depth={depth}
+              isSelected={isActive || isContextTarget}
+              isSubtle={isOpen && !isActive && !isContextTarget}
+              isDragging={rowIsDragging}
+              isDropTarget={isDropTarget}
+              dragPath={entry.path}
+              className={`pr-2 text-left ${entry.isGitignored ? 'opacity-50' : ''}`}
+              onMouseDown={onMouseDown}
+              onClick={() => {
+                if (wasDragRef.current) return;
+                entry.isDirectory ? toggleDir(entry.path) : onSelectFile(entry.path);
+              }}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                openMenu(entry, e.clientX, e.clientY);
+              }}
+            >
+              {entry.isDirectory ? (
+                <DirectoryIndicator isExpanded={isExpanded} />
+              ) : (
+                <>
+                  <span className="w-3" />
+                  <FileIcon className={`h-4 w-4 ${getFileIconColor(entry.name)}`} />
+                </>
+              )}
+              <span className="truncate text-primary">{entry.name}</span>
+            </TreeRow>
+          );
+        }}
+      />
+      {ghost &&
+        createPortal(
+          <div
+            className="fixed z-50 pointer-events-none select-none"
+            style={{ left: ghost.x + 12, top: ghost.y + 4 }}
           >
-            {entry.isDirectory ? (
-              <DirectoryIndicator isExpanded={isExpanded} />
-            ) : (
-              <>
-                <span className="w-3" />
-                <FileIcon className={`h-4 w-4 ${getFileIconColor(entry.name)}`} />
-              </>
-            )}
-            <span className="truncate text-primary">{entry.name}</span>
-          </TreeRow>
-        );
-      }}
-    />
+            <div className="flex items-center rounded-md bg-surface-2 border border-surface-3 px-2 py-1 text-xs text-primary shadow-lg opacity-90">
+              <span className="truncate max-w-[200px]">{ghost.name}</span>
+            </div>
+          </div>,
+          document.body
+        )}
+    </>
   );
 }
 

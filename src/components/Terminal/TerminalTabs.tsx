@@ -184,7 +184,10 @@ export const TerminalTabs = forwardRef<TerminalTabsHandle>(function TerminalTabs
       <div className="flex items-center bg-surface-2 px-1 pt-1 gap-0.5">
         <div ref={containerRef} className="flex flex-1 overflow-x-auto gap-0.5 items-end">
           {groups.map((group, groupIdx) => (
-            <div key={group.projectName + (group.gitRoot ?? '~')} className="flex items-end shrink-0">
+            <div
+              key={group.projectName + (group.gitRoot ?? '~')}
+              className="flex items-end shrink-0"
+            >
               {groupIdx > 0 && <div className="w-px h-5 bg-surface-3 shrink-0 mb-0.5" />}
               <div className="flex flex-col">
                 <ProjectLabel name={group.projectName} />

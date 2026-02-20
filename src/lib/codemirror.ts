@@ -17,7 +17,14 @@ import {
   indentOnInput,
 } from '@codemirror/language';
 import { closeBrackets, closeBracketsKeymap } from '@codemirror/autocomplete';
-import { defaultKeymap, history, historyKeymap, indentMore, indentLess, toggleComment } from '@codemirror/commands';
+import {
+  defaultKeymap,
+  history,
+  historyKeymap,
+  indentMore,
+  indentLess,
+  toggleComment,
+} from '@codemirror/commands';
 import { search, searchKeymap, highlightSelectionMatches, gotoLine } from '@codemirror/search';
 import { tags } from '@lezer/highlight';
 import { indentationMarkers } from '@replit/codemirror-indentation-markers';
@@ -456,7 +463,7 @@ const stickyGutters = ViewPlugin.fromClass(
 
 function tabIndentIfMultiline(view: EditorView): boolean {
   const { state } = view;
-  const hasMultiLineSelection = state.selection.ranges.some(range => {
+  const hasMultiLineSelection = state.selection.ranges.some((range) => {
     if (range.empty) return false;
     return state.doc.lineAt(range.from).number < state.doc.lineAt(range.to).number;
   });

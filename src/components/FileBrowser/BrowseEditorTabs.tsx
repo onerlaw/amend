@@ -186,7 +186,10 @@ export const BrowseEditorTabs = forwardRef<BrowseEditorTabsHandle>(
     return (
       <div className="flex h-full flex-col bg-surface-0" onClick={() => setFocusedPanel('editor')}>
         {/* Tab bar */}
-        <div ref={containerRef} className="flex bg-surface-2 overflow-x-auto px-1 pt-1 gap-0.5 items-end">
+        <div
+          ref={containerRef}
+          className="flex bg-surface-2 overflow-x-auto px-1 pt-1 gap-0.5 items-end"
+        >
           {browseOpenFiles.map((file, index) => {
             const status = getSaveStatus(file.path);
             return (
@@ -255,16 +258,17 @@ export const BrowseEditorTabs = forwardRef<BrowseEditorTabsHandle>(
 
         {/* Editor content */}
         <div className="flex-1 min-h-0">
-          {activeFile && (
-            isMarkdownPreview && activeFile.language === 'markdown'
-              ? <MarkdownPreview content={activeFile.content} />
-              : <FileContentPanel
-                  file={activeFile}
-                  onContentChange={(content) => handleContentChange(activeFile.path, content)}
-                  onEditorView={handleEditorView}
-                  additionalExtensions={additionalExtensions}
-                />
-          )}
+          {activeFile &&
+            (isMarkdownPreview && activeFile.language === 'markdown' ? (
+              <MarkdownPreview content={activeFile.content} />
+            ) : (
+              <FileContentPanel
+                file={activeFile}
+                onContentChange={(content) => handleContentChange(activeFile.path, content)}
+                onEditorView={handleEditorView}
+                additionalExtensions={additionalExtensions}
+              />
+            ))}
         </div>
 
         {/* Status bar */}

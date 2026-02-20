@@ -77,17 +77,11 @@ const markdownComponents: Components = {
       {children}
     </blockquote>
   ),
-  table: ({ children }) => (
-    <table className="w-full border-collapse mb-4">{children}</table>
-  ),
+  table: ({ children }) => <table className="w-full border-collapse mb-4">{children}</table>,
   th: ({ children }) => (
-    <th className="border border-surface-3 bg-surface-2 px-3 py-1 text-left text-sm">
-      {children}
-    </th>
+    <th className="border border-surface-3 bg-surface-2 px-3 py-1 text-left text-sm">{children}</th>
   ),
-  td: ({ children }) => (
-    <td className="border border-surface-3 px-3 py-1 text-sm">{children}</td>
-  ),
+  td: ({ children }) => <td className="border border-surface-3 px-3 py-1 text-sm">{children}</td>,
   hr: () => <hr className="border-surface-3 my-6" />,
   pre: ({ children }) => (
     <pre className="bg-surface-2 rounded p-4 overflow-x-auto mb-4 text-sm font-mono">
@@ -104,9 +98,7 @@ const markdownComponents: Components = {
 
     if (!isBlock && !className) {
       return (
-        <code className="bg-surface-2 text-accent font-mono text-sm px-1 rounded">
-          {children}
-        </code>
+        <code className="bg-surface-2 text-accent font-mono text-sm px-1 rounded">{children}</code>
       );
     }
 

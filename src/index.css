@@ -300,3 +300,8 @@ body,
 [data-panel-group-direction='vertical'] > [data-panel-resize-handle-id]:hover {
   background-color: var(--accent);
 }
+
+body.file-drag-active,
+body.file-drag-active * {
+  cursor: grabbing !important;
+}

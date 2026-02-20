@@ -5,9 +5,13 @@ interface TreeRowProps {
   depth: number;
   isSelected?: boolean;
   isSubtle?: boolean;
+  isDragging?: boolean;
+  isDropTarget?: boolean;
   className?: string;
   onClick: () => void;
   onContextMenu?: (e: React.MouseEvent) => void;
+  onMouseDown?: (e: React.MouseEvent) => void;
+  dragPath?: string;
   children: ReactNode;
 }
 
@@ -15,18 +19,24 @@ export function TreeRow({
   depth,
   isSelected,
   isSubtle,
+  isDragging,
+  isDropTarget,
   className,
   onClick,
   onContextMenu,
+  onMouseDown,
+  dragPath,
   children,
 }: TreeRowProps) {
   return (
     <button
       onClick={onClick}
       onContextMenu={onContextMenu}
+      onMouseDown={onMouseDown}
+      data-drag-path={dragPath}
       className={`flex w-full select-none items-center gap-1 py-0.5 text-sm hover:bg-surface-3/50 ${
         isSelected ? 'bg-surface-3' : isSubtle ? 'bg-surface-3/30' : ''
-      } ${className ?? ''}`}
+      } ${isDropTarget ? 'ring-1 ring-inset ring-accent bg-accent/10' : ''} ${isDragging ? 'opacity-50' : ''} ${className ?? ''}`}
       style={{ paddingLeft: `${depth * 12 + 8}px` }}
     >
       {children}
