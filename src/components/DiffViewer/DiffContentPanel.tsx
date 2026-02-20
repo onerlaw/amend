@@ -138,6 +138,8 @@ const LazyDiffFileSection = memo(function LazyDiffFileSection({
   scrollRoot: HTMLDivElement | null;
 }) {
   const sentinelRef = useRef<HTMLDivElement>(null);
+  // Track whether this section has ever been scrolled into view
+  const hasObservedRef = useRef(false);
 
   useEffect(() => {
     const el = sentinelRef.current;
@@ -146,6 +148,7 @@ const LazyDiffFileSection = memo(function LazyDiffFileSection({
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries[0]?.isIntersecting) {
+          hasObservedRef.current = true;
           loadDiff(filePath);
         }
       },
@@ -155,6 +158,15 @@ const LazyDiffFileSection = memo(function LazyDiffFileSection({
     observer.observe(el);
     return () => observer.disconnect();
   }, [filePath, loadDiff, scrollRoot, category]);
+
+  // When the diffs map is cleared (e.g. after conflict resolution refresh) while
+  // this section is already visible, the IntersectionObserver won't re-fire
+  // because the intersection state hasn't changed. Re-enqueue explicitly.
+  useEffect(() => {
+    if (diffData === undefined && hasObservedRef.current) {
+      loadDiff(filePath);
+    }
+  }, [diffData, filePath, loadDiff]);
 
   return (
     <div ref={sentinelRef}>

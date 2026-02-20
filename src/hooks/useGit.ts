@@ -100,6 +100,11 @@ export function useGitPolling(repoPath: string | null) {
         if (!changed) {
           // Nothing changed — back off
           intervalRef.current = Math.min(intervalRef.current * BACKOFF_MULTIPLIER, MAX_INTERVAL);
+          // At max interval, force a full poll to catch working-tree changes
+          // that don't modify the git index (e.g. uncommitted file edits).
+          if (intervalRef.current >= MAX_INTERVAL) {
+            await fullPoll(true);
+          }
           return;
         }
       }
