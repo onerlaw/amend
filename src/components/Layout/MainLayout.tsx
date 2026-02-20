@@ -12,7 +12,8 @@ import type { BrowseEditorTabsHandle } from '@/components/FileBrowser/BrowseEdit
 import { GlobalSearch } from '@/components/GlobalSearch/GlobalSearch';
 import { ModalOverlay } from '@/components/ModalOverlay';
 import { indexProject, getGitRoot, onFsChanged } from '@/lib/tauri';
-import { formatShortcut } from '@/lib/fileUtils';
+import { formatShortcut, openFileInBrowseMode } from '@/lib/fileUtils';
+import { useSessionStore } from '@/stores/sessionStore';
 import {
   PlusIcon,
   CloseIcon,
@@ -144,13 +145,15 @@ export function MainLayout() {
     toggleDiffFileList,
   } = useUIStore();
   const { isOpen: notesOpen, toggleNotes } = useNotesStore();
-  const { browseOpenFiles, syncTabContext, contextPath } = useFileStore();
+  const { browseOpenFiles, browseActiveFilePath, savedBrowseState, syncTabContext, contextPath } =
+    useFileStore();
   const { tabs, activeTabId } = useTerminalStore();
   const [showSettings, setShowSettings] = useState(false);
   const [showWorktrees, setShowWorktrees] = useState(false);
   const createTerminal = useCreateTerminal();
   const terminalTabsRef = useRef<TerminalTabsHandle>(null);
   const browseEditorTabsRef = useRef<BrowseEditorTabsHandle>(null);
+  const restoredContextsRef = useRef<Set<string>>(new Set());
   const gitPolling = useGitPolling(contextPath);
   const diffStats = gitPolling.diffStats;
 
@@ -162,6 +165,42 @@ export function MainLayout() {
     localStorage.removeItem('amend-projects');
     localStorage.removeItem('amend-files');
   }, []);
+
+  // Save browse state to session whenever it changes
+  useEffect(() => {
+    if (!contextPath) return;
+    const merged: Record<string, { paths: string[]; activePath: string | null }> = {};
+    for (const [ctx, state] of Object.entries(savedBrowseState)) {
+      merged[ctx] = { paths: state.files.map((f) => f.path), activePath: state.activePath };
+    }
+    merged[contextPath] = {
+      paths: browseOpenFiles.map((f) => f.path),
+      activePath: browseActiveFilePath,
+    };
+    useSessionStore.getState().saveBrowseState(merged);
+  }, [browseOpenFiles, browseActiveFilePath, contextPath, savedBrowseState]);
+
+  // Restore browse files from session when switching to a new context (once per session per context)
+  useEffect(() => {
+    if (!contextPath) return;
+    if (restoredContextsRef.current.has(contextPath)) return;
+    restoredContextsRef.current.add(contextPath);
+
+    const { browseFilePaths } = useSessionStore.getState();
+    const savedContext = browseFilePaths[contextPath];
+    if (!savedContext || savedContext.paths.length === 0) return;
+
+    // Skip if in-memory state already has files (restored by syncTabContext)
+    const { browseOpenFiles: currentFiles } = useFileStore.getState();
+    if (currentFiles.length > 0) return;
+
+    const { activePath } = savedContext;
+    Promise.allSettled(savedContext.paths.map((path) => openFileInBrowseMode(path))).then(() => {
+      if (activePath) {
+        useFileStore.getState().setBrowseActiveFile(activePath);
+      }
+    });
+  }, [contextPath]);
 
   // Derive active tab's cwd outside the effect so it only re-runs when the cwd changes
   const activeTabCwd = tabs.find((t) => t.id === activeTabId)?.cwd;

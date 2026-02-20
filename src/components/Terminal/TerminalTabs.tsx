@@ -3,6 +3,7 @@ import { open } from '@tauri-apps/plugin-dialog';
 import { homeDir } from '@tauri-apps/api/path';
 import { useTerminalStore, TerminalTab } from '@/stores/terminalStore';
 import { useUIStore } from '@/stores/uiStore';
+import { useSessionStore } from '@/stores/sessionStore';
 import { useCreateTerminal, useCloseTerminal } from '@/hooks/useTerminalLifecycle';
 import { useTabGitRoots } from '@/hooks/useTabGitRoots';
 import { TerminalPane } from './TerminalPane';
@@ -89,22 +90,49 @@ export const TerminalTabs = forwardRef<TerminalTabsHandle>(function TerminalTabs
   useTabGitRoots();
   const groups = useMemo(() => groupTabsByProject(tabs), [tabs]);
 
-  // Auto-create a terminal in home dir when none exist
+  // Auto-create terminal(s) on startup, restoring saved session if available
   useEffect(() => {
     if (tabs.length === 0 && !initializedRef.current) {
       initializedRef.current = true;
-      homeDir()
-        .then((home) => createTerminal(home))
-        .catch((err) => {
-          console.error('Failed to create terminal:', err);
-          initializedRef.current = false;
-        });
+      const { terminalCwds, activeTerminalIndex } = useSessionStore.getState();
+      if (terminalCwds.length > 0) {
+        (async () => {
+          const ids: string[] = [];
+          for (const cwd of terminalCwds) {
+            try {
+              const id = await createTerminal(cwd);
+              ids.push(id);
+            } catch (err) {
+              console.error('Failed to restore terminal:', cwd, err);
+            }
+          }
+          const targetIndex = Math.min(activeTerminalIndex, ids.length - 1);
+          if (ids[targetIndex]) {
+            setActiveTab(ids[targetIndex]);
+          }
+        })();
+      } else {
+        homeDir()
+          .then((home) => createTerminal(home))
+          .catch((err) => {
+            console.error('Failed to create terminal:', err);
+            initializedRef.current = false;
+          });
+      }
     }
     // Reset so a new terminal is auto-created if all tabs are closed later
     if (tabs.length > 0) {
       initializedRef.current = false;
     }
-  }, [tabs.length, createTerminal]);
+  }, [tabs.length, createTerminal, setActiveTab]);
+
+  // Save terminal state to session whenever tabs or active tab changes
+  useEffect(() => {
+    if (tabs.length === 0) return;
+    const cwds = tabs.map((t) => t.cwd);
+    const activeIndex = tabs.findIndex((t) => t.id === activeTabId);
+    useSessionStore.getState().saveTerminals(cwds, activeIndex >= 0 ? activeIndex : 0);
+  }, [tabs, activeTabId]);
 
   const handleNewTerminal = useCallback(async () => {
     const activeTab = tabs.find((t) => t.id === activeTabId);
