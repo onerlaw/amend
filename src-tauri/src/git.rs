@@ -547,12 +547,19 @@ pub async fn open_or_create_worktree(
             return Ok(wt.clone());
         }
 
-        // Determine destination: <repo_path>/.amend/<sanitized_branch>
+        // Determine destination: ~/.amend/<project>/<sanitized_branch>
+        let project_name = Path::new(&repo_path)
+            .file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_else(|| "project".to_string());
         let dir_name = sanitize_branch_for_path(&branch_name);
-        let worktree_path = Path::new(&repo_path).join(".amend").join(&dir_name);
+        let home = dirs::home_dir().ok_or_else(|| {
+            GitError::CommandFailed("could not determine home directory".to_string())
+        })?;
+        let worktree_path = home.join(".amend").join(&project_name).join(&dir_name);
 
-        // Ensure .amend/ parent directory exists
-        std::fs::create_dir_all(Path::new(&repo_path).join(".amend"))
+        // Ensure parent directory exists
+        std::fs::create_dir_all(worktree_path.parent().unwrap())
             .map_err(|e| GitError::CommandFailed(e.to_string()))?;
 
         let worktree_path_str = worktree_path.to_string_lossy().to_string();
