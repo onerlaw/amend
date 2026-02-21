@@ -1,4 +1,12 @@
-import { useEffect, useRef, forwardRef, useImperativeHandle, useCallback, useMemo } from 'react';
+import {
+  useEffect,
+  useRef,
+  forwardRef,
+  useImperativeHandle,
+  useCallback,
+  useMemo,
+  useState,
+} from 'react';
 import { open } from '@tauri-apps/plugin-dialog';
 import { homeDir } from '@tauri-apps/api/path';
 import { useTerminalStore, TerminalTab } from '@/stores/terminalStore';
@@ -10,6 +18,8 @@ import { TerminalPane } from './TerminalPane';
 import { CloseIcon, FolderIcon } from '@/components/Icons';
 import { getFileName, formatShortcut } from '@/lib/fileUtils';
 import { useDraggableTabs } from '@/hooks/useDraggableTabs';
+import { isTerminalBusy } from '@/lib/tauri';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 
 function TerminalTabLabel({ tab }: { tab: TerminalTab }) {
   const dirName = getFileName(tab.cwd);
@@ -81,6 +91,7 @@ export const TerminalTabs = forwardRef<TerminalTabsHandle>(function TerminalTabs
   const { setFocusedPanel } = useUIStore();
   const createTerminal = useCreateTerminal();
   const closeTerminal = useCloseTerminal();
+  const [closingTabId, setClosingTabId] = useState<string | null>(null);
   const initializedRef = useRef(false);
   const { getTabDragProps, containerRef, dropIndicatorIndex, dragFromIndex } = useDraggableTabs({
     itemCount: tabs.length,
@@ -170,9 +181,14 @@ export const TerminalTabs = forwardRef<TerminalTabsHandle>(function TerminalTabs
     [handleNewTerminal, handleOpenFolder]
   );
 
-  const handleCloseTerminal = (e: React.MouseEvent, id: string) => {
+  const handleCloseTerminal = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
-    closeTerminal(id);
+    const busy = await isTerminalBusy(id);
+    if (busy) {
+      setClosingTabId(id);
+    } else {
+      closeTerminal(id);
+    }
   };
 
   return (
@@ -235,6 +251,19 @@ export const TerminalTabs = forwardRef<TerminalTabsHandle>(function TerminalTabs
 
       {/* Terminal content */}
       <div className="flex-1 overflow-hidden relative">
+        {closingTabId && (
+          <ConfirmDialog
+            title="Close Terminal?"
+            message="A process is running in this terminal. Close it anyway?"
+            confirmLabel="Close"
+            confirmClassName="bg-red-600 hover:bg-red-700"
+            onConfirm={() => {
+              closeTerminal(closingTabId);
+              setClosingTabId(null);
+            }}
+            onCancel={() => setClosingTabId(null)}
+          />
+        )}
         {tabs.map((tab) => (
           <TerminalPane key={tab.id} id={tab.id} isActive={activeTabId === tab.id} />
         ))}

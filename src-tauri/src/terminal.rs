@@ -26,6 +26,7 @@ struct TerminalSession {
     master: Box<dyn MasterPty + Send>,
     writer: Box<dyn Write + Send>,
     child: Box<dyn portable_pty::Child + Send>,
+    shell_pid: Option<u32>,
 }
 
 pub struct TerminalManager {
@@ -137,6 +138,7 @@ impl TerminalManager {
             .spawn_command(cmd)
             .map_err(|e| TerminalError::Pty(e.to_string()))?;
 
+        let shell_pid = child.process_id();
         let id = uuid::Uuid::new_v4().to_string();
         let mut writer = pair
             .master
@@ -162,6 +164,7 @@ impl TerminalManager {
             master: pair.master,
             writer,
             child,
+            shell_pid,
         };
 
         self.sessions.lock().insert(id.clone(), session);
@@ -271,4 +274,20 @@ pub fn close_terminal(
     id: String,
 ) -> Result<(), TerminalError> {
     state.close_terminal(&id)
+}
+
+#[tauri::command]
+pub fn is_terminal_busy(id: String, state: tauri::State<'_, TerminalManager>) -> bool {
+    let sessions = state.sessions.lock();
+    let Some(session) = sessions.get(&id) else {
+        return false;
+    };
+    let Some(pid) = session.shell_pid else {
+        return false;
+    };
+    std::process::Command::new("pgrep")
+        .args(["-P", &pid.to_string()])
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false)
 }

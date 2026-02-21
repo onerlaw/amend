@@ -33,6 +33,20 @@ export async function onTerminalExit(id: string, callback: () => void): Promise<
   });
 }
 
+export async function isTerminalBusy(id: string): Promise<boolean> {
+  return invoke<boolean>('is_terminal_busy', { id });
+}
+
+export async function forceQuitApp(): Promise<void> {
+  return invoke('force_quit');
+}
+
+export async function onWindowCloseRequested(callback: () => void): Promise<UnlistenFn> {
+  return listen('window-close-requested', () => {
+    callback();
+  });
+}
+
 // File system types
 export interface FileEntry {
   name: string;

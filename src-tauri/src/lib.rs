@@ -7,7 +7,7 @@ mod watcher;
 
 use filesystem::{FileSystemManager, SearchGeneration};
 use symbols::{SymbolDefinition, SymbolIndex, SymbolReference};
-use tauri::State;
+use tauri::{Emitter, State};
 use terminal::TerminalManager;
 use tokio::task::spawn_blocking;
 use watcher::FileWatcher;
@@ -24,12 +24,20 @@ pub fn run() {
         .manage(SearchGeneration::new())
         .manage(SymbolIndex::new())
         .manage(FileWatcher::new())
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                api.prevent_close();
+                let _ = window.emit("window-close-requested", ());
+            }
+        })
         .invoke_handler(tauri::generate_handler![
             // Terminal commands
             terminal::create_terminal,
             terminal::write_to_terminal,
             terminal::resize_terminal,
             terminal::close_terminal,
+            terminal::is_terminal_busy,
+            force_quit,
             // File system commands
             filesystem::read_directory,
             filesystem::read_directories,
@@ -75,6 +83,11 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[tauri::command]
+fn force_quit(app: tauri::AppHandle) {
+    app.exit(0);
 }
 
 // Symbol navigation commands

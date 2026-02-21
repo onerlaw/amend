@@ -1,7 +1,14 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { ModalOverlay } from '@/components/ModalOverlay';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
-import { listWorktrees, openOrCreateWorktree, removeWorktree, listBranches, GitWorktree, GitBranch } from '@/lib/tauri';
+import {
+  listWorktrees,
+  openOrCreateWorktree,
+  removeWorktree,
+  listBranches,
+  GitWorktree,
+  GitBranch,
+} from '@/lib/tauri';
 import { BranchIcon, CloseIcon, PlusIcon, TrashIcon, SpinnerIcon } from '@/components/Icons';
 import { getFileName } from '@/lib/fileUtils';
 
@@ -182,7 +189,9 @@ function AddWorktreeForm({ repoPath, onOpenedOrCreated, onCancel }: AddWorktreeF
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    listBranches(repoPath).then(setBranches).catch(() => setBranches([]));
+    listBranches(repoPath)
+      .then(setBranches)
+      .catch(() => setBranches([]));
   }, [repoPath]);
 
   useEffect(() => {
@@ -245,7 +254,10 @@ function AddWorktreeForm({ repoPath, onOpenedOrCreated, onCancel }: AddWorktreeF
           ref={inputRef}
           type="text"
           value={branchName}
-          onChange={(e) => { setBranchName(e.target.value); setShowDropdown(true); }}
+          onChange={(e) => {
+            setBranchName(e.target.value);
+            setShowDropdown(true);
+          }}
           onFocus={() => setShowDropdown(true)}
           onKeyDown={handleKeyDown}
           placeholder="Branch name"
@@ -258,12 +270,13 @@ function AddWorktreeForm({ repoPath, onOpenedOrCreated, onCancel }: AddWorktreeF
               {filtered.map((branch) => (
                 <button
                   key={branch.name}
-                  onMouseDown={(e) => { e.preventDefault(); handleSelect(branch); }}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    handleSelect(branch);
+                  }}
                   className="flex w-full items-center gap-1.5 px-3 py-1.5 text-left text-xs text-primary hover:bg-surface-3"
                 >
-                  {branch.isRemote && (
-                    <span className="flex-shrink-0 text-tertiary">remote</span>
-                  )}
+                  {branch.isRemote && <span className="flex-shrink-0 text-tertiary">remote</span>}
                   <span className="truncate">{branch.name}</span>
                 </button>
               ))}
