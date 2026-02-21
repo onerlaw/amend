@@ -3,7 +3,8 @@ import { createPortal } from 'react-dom';
 import { Virtuoso } from 'react-virtuoso';
 import { useFileBrowserState } from '@/hooks/useFileBrowserState';
 import { useFileBrowserDrag } from '@/hooks/useFileBrowserDrag';
-import { readDirectories, FileEntry } from '@/lib/tauri';
+import { readDirectories, renameEntry, FileEntry } from '@/lib/tauri';
+import { dirname, join } from '@/lib/pathUtils';
 import { useContextMenuStore } from '@/stores/contextMenuStore';
 import { useFileStore } from '@/stores/fileStore';
 import { useUIStore } from '@/stores/uiStore';
@@ -54,6 +55,59 @@ function BrowseFileList({
 
   const [selectedPaths, setSelectedPaths] = useState<Set<string>>(new Set());
   const lastClickedPathRef = useRef<string | null>(null);
+
+  const [renamingPath, setRenamingPath] = useState<string | null>(null);
+  const [renamingName, setRenamingName] = useState('');
+  const renameInputRef = useRef<HTMLInputElement>(null);
+
+  const startRename = useCallback((entry: FileEntry) => {
+    setRenamingPath(entry.path);
+    setRenamingName(entry.name);
+    requestAnimationFrame(() => {
+      if (renameInputRef.current) {
+        renameInputRef.current.focus();
+        const dotIndex = entry.isDirectory ? -1 : entry.name.lastIndexOf('.');
+        if (dotIndex > 0) {
+          renameInputRef.current.setSelectionRange(0, dotIndex);
+        } else {
+          renameInputRef.current.select();
+        }
+      }
+    });
+  }, []);
+
+  const submitRename = useCallback(async () => {
+    if (!renamingPath || !renamingName) {
+      setRenamingPath(null);
+      return;
+    }
+    const currentName = renamingPath.split('/').pop() ?? '';
+    if (renamingName !== currentName) {
+      const newPath = join(dirname(renamingPath), renamingName);
+      try {
+        await renameEntry(renamingPath, newPath);
+        useFileStore.getState().invalidateFileTree();
+      } catch (err) {
+        console.error('Failed to rename:', err);
+      }
+    }
+    setRenamingPath(null);
+  }, [renamingPath, renamingName]);
+
+  const cancelRename = useCallback(() => setRenamingPath(null), []);
+
+  const handleRenameKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        submitRename();
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        cancelRename();
+      }
+    },
+    [submitRename, cancelRename]
+  );
 
   // Re-fetch expanded directory contents when file tree version changes
   useEffect(() => {
@@ -138,6 +192,33 @@ function BrowseFileList({
           const isContextTarget = contextMenuOpen && contextTargetPath === entry.path;
           const { onMouseDown, isDragging: rowIsDragging, isDropTarget } = getDragProps(entry);
 
+          if (renamingPath === entry.path) {
+            return (
+              <div
+                className={`flex w-full select-none items-center gap-1 py-0.5 text-sm bg-surface-3 pr-2 ${entry.isGitignored ? 'opacity-50' : ''}`}
+                style={{ paddingLeft: `${depth * 12 + 8}px` }}
+              >
+                {entry.isDirectory ? (
+                  <DirectoryIndicator isExpanded={expandedDirs.has(entry.path)} />
+                ) : (
+                  <>
+                    <span className="w-3" />
+                    <FileIcon className={`h-4 w-4 ${getFileIconColor(entry.name)}`} />
+                  </>
+                )}
+                <input
+                  ref={renameInputRef}
+                  type="text"
+                  value={renamingName}
+                  onChange={(e) => setRenamingName(e.target.value)}
+                  onKeyDown={handleRenameKeyDown}
+                  onBlur={submitRename}
+                  className="flex-1 min-w-0 bg-surface-1 border border-accent rounded px-1 text-sm text-primary outline-none"
+                />
+              </div>
+            );
+          }
+
           return (
             <TreeRow
               depth={depth}
@@ -150,6 +231,11 @@ function BrowseFileList({
               onMouseDown={onMouseDown}
               onClick={(e) => {
                 if (wasDragRef.current) return;
+
+                if (e.detail === 2) {
+                  startRename(entry);
+                  return;
+                }
 
                 if (e.shiftKey && lastClickedPathRef.current) {
                   const lastIdx = flatRows.findIndex(
