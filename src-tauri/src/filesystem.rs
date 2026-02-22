@@ -210,6 +210,8 @@ impl FileSystemManager {
             .max_depth(Some(1))
             .hidden(false)
             .git_ignore(false)
+            .git_global(false)
+            .git_exclude(false)
             .build();
 
         for entry in walker.flatten() {
