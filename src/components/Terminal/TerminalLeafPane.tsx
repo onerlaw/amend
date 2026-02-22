@@ -1,14 +1,17 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useEffect, useState } from 'react';
 import { TerminalPane } from './TerminalPane';
 import { DropZoneOverlay } from './DropZoneOverlay';
 import { TerminalTabLabel } from './TerminalTabs';
 import { useTerminalLayoutStore } from '@/stores/terminalLayoutStore';
+import { useTerminalDragStore } from '@/stores/terminalDragStore';
 import { useTerminalStore } from '@/stores/terminalStore';
 import { useCloseTerminal } from '@/hooks/useTerminalLifecycle';
 import { collectLeaves } from '@/lib/layoutTree';
 import { CloseIcon } from '@/components/Icons';
 import { isTerminalBusy } from '@/lib/tauri';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
+
+const DRAG_THRESHOLD = 5;
 
 interface TerminalLeafPaneProps {
   leafId: string;
@@ -24,6 +27,12 @@ export function TerminalLeafPane({ leafId, terminalIds, activeTerminalId }: Term
   const tabs = useTerminalStore((s) => s.tabs);
   const closeTerminal = useCloseTerminal();
   const [closingTabId, setClosingTabId] = useState<string | null>(null);
+
+  // Drag state for per-pane tabs
+  const dragTerminalRef = useRef<string | null>(null);
+  const dragStartPos = useRef({ x: 0, y: 0 });
+  const isDraggingRef = useRef(false);
+  const [draggingTabId, setDraggingTabId] = useState<string | null>(null);
 
   const isFocused = focusedPaneId === leafId;
   const multipleVisible = layout ? collectLeaves(layout).length > 1 : false;
@@ -55,6 +64,51 @@ export function TerminalLeafPane({ leafId, terminalIds, activeTerminalId }: Term
     [closeTerminal]
   );
 
+  const handleTabMouseDown = useCallback(
+    (e: React.MouseEvent, terminalId: string) => {
+      if (e.button !== 0) return;
+      dragTerminalRef.current = terminalId;
+      dragStartPos.current = { x: e.clientX, y: e.clientY };
+      isDraggingRef.current = false;
+    },
+    []
+  );
+
+  useEffect(() => {
+    function handleMouseMove(e: MouseEvent) {
+      if (!dragTerminalRef.current || isDraggingRef.current) return;
+
+      const dx = Math.abs(e.clientX - dragStartPos.current.x);
+      const dy = Math.abs(e.clientY - dragStartPos.current.y);
+      if (dx < DRAG_THRESHOLD && dy < DRAG_THRESHOLD) return;
+
+      isDraggingRef.current = true;
+      setDraggingTabId(dragTerminalRef.current);
+      useTerminalDragStore.getState().startDrag(dragTerminalRef.current, leafId);
+    }
+
+    function handleMouseUp() {
+      if (isDraggingRef.current) {
+        // DropZoneOverlay handles the actual drop; just clean up if drag ended
+        // without a valid drop (endDrag is called by DropZoneOverlay on drop)
+        const { isDragging } = useTerminalDragStore.getState();
+        if (isDragging) {
+          useTerminalDragStore.getState().endDrag();
+        }
+      }
+      dragTerminalRef.current = null;
+      isDraggingRef.current = false;
+      setDraggingTabId(null);
+    }
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [leafId]);
+
   return (
     <div
       className={`relative flex h-full w-full flex-col ${
@@ -71,12 +125,13 @@ export function TerminalLeafPane({ leafId, terminalIds, activeTerminalId }: Term
             return (
               <button
                 key={tid}
+                onMouseDown={(e) => handleTabMouseDown(e, tid)}
                 onClick={() => handleTabClick(tid)}
                 className={`group flex items-center gap-1 px-1.5 py-0.5 text-[11px] shrink-0 ${
                   isActive
                     ? 'bg-terminal-bg text-primary'
                     : 'text-secondary hover:bg-surface-2'
-                }`}
+                } ${draggingTabId === tid ? 'opacity-50' : ''}`}
               >
                 <TerminalTabLabel tab={tab} />
                 <span
