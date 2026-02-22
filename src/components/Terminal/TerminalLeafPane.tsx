@@ -30,7 +30,7 @@ export function TerminalLeafPane({ leafId, terminalId }: TerminalLeafPaneProps) 
       }`}
       onMouseDown={handleMouseDown}
     >
-      <TerminalPane id={terminalId} isActive={true} />
+      <TerminalPane key={terminalId} id={terminalId} isActive={true} />
       <DropZoneOverlay leafId={leafId} />
     </div>
   );

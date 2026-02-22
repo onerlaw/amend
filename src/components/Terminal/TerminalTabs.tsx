@@ -194,7 +194,11 @@ export const TerminalTabs = forwardRef<TerminalTabsHandle>(function TerminalTabs
   const handleNewTerminal = useCallback(async () => {
     const activeTab = tabs.find((t) => t.id === activeTabId);
     if (activeTab) {
-      createTerminal(activeTab.cwd, activeTabId ?? undefined);
+      const newId = await createTerminal(activeTab.cwd, activeTabId ?? undefined);
+      // Assign the new terminal to the focused pane so it becomes visible immediately
+      if (focusedPaneId) {
+        assignTerminalToPane(focusedPaneId, newId);
+      }
     } else {
       try {
         const home = await homeDir();
@@ -203,7 +207,7 @@ export const TerminalTabs = forwardRef<TerminalTabsHandle>(function TerminalTabs
         console.error('Failed to create terminal:', err);
       }
     }
-  }, [tabs, activeTabId, createTerminal]);
+  }, [tabs, activeTabId, createTerminal, focusedPaneId, assignTerminalToPane]);
 
   const handleOpenFolder = useCallback(async () => {
     const selected = await open({
