@@ -17,6 +17,7 @@ import { useCreateTerminal, useCloseTerminal } from '@/hooks/useTerminalLifecycl
 import { useTabGitRoots } from '@/hooks/useTabGitRoots';
 import { TerminalPane } from './TerminalPane';
 import { TerminalSplitLayout } from './TerminalSplitLayout';
+import { RootDropZone } from './RootDropZone';
 import { CloseIcon, FolderIcon } from '@/components/Icons';
 import { getFileName, formatShortcut } from '@/lib/fileUtils';
 import { useDraggableTabs } from '@/hooks/useDraggableTabs';
@@ -344,7 +345,11 @@ export const TerminalTabs = forwardRef<TerminalTabsHandle>(function TerminalTabs
           />
         )}
         {/* Render split layout for visible terminals */}
-        {layout && <TerminalSplitLayout node={layout} />}
+        {layout && (
+          <RootDropZone>
+            <TerminalSplitLayout node={layout} />
+          </RootDropZone>
+        )}
         {/* Keep backgrounded terminals hidden-mounted to preserve xterm state */}
         {tabs
           .filter((tab) => !visibleTerminalIds.has(tab.id))

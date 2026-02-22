@@ -33,11 +33,11 @@ function DropPreview({ zone }: { zone: DropZone }) {
 export function DropZoneOverlay({ leafId }: DropZoneOverlayProps) {
   const isDragging = useTerminalDragStore((s) => s.isDragging);
   const draggedTerminalId = useTerminalDragStore((s) => s.draggedTerminalId);
+  const rootDropActive = useTerminalDragStore((s) => s.rootDropActive);
   const endDrag = useTerminalDragStore((s) => s.endDrag);
-  const splitPane = useTerminalLayoutStore((s) => s.splitPane);
+  const moveTerminalToSplit = useTerminalLayoutStore((s) => s.moveTerminalToSplit);
   const assignTerminalToPane = useTerminalLayoutStore((s) => s.assignTerminalToPane);
   const layout = useTerminalLayoutStore((s) => s.layout);
-  const removeFromLayout = useTerminalLayoutStore((s) => s.removeFromLayout);
 
   const [hoveredZone, setHoveredZone] = useState<DropZone>(null);
 
@@ -86,11 +86,8 @@ export function DropZoneOverlay({ leafId }: DropZoneOverlayProps) {
       const side: 'first' | 'second' =
         hoveredZone === 'left' || hoveredZone === 'top' ? 'first' : 'second';
 
-      // Remove from old position if it was in layout
-      if (layout && findLeafByTerminalId(layout, draggedTerminalId)) {
-        removeFromLayout(draggedTerminalId);
-      }
-      splitPane(leafId, direction, side, draggedTerminalId);
+      // Atomic: remove from source + split target in one operation
+      moveTerminalToSplit(draggedTerminalId, leafId, direction, side);
     }
 
     endDrag();
@@ -99,9 +96,8 @@ export function DropZoneOverlay({ leafId }: DropZoneOverlayProps) {
     hoveredZone,
     leafId,
     layout,
-    splitPane,
+    moveTerminalToSplit,
     assignTerminalToPane,
-    removeFromLayout,
     endDrag,
   ]);
 
@@ -109,7 +105,7 @@ export function DropZoneOverlay({ leafId }: DropZoneOverlayProps) {
     setHoveredZone(null);
   }, []);
 
-  if (!isDragging) return null;
+  if (!isDragging || rootDropActive) return null;
 
   return (
     <div
