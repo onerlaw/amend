@@ -125,7 +125,7 @@ export function TerminalLeafPane({ leafId, terminalIds, activeTerminalId }: Term
                 onMouseDown={(e) => handleTabMouseDown(e, tid)}
                 onClick={() => handleTabClick(tid)}
                 className={`group flex items-center gap-1 px-1.5 py-0.5 text-[11px] shrink-0 ${
-                  isActive ? 'bg-terminal-bg text-primary' : 'text-secondary hover:bg-surface-2'
+                  isActive ? 'bg-terminal-bg text-primary' : 'text-secondary hover:bg-surface-2 opacity-50 hover:opacity-75'
                 } ${draggingTabId === tid ? 'opacity-50' : ''}`}
               >
                 <TerminalTabLabel tab={tab} />
