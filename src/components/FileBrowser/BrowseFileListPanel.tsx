@@ -254,7 +254,11 @@ function BrowseFileList({
 
                 if (e.metaKey || e.ctrlKey) {
                   const next = new Set(selectedPaths);
-                  next.has(entry.path) ? next.delete(entry.path) : next.add(entry.path);
+                  if (next.has(entry.path)) {
+                    next.delete(entry.path);
+                  } else {
+                    next.add(entry.path);
+                  }
                   setSelectedPaths(next);
                   lastClickedPathRef.current = entry.path;
                   return;
