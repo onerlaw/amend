@@ -299,7 +299,7 @@ export const TerminalTabs = forwardRef<TerminalTabsHandle>(function TerminalTabs
                             className={`group flex items-center gap-1.5 px-2 py-1 text-xs ${
                               isActive
                                 ? 'bg-terminal-bg text-primary'
-                                : 'text-secondary hover:bg-surface-1'
+                                : 'text-secondary hover:bg-surface-1 opacity-50 hover:opacity-75'
                             } ${dragFromIndex === globalIndex ? 'opacity-50' : ''}`}
                             title={tab.cwd}
                           >

@@ -203,7 +203,7 @@ export const BrowseEditorTabs = forwardRef<BrowseEditorTabsHandle>(
                   className={`group flex items-center gap-1.5 px-2 py-1 text-xs ${
                     browseActiveFilePath === file.path
                       ? 'bg-surface-0 text-primary'
-                      : 'text-secondary hover:bg-surface-1'
+                      : 'text-secondary hover:bg-surface-1 opacity-50 hover:opacity-75'
                   } ${dragFromIndex === index ? 'opacity-50' : ''}`}
                 >
                   <StatusIndicator status={status} />
