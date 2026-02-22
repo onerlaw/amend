@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
 import { createTerminal as createTerminalBackend, closeTerminal } from '@/lib/tauri';
 import { useTerminalStore } from '@/stores/terminalStore';
+import { destroyTerminalInstance } from '@/hooks/useTerminal';
 
 export function useCreateTerminal() {
   const addTab = useTerminalStore((state) => state.addTab);
@@ -28,6 +29,7 @@ export function useCloseTerminal() {
   const close = useCallback(
     async (id: string) => {
       await closeTerminal(id);
+      destroyTerminalInstance(id);
       removeTab(id);
     },
     [removeTab]
