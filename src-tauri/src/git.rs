@@ -528,16 +528,48 @@ fn branch_exists_locally(repo_path: &str, branch_name: &str) -> Result<bool, Git
     Ok(!output.trim().is_empty())
 }
 
+fn detect_default_branch(repo_path: &str) -> String {
+    // Try symbolic-ref for origin/HEAD
+    if let Ok(output) = run_git_command(repo_path, &["symbolic-ref", "refs/remotes/origin/HEAD"]) {
+        let trimmed = output.trim();
+        if let Some(name) = trimmed.rsplit('/').next() {
+            if !name.is_empty() {
+                return name.to_string();
+            }
+        }
+    }
+    // Fallback: check if main or master exists locally
+    if branch_exists_locally(repo_path, "main").unwrap_or(false) {
+        return "main".to_string();
+    }
+    if branch_exists_locally(repo_path, "master").unwrap_or(false) {
+        return "master".to_string();
+    }
+    // Last resort
+    "HEAD".to_string()
+}
+
+#[tauri::command]
+pub async fn get_default_branch(repo_path: String) -> Result<String, GitError> {
+    spawn_blocking(move || Ok(detect_default_branch(&repo_path)))
+        .await
+        .map_err(|e| GitError::TaskJoin(e.to_string()))?
+}
+
 #[tauri::command]
 pub async fn open_or_create_worktree(
     repo_path: String,
     branch_name: String,
+    start_point: Option<String>,
 ) -> Result<GitWorktree, GitError> {
     validate_no_flag(&branch_name, "branch name")?;
     if branch_name.trim().is_empty() {
         return Err(GitError::InvalidArgument(
             "branch name must not be empty".to_string(),
         ));
+    }
+    if let Some(ref sp) = start_point {
+        validate_no_flag(sp, "start point")?;
     }
 
     spawn_blocking(move || {
@@ -571,7 +603,9 @@ pub async fn open_or_create_worktree(
                 &["worktree", "add", "--", &worktree_path_str, &branch_name],
             )?;
         } else {
-            // Create new branch and worktree
+            // Create new branch and worktree, based off start_point (default: main branch)
+            let resolved_start = start_point
+                .unwrap_or_else(|| detect_default_branch(&repo_path));
             run_git_command(
                 &repo_path,
                 &[
@@ -581,6 +615,7 @@ pub async fn open_or_create_worktree(
                     &branch_name,
                     "--",
                     &worktree_path_str,
+                    &resolved_start,
                 ],
             )?;
         }

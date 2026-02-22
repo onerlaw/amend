@@ -64,6 +64,7 @@ pub fn run() {
             git::list_worktrees,
             git::add_worktree,
             git::open_or_create_worktree,
+            git::get_default_branch,
             git::remove_worktree,
             git::list_branches,
             git::get_branch_diff_files,

@@ -211,9 +211,14 @@ export async function addWorktree(
 
 export async function openOrCreateWorktree(
   repoPath: string,
-  branchName: string
+  branchName: string,
+  startPoint?: string
 ): Promise<GitWorktree> {
-  return invoke('open_or_create_worktree', { repoPath, branchName });
+  return invoke('open_or_create_worktree', { repoPath, branchName, startPoint });
+}
+
+export async function getDefaultBranch(repoPath: string): Promise<string> {
+  return invoke('get_default_branch', { repoPath });
 }
 
 export async function removeWorktree(

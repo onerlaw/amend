@@ -6,6 +6,7 @@ import {
   openOrCreateWorktree,
   removeWorktree,
   listBranches,
+  getDefaultBranch,
   GitWorktree,
   GitBranch,
 } from '@/lib/tauri';
@@ -181,10 +182,13 @@ interface AddWorktreeFormProps {
 
 function AddWorktreeForm({ repoPath, onOpenedOrCreated, onCancel }: AddWorktreeFormProps) {
   const [branchName, setBranchName] = useState('');
+  const [startPoint, setStartPoint] = useState('');
+  const [defaultBranch, setDefaultBranch] = useState('main');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [branches, setBranches] = useState<GitBranch[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
+  const [showFromDropdown, setShowFromDropdown] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -192,18 +196,22 @@ function AddWorktreeForm({ repoPath, onOpenedOrCreated, onCancel }: AddWorktreeF
     listBranches(repoPath)
       .then(setBranches)
       .catch(() => setBranches([]));
+    getDefaultBranch(repoPath)
+      .then(setDefaultBranch)
+      .catch(() => {});
   }, [repoPath]);
 
   useEffect(() => {
-    if (!showDropdown) return;
+    if (!showDropdown && !showFromDropdown) return;
     const handler = (e: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         setShowDropdown(false);
+        setShowFromDropdown(false);
       }
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
-  }, [showDropdown]);
+  }, [showDropdown, showFromDropdown]);
 
   const filtered = useMemo(() => {
     const lower = branchName.toLowerCase();
@@ -215,6 +223,16 @@ function AddWorktreeForm({ repoPath, onOpenedOrCreated, onCancel }: AddWorktreeF
       });
   }, [branches, branchName]);
 
+  const filteredFrom = useMemo(() => {
+    const lower = startPoint.toLowerCase();
+    return branches
+      .filter((b) => b.name.toLowerCase().includes(lower))
+      .sort((a, b) => {
+        if (a.isRemote !== b.isRemote) return a.isRemote ? 1 : -1;
+        return a.name.localeCompare(b.name);
+      });
+  }, [branches, startPoint]);
+
   const handleSelect = (branch: GitBranch) => {
     // For remote branches strip the remote prefix (e.g. "origin/foo" → "foo")
     const name = branch.isRemote ? branch.name.replace(/^[^/]+\//, '') : branch.name;
@@ -223,14 +241,20 @@ function AddWorktreeForm({ repoPath, onOpenedOrCreated, onCancel }: AddWorktreeF
     inputRef.current?.focus();
   };
 
+  const handleFromSelect = (branch: GitBranch) => {
+    setStartPoint(branch.name);
+    setShowFromDropdown(false);
+  };
+
   const handleSubmit = async () => {
     const trimmed = branchName.trim();
     if (!trimmed) return;
     setShowDropdown(false);
+    setShowFromDropdown(false);
     setLoading(true);
     setError(null);
     try {
-      const wt = await openOrCreateWorktree(repoPath, trimmed);
+      const wt = await openOrCreateWorktree(repoPath, trimmed, startPoint.trim() || undefined);
       onOpenedOrCreated(wt);
     } catch (err) {
       setError(String(err));
@@ -242,8 +266,12 @@ function AddWorktreeForm({ repoPath, onOpenedOrCreated, onCancel }: AddWorktreeF
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') handleSubmit();
     if (e.key === 'Escape') {
-      if (showDropdown) setShowDropdown(false);
-      else onCancel();
+      if (showDropdown || showFromDropdown) {
+        setShowDropdown(false);
+        setShowFromDropdown(false);
+      } else {
+        onCancel();
+      }
     }
   };
 
@@ -257,8 +285,12 @@ function AddWorktreeForm({ repoPath, onOpenedOrCreated, onCancel }: AddWorktreeF
           onChange={(e) => {
             setBranchName(e.target.value);
             setShowDropdown(true);
+            setShowFromDropdown(false);
           }}
-          onFocus={() => setShowDropdown(true)}
+          onFocus={() => {
+            setShowDropdown(true);
+            setShowFromDropdown(false);
+          }}
           onKeyDown={handleKeyDown}
           placeholder="Branch name"
           className="w-full rounded-md border border-surface-3 bg-surface-1 px-2 py-1 text-xs text-primary placeholder:text-tertiary focus:border-accent focus:outline-none"
@@ -273,6 +305,46 @@ function AddWorktreeForm({ repoPath, onOpenedOrCreated, onCancel }: AddWorktreeF
                   onMouseDown={(e) => {
                     e.preventDefault();
                     handleSelect(branch);
+                  }}
+                  className="flex w-full items-center gap-1.5 px-3 py-1.5 text-left text-xs text-primary hover:bg-surface-3"
+                >
+                  {branch.isRemote && <span className="flex-shrink-0 text-tertiary">remote</span>}
+                  <span className="truncate">{branch.name}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+      <div className="relative mb-2">
+        <div className="flex items-center gap-1.5">
+          <span className="text-[11px] text-tertiary">from</span>
+          <input
+            type="text"
+            value={startPoint}
+            onChange={(e) => {
+              setStartPoint(e.target.value);
+              setShowFromDropdown(true);
+              setShowDropdown(false);
+            }}
+            onFocus={() => {
+              setShowFromDropdown(true);
+              setShowDropdown(false);
+            }}
+            onKeyDown={handleKeyDown}
+            placeholder={defaultBranch}
+            className="min-w-0 flex-1 rounded-md border border-surface-3 bg-surface-1 px-2 py-0.5 text-[11px] text-secondary placeholder:text-tertiary focus:border-accent focus:outline-none"
+          />
+        </div>
+        {showFromDropdown && filteredFrom.length > 0 && (
+          <div className="absolute top-full left-0 z-50 mt-1 w-full overflow-hidden rounded-md border border-surface-3 bg-surface-1 shadow-lg">
+            <div className="max-h-40 overflow-y-auto">
+              {filteredFrom.map((branch) => (
+                <button
+                  key={branch.name}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    handleFromSelect(branch);
                   }}
                   className="flex w-full items-center gap-1.5 px-3 py-1.5 text-left text-xs text-primary hover:bg-surface-3"
                 >
