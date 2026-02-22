@@ -604,8 +604,7 @@ pub async fn open_or_create_worktree(
             )?;
         } else {
             // Create new branch and worktree, based off start_point (default: main branch)
-            let resolved_start = start_point
-                .unwrap_or_else(|| detect_default_branch(&repo_path));
+            let resolved_start = start_point.unwrap_or_else(|| detect_default_branch(&repo_path));
             run_git_command(
                 &repo_path,
                 &[

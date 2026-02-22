@@ -212,7 +212,8 @@ export function MainLayout() {
   // Sync file tree context with active terminal's cwd / git root.
   // Re-fires when gitRoot changes (e.g. after `git init` is detected by polling).
   useEffect(() => {
-    if (import.meta.env.DEV) console.log('[CWD] MainLayout effect fired:', { activeTabCwd, activeTabGitRoot });
+    if (import.meta.env.DEV)
+      console.log('[CWD] MainLayout effect fired:', { activeTabCwd, activeTabGitRoot });
     if (!activeTabCwd) return;
 
     // If useTabGitRoots has already resolved the git root, use it directly
