@@ -8,7 +8,6 @@ case "$BUMP_TYPE" in
   *) echo "Invalid bump type: $BUMP_TYPE (use major, minor, or patch)" >&2; exit 1 ;;
 esac
 
-TAG="release/$BUMP_TYPE"
-echo "Pushing trigger tag '$TAG' to start CI release..."
-git tag "$TAG"
-git push origin "$TAG"
+echo "Triggering manual $BUMP_TYPE release via workflow_dispatch..."
+gh workflow run release.yml -f bump_type="$BUMP_TYPE"
+echo "Release workflow triggered. Watch progress: gh run watch"

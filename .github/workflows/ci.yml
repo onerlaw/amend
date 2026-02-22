@@ -9,6 +9,8 @@ on:
 jobs:
   lint-and-typecheck:
     runs-on: ubuntu-latest
+    # Skip automated release commits
+    if: "!startsWith(github.event.head_commit.message, 'chore(release):')"
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -33,6 +35,7 @@ jobs:
 
   rust-check:
     runs-on: ubuntu-latest
+    if: "!startsWith(github.event.head_commit.message, 'chore(release):')"
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4

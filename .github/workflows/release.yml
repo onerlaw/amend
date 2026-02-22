@@ -2,12 +2,11 @@ name: Build and Release
 
 on:
   push:
-    tags:
-      - 'release/*'
+    branches: [main]
   workflow_dispatch:
     inputs:
       bump_type:
-        description: 'Version bump type'
+        description: 'Version bump type (overrides conventional commit detection)'
         required: true
         type: choice
         options:
@@ -25,34 +24,81 @@ permissions:
 jobs:
   prepare:
     runs-on: ubuntu-latest
+    # Skip version bump commits pushed by this workflow
+    if: "!startsWith(github.event.head_commit.message, 'chore(release):')"
     outputs:
       version: ${{ steps.bump.outputs.version }}
       changelog: ${{ steps.changelog.outputs.changelog }}
+      should_release: ${{ steps.detect.outputs.should_release }}
     steps:
-      - name: Determine bump type
-        id: bump-type
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "type=${{ inputs.bump_type }}" >> "$GITHUB_OUTPUT"
-          else
-            TYPE="${GITHUB_REF_NAME#release/}"
-            if [[ ! "$TYPE" =~ ^(major|minor|patch)$ ]]; then
-              echo "::error::Invalid bump type '$TYPE'. Use release/major, release/minor, or release/patch"
-              exit 1
-            fi
-            echo "type=$TYPE" >> "$GITHUB_OUTPUT"
-          fi
-
       - name: Checkout main
         uses: actions/checkout@v4
         with:
           ref: main
           fetch-depth: 0
 
+      - name: Detect bump type from conventional commits
+        id: detect
+        run: |
+          # If manually triggered, use the provided bump type
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "type=${{ inputs.bump_type }}" >> "$GITHUB_OUTPUT"
+            echo "should_release=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Find the latest version tag
+          LAST_TAG=$(git tag --sort=-v:refname | grep '^v' | head -1)
+
+          if [ -z "$LAST_TAG" ]; then
+            RANGE="HEAD"
+          else
+            RANGE="$LAST_TAG..HEAD"
+          fi
+
+          echo "Analyzing commits in range: $RANGE"
+
+          BUMP="none"
+
+          while IFS= read -r msg; do
+            [ -z "$msg" ] && continue
+
+            # Check for BREAKING CHANGE (major)
+            if echo "$msg" | grep -qE '^[a-z]+(\(.+\))?!:' || echo "$msg" | grep -qi 'BREAKING CHANGE'; then
+              BUMP="major"
+              break
+            fi
+
+            # Check for feat (minor)
+            if echo "$msg" | grep -qE '^feat(\(.+\))?:'; then
+              if [ "$BUMP" != "major" ]; then
+                BUMP="minor"
+              fi
+            fi
+
+            # Check for fix (patch)
+            if echo "$msg" | grep -qE '^fix(\(.+\))?:'; then
+              if [ "$BUMP" = "none" ]; then
+                BUMP="patch"
+              fi
+            fi
+          done <<< "$(git log "$RANGE" --pretty=format:'%s' --no-merges)"
+
+          if [ "$BUMP" = "none" ]; then
+            echo "No releasable conventional commits found. Skipping release."
+            echo "should_release=false" >> "$GITHUB_OUTPUT"
+            echo "type=patch" >> "$GITHUB_OUTPUT"
+          else
+            echo "Detected bump type: $BUMP"
+            echo "should_release=true" >> "$GITHUB_OUTPUT"
+            echo "type=$BUMP" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Bump version and tag
         id: bump
+        if: steps.detect.outputs.should_release == 'true'
         run: |
-          BUMP_TYPE="${{ steps.bump-type.outputs.type }}"
+          BUMP_TYPE="${{ steps.detect.outputs.type }}"
 
           CURRENT=$(grep '"version"' package.json | head -1 | sed 's/.*"\([0-9]*\.[0-9]*\.[0-9]*\)".*/\1/')
           IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
@@ -64,7 +110,7 @@ jobs:
           esac
 
           NEW_VERSION="$MAJOR.$MINOR.$PATCH"
-          echo "Bumping $CURRENT -> $NEW_VERSION"
+          echo "Bumping $CURRENT -> $NEW_VERSION ($BUMP_TYPE)"
 
           sed -i "s/\"version\": \"$CURRENT\"/\"version\": \"$NEW_VERSION\"/" package.json
           sed -i "s/\"version\": \"$CURRENT\"/\"version\": \"$NEW_VERSION\"/" src-tauri/tauri.conf.json
@@ -73,7 +119,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add package.json src-tauri/tauri.conf.json src-tauri/Cargo.toml
-          git commit -m "bump version to $NEW_VERSION"
+          git commit -m "chore(release): v$NEW_VERSION"
           git tag "v$NEW_VERSION"
           git push origin main --tags
 
@@ -81,14 +127,13 @@ jobs:
 
       - name: Generate changelog
         id: changelog
+        if: steps.detect.outputs.should_release == 'true'
         run: |
           NEW_VERSION="${{ steps.bump.outputs.version }}"
 
-          # Find the previous release tag (the one before the tag we just created)
           PREV_TAG=$(git tag --sort=-v:refname | grep '^v' | grep -v "v$NEW_VERSION" | head -1)
 
           if [ -z "$PREV_TAG" ]; then
-            # No previous tag, use all commits up to the new tag
             RANGE="v$NEW_VERSION"
           else
             RANGE="$PREV_TAG..v$NEW_VERSION"
@@ -96,31 +141,26 @@ jobs:
 
           echo "Generating changelog for $RANGE"
 
-          # Collect commits, skip version bump commits
           FEATURES=""
           FIXES=""
           OTHER=""
 
           while IFS= read -r line; do
-            # Skip empty lines and version bump commits
             [ -z "$line" ] && continue
-            echo "$line" | grep -qi "^bump version" && continue
+            echo "$line" | grep -qi "^chore(release)" && continue
 
-            if echo "$line" | grep -qi "^feat"; then
-              # Strip conventional commit prefix
+            if echo "$line" | grep -qiE "^feat(\(.+\))?[!]?:"; then
               MSG=$(echo "$line" | sed 's/^feat[^:]*: *//')
               FEATURES="${FEATURES}- ${MSG}\n"
-            elif echo "$line" | grep -qi "^fix"; then
+            elif echo "$line" | grep -qiE "^fix(\(.+\))?[!]?:"; then
               MSG=$(echo "$line" | sed 's/^fix[^:]*: *//')
               FIXES="${FIXES}- ${MSG}\n"
             else
-              # Strip any conventional commit prefix (chore:, docs:, refactor:, etc.)
               MSG=$(echo "$line" | sed 's/^[a-z]*[^:]*: *//')
               OTHER="${OTHER}- ${MSG}\n"
             fi
           done <<< "$(git log "$RANGE" --pretty=format:'%s' --no-merges)"
 
-          # Build changelog
           CHANGELOG=""
           if [ -n "$FEATURES" ]; then
             CHANGELOG="${CHANGELOG}### Features\n${FEATURES}\n"
@@ -136,19 +176,15 @@ jobs:
             CHANGELOG="No notable changes."
           fi
 
-          # Write to output using heredoc delimiter for multiline
           {
             echo "changelog<<CHANGELOG_EOF"
             echo -e "$CHANGELOG"
             echo "CHANGELOG_EOF"
           } >> "$GITHUB_OUTPUT"
 
-      - name: Delete trigger tag
-        if: startsWith(github.ref, 'refs/tags/release/')
-        run: git push origin --delete "${{ github.ref_name }}"
-
   build:
     needs: [prepare]
+    if: needs.prepare.outputs.should_release == 'true'
     strategy:
       fail-fast: false
       matrix:
