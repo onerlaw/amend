@@ -30,6 +30,17 @@ interface TerminalLayoutState {
   ensureTerminalInLayout: (terminalId: string) => void;
   setActiveTerminalInPane: (leafId: string, terminalId: string) => void;
   moveTerminalToPane: (terminalId: string, targetLeafId: string) => void;
+  moveTerminalToSplit: (
+    terminalId: string,
+    targetLeafId: string,
+    direction: 'horizontal' | 'vertical',
+    side: 'first' | 'second'
+  ) => void;
+  splitAtRoot: (
+    direction: 'horizontal' | 'vertical',
+    side: 'first' | 'second',
+    terminalId: string
+  ) => void;
 }
 
 export const useTerminalLayoutStore = create<TerminalLayoutState>((set, get) => ({
@@ -186,6 +197,94 @@ export const useTerminalLayoutStore = create<TerminalLayoutState>((set, get) => 
   moveTerminalToPane: (terminalId: string, targetLeafId: string) => {
     const { assignTerminalToPane } = get();
     assignTerminalToPane(targetLeafId, terminalId);
+  },
+
+  moveTerminalToSplit: (terminalId, targetLeafId, direction, side) => {
+    let { layout } = get();
+    if (!layout) return;
+
+    const sourceLeaf = findLeafByTerminalId(layout, terminalId);
+
+    // Guard: self-split of a single-terminal pane is a no-op
+    if (sourceLeaf && sourceLeaf.id === targetLeafId && sourceLeaf.type === 'leaf' && sourceLeaf.terminalIds.length === 1) {
+      return;
+    }
+
+    // Remove terminal from its current position (if any)
+    if (sourceLeaf) {
+      const afterRemove = removeLeaf(layout, terminalId);
+      if (!afterRemove) {
+        // Layout collapsed entirely — just create a single leaf
+        const leaf = makeLeaf(terminalId);
+        set({ layout: leaf, focusedPaneId: leaf.id });
+        useTerminalStore.getState().setActiveTab(terminalId);
+        return;
+      }
+      layout = afterRemove;
+    }
+
+    // Try to find target leaf in the (possibly restructured) layout
+    const target = findNode(layout, targetLeafId);
+    if (target && target.type === 'leaf') {
+      // Target still exists — split it normally
+      const newLeaf = makeLeaf(terminalId);
+      const splitNode: LayoutNode = {
+        type: 'split',
+        id: genNodeId(),
+        direction,
+        first: side === 'first' ? newLeaf : target,
+        second: side === 'second' ? newLeaf : target,
+        ratio: 50,
+      };
+      const newLayout = replaceNode(layout, targetLeafId, splitNode);
+      set({ layout: newLayout, focusedPaneId: newLeaf.id });
+      useTerminalStore.getState().setActiveTab(terminalId);
+    } else {
+      // Target was lost (collapsed when source was removed) — wrap at root
+      const newLeaf = makeLeaf(terminalId);
+      const newLayout: LayoutNode = {
+        type: 'split',
+        id: genNodeId(),
+        direction,
+        first: side === 'first' ? newLeaf : layout,
+        second: side === 'second' ? newLeaf : layout,
+        ratio: 50,
+      };
+      set({ layout: newLayout, focusedPaneId: newLeaf.id });
+      useTerminalStore.getState().setActiveTab(terminalId);
+    }
+  },
+
+  splitAtRoot: (direction, side, terminalId) => {
+    let { layout } = get();
+    if (!layout) return;
+
+    // Remove terminal from current position if in layout
+    const sourceLeaf = findLeafByTerminalId(layout, terminalId);
+    if (sourceLeaf) {
+      const afterRemove = removeLeaf(layout, terminalId);
+      if (!afterRemove) {
+        // Layout collapsed — just create a single leaf
+        const leaf = makeLeaf(terminalId);
+        set({ layout: leaf, focusedPaneId: leaf.id });
+        useTerminalStore.getState().setActiveTab(terminalId);
+        return;
+      }
+      layout = afterRemove;
+    }
+
+    // Wrap the entire remaining layout in a new root-level split
+    const newLeaf = makeLeaf(terminalId);
+    const newLayout: LayoutNode = {
+      type: 'split',
+      id: genNodeId(),
+      direction,
+      first: side === 'first' ? newLeaf : layout,
+      second: side === 'second' ? newLeaf : layout,
+      ratio: 50,
+    };
+    set({ layout: newLayout, focusedPaneId: newLeaf.id });
+    useTerminalStore.getState().setActiveTab(terminalId);
   },
 
   ensureTerminalInLayout: (terminalId: string) => {
