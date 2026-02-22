@@ -202,15 +202,26 @@ export function MainLayout() {
     });
   }, [contextPath]);
 
-  // Derive active tab's cwd outside the effect so it only re-runs when the cwd changes
-  const activeTabCwd = tabs.find((t) => t.id === activeTabId)?.cwd;
+  // Derive active tab's cwd and gitRoot outside the effect so it only re-runs when they change
+  const activeTab = tabs.find((t) => t.id === activeTabId);
+  const activeTabCwd = activeTab?.cwd;
+  const activeTabGitRoot = activeTab?.gitRoot;
 
-  // Sync file tree context with active terminal's cwd via git root detection
+  // Sync file tree context with active terminal's cwd / git root.
+  // Re-fires when gitRoot changes (e.g. after `git init` is detected by polling).
   useEffect(() => {
-    if (import.meta.env.DEV) console.log('[CWD] MainLayout effect fired:', { activeTabCwd });
+    if (import.meta.env.DEV) console.log('[CWD] MainLayout effect fired:', { activeTabCwd, activeTabGitRoot });
     if (!activeTabCwd) return;
-    let cancelled = false;
 
+    // If useTabGitRoots has already resolved the git root, use it directly
+    // instead of making a redundant async getGitRoot call.
+    if (activeTabGitRoot !== undefined) {
+      syncTabContext(activeTabGitRoot);
+      return;
+    }
+
+    // Fallback for the brief window before useTabGitRoots resolves
+    let cancelled = false;
     getGitRoot(activeTabCwd).then((gitRoot) => {
       if (import.meta.env.DEV) console.log('[CWD] getGitRoot resolved:', { activeTabCwd, gitRoot });
       if (!cancelled) {
@@ -221,7 +232,7 @@ export function MainLayout() {
     return () => {
       cancelled = true;
     };
-  }, [activeTabCwd, syncTabContext]);
+  }, [activeTabCwd, activeTabGitRoot, syncTabContext]);
 
   // Index project for symbol navigation when context path changes (deferred to avoid blocking startup)
   useEffect(() => {
