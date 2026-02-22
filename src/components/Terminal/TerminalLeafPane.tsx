@@ -110,7 +110,7 @@ export function TerminalLeafPane({ leafId, terminalIds, activeTerminalId }: Term
     <div
       className={`relative flex h-full w-full flex-col ${
         multipleVisible && isFocused ? 'ring-1 ring-inset ring-accent/50' : ''
-      }`}
+      } ${multipleVisible && !isFocused ? 'opacity-50' : ''}`}
       onMouseDown={handleMouseDown}
     >
       {showTabBar && (
