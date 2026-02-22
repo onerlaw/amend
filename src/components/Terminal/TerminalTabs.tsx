@@ -117,7 +117,10 @@ export const TerminalTabs = forwardRef<TerminalTabsHandle>(function TerminalTabs
     () => tabs.filter((tab) => !visibleTerminalIds.has(tab.id)),
     [tabs, visibleTerminalIds]
   );
-  const backgroundedGroups = useMemo(() => groupTabsByProject(backgroundedTabs), [backgroundedTabs]);
+  const backgroundedGroups = useMemo(
+    () => groupTabsByProject(backgroundedTabs),
+    [backgroundedTabs]
+  );
 
   const { getTabDragProps, containerRef, dropIndicatorIndex, dragFromIndex } = useDraggableTabs({
     itemCount: backgroundedTabs.length,
@@ -191,12 +194,9 @@ export const TerminalTabs = forwardRef<TerminalTabsHandle>(function TerminalTabs
     const cwds = tabs.map((t) => t.cwd);
     const activeIndex = tabs.findIndex((t) => t.id === activeTabId);
     const terminalIds = tabs.map((t) => t.id);
-    useSessionStore.getState().saveTerminals(
-      cwds,
-      activeIndex >= 0 ? activeIndex : 0,
-      layout,
-      terminalIds
-    );
+    useSessionStore
+      .getState()
+      .saveTerminals(cwds, activeIndex >= 0 ? activeIndex : 0, layout, terminalIds);
   }, [tabs, activeTabId, layout]);
 
   const handleNewTerminal = useCallback(async () => {

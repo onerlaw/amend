@@ -1,10 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import {
-  LayoutNode,
-  SerializedLayoutNode,
-  serializeLayout,
-} from '@/lib/layoutTree';
+import { LayoutNode, SerializedLayoutNode, serializeLayout } from '@/lib/layoutTree';
 
 interface BrowseContextState {
   paths: string[];

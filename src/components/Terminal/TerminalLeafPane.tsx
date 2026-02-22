@@ -64,15 +64,12 @@ export function TerminalLeafPane({ leafId, terminalIds, activeTerminalId }: Term
     [closeTerminal]
   );
 
-  const handleTabMouseDown = useCallback(
-    (e: React.MouseEvent, terminalId: string) => {
-      if (e.button !== 0) return;
-      dragTerminalRef.current = terminalId;
-      dragStartPos.current = { x: e.clientX, y: e.clientY };
-      isDraggingRef.current = false;
-    },
-    []
-  );
+  const handleTabMouseDown = useCallback((e: React.MouseEvent, terminalId: string) => {
+    if (e.button !== 0) return;
+    dragTerminalRef.current = terminalId;
+    dragStartPos.current = { x: e.clientX, y: e.clientY };
+    isDraggingRef.current = false;
+  }, []);
 
   useEffect(() => {
     function handleMouseMove(e: MouseEvent) {
@@ -128,9 +125,7 @@ export function TerminalLeafPane({ leafId, terminalIds, activeTerminalId }: Term
                 onMouseDown={(e) => handleTabMouseDown(e, tid)}
                 onClick={() => handleTabClick(tid)}
                 className={`group flex items-center gap-1 px-1.5 py-0.5 text-[11px] shrink-0 ${
-                  isActive
-                    ? 'bg-terminal-bg text-primary'
-                    : 'text-secondary hover:bg-surface-2'
+                  isActive ? 'bg-terminal-bg text-primary' : 'text-secondary hover:bg-surface-2'
                 } ${draggingTabId === tid ? 'opacity-50' : ''}`}
               >
                 <TerminalTabLabel tab={tab} />

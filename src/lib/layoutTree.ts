@@ -47,9 +47,10 @@ export function removeLeaf(root: LayoutNode, terminalId: string): LayoutNode | n
     return {
       ...root,
       terminalIds: remaining,
-      activeTerminalId: root.activeTerminalId === terminalId
-        ? remaining[Math.min(root.terminalIds.indexOf(terminalId), remaining.length - 1)]
-        : root.activeTerminalId,
+      activeTerminalId:
+        root.activeTerminalId === terminalId
+          ? remaining[Math.min(root.terminalIds.indexOf(terminalId), remaining.length - 1)]
+          : root.activeTerminalId,
     };
   }
 

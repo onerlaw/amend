@@ -25,9 +25,7 @@ export function TerminalSplitLayout({ node }: TerminalSplitLayoutProps) {
       <PanelResizeHandle className="data-[resize-handle-state=hover]:bg-accent/30 data-[resize-handle-state=drag]:bg-accent/50 transition-colors flex items-center justify-center">
         <div
           className={
-            node.direction === 'horizontal'
-              ? 'w-px h-8 bg-surface-3'
-              : 'h-px w-8 bg-surface-3'
+            node.direction === 'horizontal' ? 'w-px h-8 bg-surface-3' : 'h-px w-8 bg-surface-3'
           }
         />
       </PanelResizeHandle>

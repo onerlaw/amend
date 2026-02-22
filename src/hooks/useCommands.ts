@@ -68,9 +68,7 @@ export function useCommands({ terminalTabsRef, browseEditorTabsRef }: CommandRef
 
         const currentIdx = target.terminalIds.indexOf(target.activeTerminalId);
         const len = target.terminalIds.length;
-        const nextIdx = e.key === '['
-          ? (currentIdx - 1 + len) % len
-          : (currentIdx + 1) % len;
+        const nextIdx = e.key === '[' ? (currentIdx - 1 + len) % len : (currentIdx + 1) % len;
         setActiveTerminalInPane(focusedPaneId, target.terminalIds[nextIdx]);
         return;
       }
