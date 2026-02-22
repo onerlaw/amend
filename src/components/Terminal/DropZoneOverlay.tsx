@@ -25,7 +25,7 @@ function DropPreview({ zone }: { zone: DropZone }) {
 
   return (
     <div
-      className={`absolute ${previewStyle[zone]} rounded-md bg-accent/15 border-2 border-accent/40 pointer-events-none transition-all duration-100`}
+      className={`absolute ${previewStyle[zone]} rounded-md bg-accent/25 border-2 border-accent/60 pointer-events-none transition-all duration-100`}
     />
   );
 }
@@ -119,7 +119,7 @@ export function DropZoneOverlay({ leafId }: DropZoneOverlayProps) {
       onMouseLeave={handleMouseLeave}
     >
       {/* Translucent scrim so the preview stands out */}
-      <div className="absolute inset-0 bg-black/10 pointer-events-none" />
+      <div className="absolute inset-0 bg-black/20 pointer-events-none" />
 
       {/* Placement preview */}
       <DropPreview zone={hoveredZone} />
