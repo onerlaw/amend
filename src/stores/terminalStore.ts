@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { reorderArray } from '@/lib/fileUtils';
+import { useTerminalLayoutStore } from '@/stores/terminalLayoutStore';
 
 export interface TerminalTab {
   id: string;
@@ -51,6 +52,9 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
   },
 
   removeTab: (id: string) => {
+    // Remove from layout first (layout store handles focus transfer)
+    useTerminalLayoutStore.getState().removeFromLayout(id);
+
     const { tabs, activeTabId } = get();
     const newTabs = tabs.filter((t) => t.id !== id);
     let newActiveId = activeTabId;

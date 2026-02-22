@@ -1,4 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
+import { useTerminalDragStore } from '@/stores/terminalDragStore';
+import { useTerminalStore } from '@/stores/terminalStore';
 
 interface UseDraggableTabsOptions {
   itemCount: number;
@@ -14,7 +16,9 @@ export function useDraggableTabs({ itemCount, onReorder }: UseDraggableTabsOptio
   const dragFromRef = useRef<number | null>(null);
   const dropIndicatorRef = useRef<number | null>(null);
   const isDraggingRef = useRef(false);
+  const inSplitModeRef = useRef(false);
   const startXRef = useRef(0);
+  const startYRef = useRef(0);
   const tabElementsRef = useRef<Map<number, HTMLElement>>(new Map());
   const containerRef = useRef<HTMLElement | null>(null);
   const tabRectsRef = useRef<DOMRect[]>([]);
@@ -49,6 +53,7 @@ export function useDraggableTabs({ itemCount, onReorder }: UseDraggableTabsOptio
       dragFromRef.current = null;
       dropIndicatorRef.current = null;
       isDraggingRef.current = false;
+      inSplitModeRef.current = false;
       tabRectsRef.current = [];
       containerRectRef.current = null;
       setDragFromIndex(null);
@@ -59,7 +64,9 @@ export function useDraggableTabs({ itemCount, onReorder }: UseDraggableTabsOptio
       if (dragFromRef.current === null) return;
 
       if (!isDraggingRef.current) {
-        if (Math.abs(e.clientX - startXRef.current) < DRAG_THRESHOLD) return;
+        const dx = Math.abs(e.clientX - startXRef.current);
+        const dy = Math.abs(e.clientY - startYRef.current);
+        if (dx < DRAG_THRESHOLD && dy < DRAG_THRESHOLD) return;
         isDraggingRef.current = true;
         setDragFromIndex(dragFromRef.current);
 
@@ -73,8 +80,29 @@ export function useDraggableTabs({ itemCount, onReorder }: UseDraggableTabsOptio
         containerRectRef.current = containerRef.current?.getBoundingClientRect() ?? null;
       }
 
-      // Clear indicator if cursor leaves the container vertically
+      // Check if cursor has moved below the tab bar — transition to split mode
       const cRect = containerRectRef.current;
+      if (cRect && e.clientY > cRect.bottom && !inSplitModeRef.current) {
+        // Only allow split mode if there's more than 1 tab
+        const tabs = useTerminalStore.getState().tabs;
+        if (tabs.length > 1) {
+          inSplitModeRef.current = true;
+          const fromIdx = dragFromRef.current;
+          if (fromIdx !== null && fromIdx < tabs.length) {
+            const terminalId = tabs[fromIdx].id;
+            useTerminalDragStore.getState().startDrag(terminalId);
+          }
+          // Clear reorder indicator
+          dropIndicatorRef.current = null;
+          setDropIndicatorIndex(null);
+        }
+        return;
+      }
+
+      // If in split mode, let the DropZoneOverlay handle everything
+      if (inSplitModeRef.current) return;
+
+      // Clear indicator if cursor leaves the container vertically
       if (cRect && (e.clientY < cRect.top || e.clientY > cRect.bottom)) {
         dropIndicatorRef.current = null;
         setDropIndicatorIndex(null);
@@ -87,7 +115,9 @@ export function useDraggableTabs({ itemCount, onReorder }: UseDraggableTabsOptio
     }
 
     function handleMouseUp() {
-      if (isDraggingRef.current) {
+      if (inSplitModeRef.current) {
+        useTerminalDragStore.getState().endDrag();
+      } else if (isDraggingRef.current) {
         const from = dragFromRef.current;
         const indicator = dropIndicatorRef.current;
         if (from !== null && indicator !== null) {
@@ -123,6 +153,7 @@ export function useDraggableTabs({ itemCount, onReorder }: UseDraggableTabsOptio
         if (e.button !== 0) return;
         dragFromRef.current = index;
         startXRef.current = e.clientX;
+        startYRef.current = e.clientY;
       },
     }),
     []

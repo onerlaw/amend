@@ -12,14 +12,17 @@ import { homeDir } from '@tauri-apps/api/path';
 import { useTerminalStore, TerminalTab } from '@/stores/terminalStore';
 import { useUIStore } from '@/stores/uiStore';
 import { useSessionStore } from '@/stores/sessionStore';
+import { useTerminalLayoutStore } from '@/stores/terminalLayoutStore';
 import { useCreateTerminal, useCloseTerminal } from '@/hooks/useTerminalLifecycle';
 import { useTabGitRoots } from '@/hooks/useTabGitRoots';
 import { TerminalPane } from './TerminalPane';
+import { TerminalSplitLayout } from './TerminalSplitLayout';
 import { CloseIcon, FolderIcon } from '@/components/Icons';
 import { getFileName, formatShortcut } from '@/lib/fileUtils';
 import { useDraggableTabs } from '@/hooks/useDraggableTabs';
 import { isTerminalBusy } from '@/lib/tauri';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { collectTerminalIds, findLeafByTerminalId, deserializeLayout } from '@/lib/layoutTree';
 
 function TerminalTabLabel({ tab }: { tab: TerminalTab }) {
   const dirName = getFileName(tab.cwd);
@@ -89,6 +92,12 @@ export interface TerminalTabsHandle {
 export const TerminalTabs = forwardRef<TerminalTabsHandle>(function TerminalTabs(_, ref) {
   const { tabs, activeTabId, setActiveTab, reorderTabs } = useTerminalStore();
   const { setFocusedPanel } = useUIStore();
+  const layout = useTerminalLayoutStore((s) => s.layout);
+  const focusedPaneId = useTerminalLayoutStore((s) => s.focusedPaneId);
+  const initLayout = useTerminalLayoutStore((s) => s.initLayout);
+  const setLayout = useTerminalLayoutStore((s) => s.setLayout);
+  const setFocusedPane = useTerminalLayoutStore((s) => s.setFocusedPane);
+  const assignTerminalToPane = useTerminalLayoutStore((s) => s.assignTerminalToPane);
   const createTerminal = useCreateTerminal();
   const closeTerminal = useCloseTerminal();
   const [closingTabId, setClosingTabId] = useState<string | null>(null);
@@ -101,11 +110,17 @@ export const TerminalTabs = forwardRef<TerminalTabsHandle>(function TerminalTabs
   useTabGitRoots();
   const groups = useMemo(() => groupTabsByProject(tabs), [tabs]);
 
+  // Compute visible terminal IDs from layout
+  const visibleTerminalIds = useMemo(() => {
+    if (!layout) return new Set<string>();
+    return new Set(collectTerminalIds(layout));
+  }, [layout]);
+
   // Auto-create terminal(s) on startup, restoring saved session if available
   useEffect(() => {
     if (tabs.length === 0 && !initializedRef.current) {
       initializedRef.current = true;
-      const { terminalCwds, activeTerminalIndex } = useSessionStore.getState();
+      const { terminalCwds, activeTerminalIndex, terminalLayout } = useSessionStore.getState();
       if (terminalCwds.length > 0) {
         (async () => {
           const ids: string[] = [];
@@ -121,6 +136,24 @@ export const TerminalTabs = forwardRef<TerminalTabsHandle>(function TerminalTabs
           if (ids[targetIndex]) {
             setActiveTab(ids[targetIndex]);
           }
+          // Restore layout from session
+          if (terminalLayout && ids.length > 0) {
+            const restored = deserializeLayout(terminalLayout, ids);
+            if (restored) {
+              setLayout(restored);
+              // Set focus to the active terminal's pane
+              const activeId = ids[targetIndex] ?? ids[0];
+              const leaf = findLeafByTerminalId(restored, activeId);
+              if (leaf) {
+                setFocusedPane(leaf.id);
+              }
+              return;
+            }
+          }
+          // Fallback: single leaf for first terminal
+          if (ids.length > 0) {
+            initLayout(ids[targetIndex] ?? ids[0]);
+          }
         })();
       } else {
         homeDir()
@@ -135,15 +168,28 @@ export const TerminalTabs = forwardRef<TerminalTabsHandle>(function TerminalTabs
     if (tabs.length > 0) {
       initializedRef.current = false;
     }
-  }, [tabs.length, createTerminal, setActiveTab]);
+  }, [tabs.length, createTerminal, setActiveTab, initLayout, setLayout, setFocusedPane]);
 
-  // Save terminal state to session whenever tabs or active tab changes
+  // Initialize layout when first terminal is added and layout is null
+  useEffect(() => {
+    if (tabs.length > 0 && !layout) {
+      initLayout(tabs[0].id);
+    }
+  }, [tabs.length, layout, initLayout, tabs]);
+
+  // Save terminal state to session whenever tabs, active tab, or layout changes
   useEffect(() => {
     if (tabs.length === 0) return;
     const cwds = tabs.map((t) => t.cwd);
     const activeIndex = tabs.findIndex((t) => t.id === activeTabId);
-    useSessionStore.getState().saveTerminals(cwds, activeIndex >= 0 ? activeIndex : 0);
-  }, [tabs, activeTabId]);
+    const terminalIds = tabs.map((t) => t.id);
+    useSessionStore.getState().saveTerminals(
+      cwds,
+      activeIndex >= 0 ? activeIndex : 0,
+      layout,
+      terminalIds
+    );
+  }, [tabs, activeTabId, layout]);
 
   const handleNewTerminal = useCallback(async () => {
     const activeTab = tabs.find((t) => t.id === activeTabId);
@@ -191,6 +237,24 @@ export const TerminalTabs = forwardRef<TerminalTabsHandle>(function TerminalTabs
     }
   };
 
+  const handleTabClick = useCallback(
+    (tabId: string) => {
+      if (!layout) return;
+
+      // If terminal is visible in layout, focus its pane
+      const leaf = findLeafByTerminalId(layout, tabId);
+      if (leaf) {
+        setFocusedPane(leaf.id);
+      } else if (focusedPaneId) {
+        // Terminal is backgrounded — assign to focused pane
+        assignTerminalToPane(focusedPaneId, tabId);
+      } else {
+        setActiveTab(tabId);
+      }
+    },
+    [layout, focusedPaneId, setFocusedPane, assignTerminalToPane, setActiveTab]
+  );
+
   return (
     <div
       className="flex h-full flex-col bg-terminal-bg"
@@ -210,6 +274,8 @@ export const TerminalTabs = forwardRef<TerminalTabsHandle>(function TerminalTabs
                 <div className="flex gap-0.5">
                   {group.tabs.map((tab, tabIdx) => {
                     const globalIndex = group.globalIndices[tabIdx];
+                    const isActive = activeTabId === tab.id;
+                    const isVisible = visibleTerminalIds.has(tab.id);
                     return (
                       <div key={tab.id} className="relative flex">
                         {dropIndicatorIndex === globalIndex && (
@@ -217,14 +283,19 @@ export const TerminalTabs = forwardRef<TerminalTabsHandle>(function TerminalTabs
                         )}
                         <button
                           {...getTabDragProps(globalIndex)}
-                          onClick={() => setActiveTab(tab.id)}
+                          onClick={() => handleTabClick(tab.id)}
                           className={`group flex items-center gap-1.5 px-2 py-1 text-xs ${
-                            activeTabId === tab.id
+                            isActive
                               ? 'bg-terminal-bg text-primary'
-                              : 'text-secondary hover:bg-surface-1'
+                              : isVisible
+                                ? 'bg-surface-1 text-primary'
+                                : 'text-secondary hover:bg-surface-1'
                           } ${dragFromIndex === globalIndex ? 'opacity-50' : ''}`}
                           title={tab.cwd}
                         >
+                          {isVisible && !isActive && (
+                            <span className="w-1.5 h-1.5 rounded-full bg-accent/60 shrink-0" />
+                          )}
                           <TerminalTabLabel tab={tab} />
                           <span
                             onMouseDown={(e) => e.stopPropagation()}
@@ -264,9 +335,16 @@ export const TerminalTabs = forwardRef<TerminalTabsHandle>(function TerminalTabs
             onCancel={() => setClosingTabId(null)}
           />
         )}
-        {tabs.map((tab) => (
-          <TerminalPane key={tab.id} id={tab.id} isActive={activeTabId === tab.id} />
-        ))}
+        {/* Render split layout for visible terminals */}
+        {layout && <TerminalSplitLayout node={layout} />}
+        {/* Keep backgrounded terminals hidden-mounted to preserve xterm state */}
+        {tabs
+          .filter((tab) => !visibleTerminalIds.has(tab.id))
+          .map((tab) => (
+            <div key={tab.id} className="hidden">
+              <TerminalPane id={tab.id} isActive={false} />
+            </div>
+          ))}
         {tabs.length === 0 && (
           <div className="flex h-full flex-col items-center justify-center gap-4 text-center">
             <FolderIcon className="h-12 w-12 text-tertiary" />
