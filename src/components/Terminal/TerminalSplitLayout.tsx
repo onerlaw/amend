@@ -8,7 +8,13 @@ interface TerminalSplitLayoutProps {
 
 export function TerminalSplitLayout({ node }: TerminalSplitLayoutProps) {
   if (node.type === 'leaf') {
-    return <TerminalLeafPane leafId={node.id} terminalId={node.terminalId} />;
+    return (
+      <TerminalLeafPane
+        leafId={node.id}
+        terminalIds={node.terminalIds}
+        activeTerminalId={node.activeTerminalId}
+      />
+    );
   }
 
   return (

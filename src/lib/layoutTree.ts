@@ -1,5 +1,5 @@
 export type LayoutNode =
-  | { type: 'leaf'; id: string; terminalId: string }
+  | { type: 'leaf'; id: string; terminalIds: string[]; activeTerminalId: string }
   | {
       type: 'split';
       id: string;
@@ -15,7 +15,7 @@ export function genNodeId(): string {
 }
 
 export function makeLeaf(terminalId: string): LayoutNode {
-  return { type: 'leaf', id: genNodeId(), terminalId };
+  return { type: 'leaf', id: genNodeId(), terminalIds: [terminalId], activeTerminalId: terminalId };
 }
 
 export function findNode(root: LayoutNode, nodeId: string): LayoutNode | null {
@@ -38,26 +38,28 @@ export function replaceNode(root: LayoutNode, nodeId: string, replacement: Layou
   return root;
 }
 
-/** Remove a leaf by terminal ID. Collapses parent split and promotes sibling. */
+/** Remove a terminal from its leaf's terminalIds. If the leaf becomes empty, collapse it. */
 export function removeLeaf(root: LayoutNode, terminalId: string): LayoutNode | null {
   if (root.type === 'leaf') {
-    return root.terminalId === terminalId ? null : root;
+    if (!root.terminalIds.includes(terminalId)) return root;
+    const remaining = root.terminalIds.filter((id) => id !== terminalId);
+    if (remaining.length === 0) return null;
+    return {
+      ...root,
+      terminalIds: remaining,
+      activeTerminalId: root.activeTerminalId === terminalId
+        ? remaining[Math.min(root.terminalIds.indexOf(terminalId), remaining.length - 1)]
+        : root.activeTerminalId,
+    };
   }
 
-  // Check if either child is the target leaf
-  if (root.first.type === 'leaf' && root.first.terminalId === terminalId) {
-    return root.second;
-  }
-  if (root.second.type === 'leaf' && root.second.terminalId === terminalId) {
-    return root.first;
-  }
-
-  // Recurse into children
+  // Try first child
   const newFirst = removeLeaf(root.first, terminalId);
   if (newFirst !== root.first) {
     return newFirst === null ? root.second : { ...root, first: newFirst };
   }
 
+  // Try second child
   const newSecond = removeLeaf(root.second, terminalId);
   if (newSecond !== root.second) {
     return newSecond === null ? root.first : { ...root, second: newSecond };
@@ -66,14 +68,16 @@ export function removeLeaf(root: LayoutNode, terminalId: string): LayoutNode | n
   return root;
 }
 
+/** Returns ALL terminal IDs across all leaves (all terminalIds arrays flattened). */
 export function collectTerminalIds(root: LayoutNode): string[] {
-  if (root.type === 'leaf') return [root.terminalId];
+  if (root.type === 'leaf') return [...root.terminalIds];
   return [...collectTerminalIds(root.first), ...collectTerminalIds(root.second)];
 }
 
+/** Find the leaf that contains a given terminal ID (searches through terminalIds arrays). */
 export function findLeafByTerminalId(root: LayoutNode, terminalId: string): LayoutNode | null {
   if (root.type === 'leaf') {
-    return root.terminalId === terminalId ? root : null;
+    return root.terminalIds.includes(terminalId) ? root : null;
   }
   return (
     findLeafByTerminalId(root.first, terminalId) ?? findLeafByTerminalId(root.second, terminalId)
@@ -101,7 +105,7 @@ export function findParent(
 }
 
 export type SerializedLayoutNode =
-  | { type: 'leaf'; terminalIndex: number }
+  | { type: 'leaf'; terminalIndices: number[]; activeTerminalIndex: number }
   | {
       type: 'split';
       direction: 'horizontal' | 'vertical';
@@ -112,7 +116,11 @@ export type SerializedLayoutNode =
 
 export function serializeLayout(node: LayoutNode, terminalIds: string[]): SerializedLayoutNode {
   if (node.type === 'leaf') {
-    return { type: 'leaf', terminalIndex: terminalIds.indexOf(node.terminalId) };
+    return {
+      type: 'leaf',
+      terminalIndices: node.terminalIds.map((id) => terminalIds.indexOf(id)),
+      activeTerminalIndex: terminalIds.indexOf(node.activeTerminalId),
+    };
   }
   return {
     type: 'split',
@@ -128,9 +136,27 @@ export function deserializeLayout(
   terminalIds: string[]
 ): LayoutNode | null {
   if (node.type === 'leaf') {
-    const tid = terminalIds[node.terminalIndex];
-    if (!tid) return null;
-    return makeLeaf(tid);
+    // Support both old format (terminalIndex) and new format (terminalIndices)
+    let ids: string[];
+    let activeId: string;
+    if ('terminalIndices' in node) {
+      ids = node.terminalIndices.map((i) => terminalIds[i]).filter(Boolean);
+      activeId = terminalIds[node.activeTerminalIndex];
+    } else {
+      // Legacy: single terminalIndex
+      const tid = terminalIds[(node as { terminalIndex: number }).terminalIndex];
+      if (!tid) return null;
+      ids = [tid];
+      activeId = tid;
+    }
+    if (ids.length === 0) return null;
+    if (!activeId || !ids.includes(activeId)) activeId = ids[0];
+    const leaf = makeLeaf(ids[0]);
+    if (leaf.type === 'leaf') {
+      leaf.terminalIds = ids;
+      leaf.activeTerminalId = activeId;
+    }
+    return leaf;
   }
   const first = deserializeLayout(node.first, terminalIds);
   const second = deserializeLayout(node.second, terminalIds);

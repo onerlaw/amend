@@ -24,7 +24,7 @@ import { isTerminalBusy } from '@/lib/tauri';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { collectTerminalIds, findLeafByTerminalId, deserializeLayout } from '@/lib/layoutTree';
 
-function TerminalTabLabel({ tab }: { tab: TerminalTab }) {
+export function TerminalTabLabel({ tab }: { tab: TerminalTab }) {
   const dirName = getFileName(tab.cwd);
   if (tab.worktreeName) {
     const subtitle = tab.title || dirName;
@@ -98,6 +98,7 @@ export const TerminalTabs = forwardRef<TerminalTabsHandle>(function TerminalTabs
   const setLayout = useTerminalLayoutStore((s) => s.setLayout);
   const setFocusedPane = useTerminalLayoutStore((s) => s.setFocusedPane);
   const assignTerminalToPane = useTerminalLayoutStore((s) => s.assignTerminalToPane);
+  const setActiveTerminalInPane = useTerminalLayoutStore((s) => s.setActiveTerminalInPane);
   const createTerminal = useCreateTerminal();
   const closeTerminal = useCloseTerminal();
   const [closingTabId, setClosingTabId] = useState<string | null>(null);
@@ -245,18 +246,18 @@ export const TerminalTabs = forwardRef<TerminalTabsHandle>(function TerminalTabs
     (tabId: string) => {
       if (!layout) return;
 
-      // If terminal is visible in layout, focus its pane
+      // If terminal is in a leaf, focus that pane and set it as active within it
       const leaf = findLeafByTerminalId(layout, tabId);
       if (leaf) {
-        setFocusedPane(leaf.id);
+        setActiveTerminalInPane(leaf.id, tabId);
       } else if (focusedPaneId) {
-        // Terminal is backgrounded — assign to focused pane
+        // Terminal is backgrounded — add to focused pane's stack
         assignTerminalToPane(focusedPaneId, tabId);
       } else {
         setActiveTab(tabId);
       }
     },
-    [layout, focusedPaneId, setFocusedPane, assignTerminalToPane, setActiveTab]
+    [layout, focusedPaneId, setActiveTerminalInPane, assignTerminalToPane, setActiveTab]
   );
 
   return (

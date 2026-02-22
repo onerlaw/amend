@@ -57,10 +57,7 @@ export function DropZoneOverlay({ leafId }: DropZoneOverlayProps) {
     }
 
     if (hoveredZone === 'center') {
-      // Remove from old position first if it was in layout
-      if (layout && findLeafByTerminalId(layout, draggedTerminalId)) {
-        removeFromLayout(draggedTerminalId);
-      }
+      // assignTerminalToPane handles removing from source leaf internally
       assignTerminalToPane(leafId, draggedTerminalId);
     } else {
       const direction: 'horizontal' | 'vertical' =

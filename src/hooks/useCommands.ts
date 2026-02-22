@@ -56,6 +56,25 @@ export function useCommands({ terminalTabsRef, browseEditorTabsRef }: CommandRef
         return;
       }
 
+      // Cmd/Ctrl + Shift + [ or ]: Cycle through terminals within focused pane
+      if (mod && e.shiftKey && (e.key === '[' || e.key === ']')) {
+        e.preventDefault();
+        const layoutState = useTerminalLayoutStore.getState();
+        const { layout, focusedPaneId, setActiveTerminalInPane } = layoutState;
+        if (!layout || !focusedPaneId) return;
+
+        const target = findNode(layout, focusedPaneId);
+        if (!target || target.type !== 'leaf' || target.terminalIds.length <= 1) return;
+
+        const currentIdx = target.terminalIds.indexOf(target.activeTerminalId);
+        const len = target.terminalIds.length;
+        const nextIdx = e.key === '['
+          ? (currentIdx - 1 + len) % len
+          : (currentIdx + 1) % len;
+        setActiveTerminalInPane(focusedPaneId, target.terminalIds[nextIdx]);
+        return;
+      }
+
       if (!mod) return;
 
       switch (e.key) {
