@@ -158,6 +158,7 @@ export function MainLayout() {
   const restoredContextsRef = useRef<Set<string>>(new Set());
   const gitPolling = useGitPolling(contextPath);
   const diffStats = gitPolling.diffStats;
+  const gitStatus = gitPolling.status;
 
   // Centralized keyboard shortcuts
   useCommands({ terminalTabsRef, browseEditorTabsRef });
@@ -351,6 +352,13 @@ export function MainLayout() {
                       -{diffStats.deletions}
                     </span>
                   )}
+                </span>
+              )}
+              {gitStatus && gitStatus.untracked.length > 0 && (
+                <span
+                  className={`${diffStats && (diffStats.additions > 0 || diffStats.deletions > 0) ? 'ml-1' : 'ml-1.5'} ${panelMode === 'diff' ? 'text-white/80' : 'text-tertiary'}`}
+                >
+                  ?{gitStatus.untracked.length}
                 </span>
               )}
             </button>
