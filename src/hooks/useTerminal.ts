@@ -17,8 +17,6 @@ import { useUIStore } from '@/stores/uiStore';
 import { FileLinkProvider } from '@/lib/terminalLinks';
 import { isDarkMode } from '@/hooks/useTheme';
 
-let initializationCounter = 0;
-
 // Get the terminal theme based on the current app theme
 function getTerminalTheme(isDark: boolean) {
   if (isDark) {
@@ -71,13 +69,33 @@ function getTerminalTheme(isDark: boolean) {
   };
 }
 
+// --- Terminal instance registry ---
+// Stores xterm instances so they survive React component unmount/remount.
+// Instances are only destroyed when the terminal is explicitly closed.
+interface TerminalEntry {
+  terminal: Terminal;
+  fitAddon: FitAddon;
+  decoder: TextDecoder;
+  unlisteners: (() => void)[];
+}
+
+const terminalRegistry = new Map<string, TerminalEntry>();
+
+/** Explicitly destroy a terminal instance (call when closing a terminal). */
+export function destroyTerminalInstance(id: string) {
+  const entry = terminalRegistry.get(id);
+  if (!entry) return;
+  for (const unlisten of entry.unlisteners) {
+    unlisten();
+  }
+  entry.terminal.dispose();
+  terminalRegistry.delete(id);
+}
+
 export function useTerminal(containerId: string | null) {
   const terminalRef = useRef<Terminal | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const unlistenRef = useRef<(() => void)[]>([]);
-  const decoderRef = useRef<TextDecoder | null>(null);
-  const currentInitIdRef = useRef<number>(0);
   const isInitializedRef = useRef(false);
 
   const themeMode = useUIStore((state) => state.themeMode);
@@ -144,14 +162,36 @@ export function useTerminal(containerId: string | null) {
         return false;
       }
       if (terminalRef.current) {
-        return true; // Already initialized
+        return true; // Already initialized in this hook instance
       }
 
       containerRef.current = container;
 
-      // Create unique ID for this initialization to prevent stale listeners from processing events
-      const initId = ++initializationCounter;
-      currentInitIdRef.current = initId;
+      // Check registry for an existing instance (surviving a React remount)
+      const existing = terminalRegistry.get(containerId);
+      if (existing) {
+        // Reattach: move the xterm DOM element into the new container
+        const xtermEl = existing.terminal.element;
+        if (xtermEl) {
+          container.appendChild(xtermEl);
+        }
+        terminalRef.current = existing.terminal;
+        fitAddonRef.current = existing.fitAddon;
+        isInitializedRef.current = true;
+
+        // Fit to new container size
+        try {
+          existing.fitAddon.fit();
+          const { cols, rows } = existing.terminal;
+          await resizeTerminal(containerId, cols, rows);
+        } catch (e) {
+          console.warn('Reattach fit failed:', e);
+        }
+
+        return true;
+      }
+
+      // --- Create a brand new terminal instance ---
 
       // Determine initial theme
       const currentThemeMode = useUIStore.getState().themeMode;
@@ -213,25 +253,25 @@ export function useTerminal(containerId: string | null) {
       });
 
       // Set up streaming UTF-8 decoder
-      decoderRef.current = new TextDecoder('utf-8', { fatal: false });
+      const decoder = new TextDecoder('utf-8', { fatal: false });
 
-      // Set up output listener (per-terminal, base64-encoded)
-      const listenerInitId = initId;
+      // Set up output listener — references the registry so it works even when
+      // the React component is unmounted (terminal backgrounded).
       const unlistenOutput = await onTerminalOutput(containerId, (base64Data) => {
-        if (listenerInitId !== currentInitIdRef.current) return;
-        if (!terminalRef.current || !decoderRef.current) return;
+        const entry = terminalRegistry.get(containerId);
+        if (!entry) return;
         const binaryStr = atob(base64Data);
         const bytes = new Uint8Array(binaryStr.length);
         for (let i = 0; i < binaryStr.length; i++) {
           bytes[i] = binaryStr.charCodeAt(i);
         }
-        const text = decoderRef.current.decode(bytes, { stream: true });
-        terminalRef.current.write(text);
+        const text = entry.decoder.decode(bytes, { stream: true });
+        entry.terminal.write(text);
       });
 
       // Set up exit listener - close the tab when the process exits
       const unlistenExit = await onTerminalExit(containerId, () => {
-        if (listenerInitId !== currentInitIdRef.current) return;
+        if (!terminalRegistry.has(containerId)) return;
         closeTerminal(containerId).catch(console.error);
         useTerminalStore.getState().removeTab(containerId);
       });
@@ -257,12 +297,18 @@ export function useTerminal(containerId: string | null) {
         useTerminalStore.getState().setTabTitle(containerId, title);
       });
 
-      unlistenRef.current = [
-        unlistenOutput,
-        unlistenExit,
-        () => oscDisposable.dispose(),
-        () => titleDisposable.dispose(),
-      ];
+      // Store in registry BEFORE the first fit so listeners can reference it
+      terminalRegistry.set(containerId, {
+        terminal,
+        fitAddon,
+        decoder,
+        unlisteners: [
+          unlistenOutput,
+          unlistenExit,
+          () => oscDisposable.dispose(),
+          () => titleDisposable.dispose(),
+        ],
+      });
 
       // Mark as initialized before fitting
       isInitializedRef.current = true;
@@ -281,18 +327,11 @@ export function useTerminal(containerId: string | null) {
     [containerId]
   );
 
+  // On unmount: clear local refs but do NOT destroy the terminal instance.
+  // The instance lives in the registry and will be reattached on remount.
   const dispose = useCallback(() => {
-    currentInitIdRef.current = 0; // Invalidate current init ID to stop event processing
     isInitializedRef.current = false;
-    for (const unlisten of unlistenRef.current) {
-      unlisten();
-    }
-    unlistenRef.current = [];
-    decoderRef.current = null;
-    if (terminalRef.current) {
-      terminalRef.current.dispose();
-      terminalRef.current = null;
-    }
+    terminalRef.current = null;
     fitAddonRef.current = null;
   }, []);
 

@@ -108,7 +108,9 @@ function SettingsPanel({ onClose }: { onClose: () => void }) {
             {[
               ['New Terminal', formatShortcut('Mod+T')],
               ['Open Folder', formatShortcut('Mod+O')],
-              ['Cycle Terminals', formatShortcut('Mod+`')],
+              ['Cycle Panes', formatShortcut('Mod+`')],
+              ['Split Right', formatShortcut('Mod+D')],
+              ['Split Down', formatShortcut('Mod+Shift+D')],
               ['Close Tab', formatShortcut('Mod+W')],
               ['Search', `${formatShortcut('Mod+P')} / ${formatShortcut('Mod+Shift+F')}`],
               ['Find in File', formatShortcut('Mod+F')],

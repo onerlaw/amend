@@ -2,13 +2,16 @@ import { useEffect, useCallback, RefObject } from 'react';
 import { useUIStore } from '@/stores/uiStore';
 import { useTerminalStore } from '@/stores/terminalStore';
 import { useFileStore } from '@/stores/fileStore';
-import { useCloseTerminal } from '@/hooks/useTerminalLifecycle';
+import { useCloseTerminal, useCreateTerminal } from '@/hooks/useTerminalLifecycle';
 import { useContextMenuStore } from '@/stores/contextMenuStore';
 import { useNotesStore } from '@/stores/notesStore';
+import { useTerminalLayoutStore } from '@/stores/terminalLayoutStore';
+import { collectLeaves, findNode } from '@/lib/layoutTree';
 import { copyEntry, moveEntry, getClipboardFilePaths } from '@/lib/tauri';
 import { basename, join } from '@/lib/pathUtils';
 import type { TerminalTabsHandle } from '@/components/Terminal/TerminalTabs';
 import type { BrowseEditorTabsHandle } from '@/components/FileBrowser/BrowseEditorTabs';
+import type { TerminalTab } from '@/stores/terminalStore';
 
 interface CommandRefs {
   terminalTabsRef: RefObject<TerminalTabsHandle | null>;
@@ -24,10 +27,52 @@ export function useCommands({ terminalTabsRef, browseEditorTabsRef }: CommandRef
   const { tabs, activeTabId, setActiveTab } = useTerminalStore();
   const { browseActiveFilePath, closeBrowseFile, contextPath } = useFileStore();
   const closeTerminal = useCloseTerminal();
+  const createTerminal = useCreateTerminal();
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
       const mod = e.metaKey || e.ctrlKey;
+
+      // Cmd/Ctrl + Alt + Arrow: Navigate focus between panes (no switch needed)
+      if (mod && e.altKey && ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) {
+        e.preventDefault();
+        const layoutState = useTerminalLayoutStore.getState();
+        const { layout, focusedPaneId, setFocusedPane } = layoutState;
+        if (!layout || !focusedPaneId) return;
+
+        const leaves = collectLeaves(layout);
+        if (leaves.length <= 1) return;
+
+        const currentIdx = leaves.findIndex((l) => l.id === focusedPaneId);
+        if (currentIdx === -1) return;
+
+        let nextIdx: number;
+        if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+          nextIdx = (currentIdx - 1 + leaves.length) % leaves.length;
+        } else {
+          nextIdx = (currentIdx + 1) % leaves.length;
+        }
+        setFocusedPane(leaves[nextIdx].id);
+        return;
+      }
+
+      // Cmd/Ctrl + Shift + [ or ]: Cycle through terminals within focused pane
+      if (mod && e.shiftKey && (e.key === '[' || e.key === ']')) {
+        e.preventDefault();
+        const layoutState = useTerminalLayoutStore.getState();
+        const { layout, focusedPaneId, setActiveTerminalInPane } = layoutState;
+        if (!layout || !focusedPaneId) return;
+
+        const target = findNode(layout, focusedPaneId);
+        if (!target || target.type !== 'leaf' || target.terminalIds.length <= 1) return;
+
+        const currentIdx = target.terminalIds.indexOf(target.activeTerminalId);
+        const len = target.terminalIds.length;
+        const nextIdx = e.key === '[' ? (currentIdx - 1 + len) % len : (currentIdx + 1) % len;
+        setActiveTerminalInPane(focusedPaneId, target.terminalIds[nextIdx]);
+        return;
+      }
+
       if (!mod) return;
 
       switch (e.key) {
@@ -45,13 +90,42 @@ export function useCommands({ terminalTabsRef, browseEditorTabsRef }: CommandRef
           return;
         }
 
-        // Cmd/Ctrl + `: Cycle terminals
+        // Cmd/Ctrl + `: Cycle focus between visible panes
         case '`': {
           e.preventDefault();
-          if (tabs.length > 1 && activeTabId) {
+          const layoutState = useTerminalLayoutStore.getState();
+          const { layout, focusedPaneId, setFocusedPane } = layoutState;
+          if (layout) {
+            const leaves = collectLeaves(layout);
+            if (leaves.length > 1 && focusedPaneId) {
+              const currentIdx = leaves.findIndex((l) => l.id === focusedPaneId);
+              const nextIdx = (currentIdx + 1) % leaves.length;
+              setFocusedPane(leaves[nextIdx].id);
+            }
+          } else if (tabs.length > 1 && activeTabId) {
             const currentIndex = tabs.findIndex((t) => t.id === activeTabId);
             const nextIndex = (currentIndex + 1) % tabs.length;
             setActiveTab(tabs[nextIndex].id);
+          }
+          return;
+        }
+
+        // Cmd/Ctrl + D: Split focused pane horizontally (new terminal right)
+        case 'd': {
+          if (!e.shiftKey) {
+            e.preventDefault();
+            handleSplitPane('horizontal', createTerminal, tabs, activeTabId);
+          } else {
+            // Cmd/Ctrl + Shift + D: Split focused pane vertically (new terminal bottom)
+            e.preventDefault();
+            handleSplitPane('vertical', createTerminal, tabs, activeTabId);
+          }
+          return;
+        }
+        case 'D': {
+          if (e.shiftKey) {
+            e.preventDefault();
+            handleSplitPane('vertical', createTerminal, tabs, activeTabId);
           }
           return;
         }
@@ -134,6 +208,7 @@ export function useCommands({ terminalTabsRef, browseEditorTabsRef }: CommandRef
       activeTabId,
       setActiveTab,
       closeTerminal,
+      createTerminal,
       panelMode,
       browseActiveFilePath,
       closeBrowseFile,
@@ -147,6 +222,30 @@ export function useCommands({ terminalTabsRef, browseEditorTabsRef }: CommandRef
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleKeyDown]);
+}
+
+async function handleSplitPane(
+  direction: 'horizontal' | 'vertical',
+  createTerminal: (cwd: string, afterTabId?: string) => Promise<string>,
+  tabs: TerminalTab[],
+  activeTabId: string | null
+) {
+  const { focusedPaneId, splitPane, layout } = useTerminalLayoutStore.getState();
+  if (!focusedPaneId || !layout) return;
+
+  const target = findNode(layout, focusedPaneId);
+  if (!target || target.type !== 'leaf') return;
+
+  const activeTab = tabs.find((t) => t.id === activeTabId);
+  const cwd = activeTab?.cwd;
+  if (!cwd) return;
+
+  try {
+    const newId = await createTerminal(cwd, activeTabId ?? undefined);
+    splitPane(focusedPaneId, direction, 'second', newId);
+  } catch (err) {
+    console.error('Failed to create terminal for split:', err);
+  }
 }
 
 function handlePasteFiles(e: KeyboardEvent, contextPath: string | null, panelMode: string | null) {
