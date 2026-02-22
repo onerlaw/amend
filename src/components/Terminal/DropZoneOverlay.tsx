@@ -9,6 +9,27 @@ interface DropZoneOverlayProps {
   leafId: string;
 }
 
+/** Placement preview: shows where the dropped terminal will appear. */
+function DropPreview({ zone }: { zone: DropZone }) {
+  if (!zone) return null;
+
+  // For edge zones, show a half-pane highlight where the new split will appear.
+  // For center, highlight the full pane to indicate "add to this tab group".
+  const previewStyle: Record<NonNullable<DropZone>, string> = {
+    left: 'left-1 top-1 bottom-1 w-[calc(50%-4px)]',
+    right: 'right-1 top-1 bottom-1 w-[calc(50%-4px)]',
+    top: 'left-1 top-1 right-1 h-[calc(50%-4px)]',
+    bottom: 'left-1 bottom-1 right-1 h-[calc(50%-4px)]',
+    center: 'inset-1',
+  };
+
+  return (
+    <div
+      className={`absolute ${previewStyle[zone]} rounded-md bg-accent/15 border-2 border-accent/40 pointer-events-none transition-all duration-100`}
+    />
+  );
+}
+
 export function DropZoneOverlay({ leafId }: DropZoneOverlayProps) {
   const isDragging = useTerminalDragStore((s) => s.isDragging);
   const draggedTerminalId = useTerminalDragStore((s) => s.draggedTerminalId);
@@ -25,7 +46,7 @@ export function DropZoneOverlay({ leafId }: DropZoneOverlayProps) {
     const x = (e.clientX - rect.left) / rect.width;
     const y = (e.clientY - rect.top) / rect.height;
 
-    const edgeThreshold = 0.3;
+    const edgeThreshold = 0.25;
 
     if (x < edgeThreshold) return 'left';
     if (x > 1 - edgeThreshold) return 'right';
@@ -97,36 +118,11 @@ export function DropZoneOverlay({ leafId }: DropZoneOverlayProps) {
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseLeave}
     >
-      {/* Left zone */}
-      <div
-        className={`absolute left-0 top-0 bottom-0 w-[30%] transition-colors ${
-          hoveredZone === 'left' ? 'bg-accent/20' : ''
-        }`}
-      />
-      {/* Right zone */}
-      <div
-        className={`absolute right-0 top-0 bottom-0 w-[30%] transition-colors ${
-          hoveredZone === 'right' ? 'bg-accent/20' : ''
-        }`}
-      />
-      {/* Top zone */}
-      <div
-        className={`absolute top-0 left-[30%] right-[30%] h-[30%] transition-colors ${
-          hoveredZone === 'top' ? 'bg-accent/20' : ''
-        }`}
-      />
-      {/* Bottom zone */}
-      <div
-        className={`absolute bottom-0 left-[30%] right-[30%] h-[30%] transition-colors ${
-          hoveredZone === 'bottom' ? 'bg-accent/20' : ''
-        }`}
-      />
-      {/* Center zone */}
-      <div
-        className={`absolute top-[30%] bottom-[30%] left-[30%] right-[30%] transition-colors ${
-          hoveredZone === 'center' ? 'bg-accent/20' : ''
-        }`}
-      />
+      {/* Translucent scrim so the preview stands out */}
+      <div className="absolute inset-0 bg-black/10 pointer-events-none" />
+
+      {/* Placement preview */}
+      <DropPreview zone={hoveredZone} />
     </div>
   );
 }
