@@ -296,6 +296,43 @@ export async function gitQuickCheck(repoPath: string, cachedFingerprint: string)
   return invoke('git_quick_check', { repoPath, cachedFingerprint });
 }
 
+// LSP commands
+export interface LspStartParams {
+  serverId: string;
+  command?: string;
+  args: string[];
+  rootPath?: string;
+  useBundledNode?: boolean;
+  serverScript?: string;
+}
+
+export async function lspStartServer(params: LspStartParams): Promise<void> {
+  return invoke('lsp_start_server', { params });
+}
+
+export async function lspSendMessage(serverId: string, message: string): Promise<void> {
+  return invoke('lsp_send_message', { serverId, message });
+}
+
+export async function lspStopServer(serverId: string): Promise<void> {
+  return invoke('lsp_stop_server', { serverId });
+}
+
+export async function onLspMessage(
+  serverId: string,
+  callback: (json: string) => void
+): Promise<UnlistenFn> {
+  return listen(`lsp-message-${serverId}`, (event) => {
+    callback(event.payload as string);
+  });
+}
+
+export async function onLspExit(serverId: string, callback: () => void): Promise<UnlistenFn> {
+  return listen(`lsp-exit-${serverId}`, () => {
+    callback();
+  });
+}
+
 // Symbol navigation types
 export interface SymbolDefinition {
   name: string;
