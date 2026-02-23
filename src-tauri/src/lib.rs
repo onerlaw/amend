@@ -1,11 +1,13 @@
 mod error;
 mod filesystem;
 mod git;
+mod lsp;
 mod symbols;
 mod terminal;
 mod watcher;
 
 use filesystem::{FileSystemManager, SearchGeneration};
+use lsp::LspManager;
 use symbols::{SymbolDefinition, SymbolIndex, SymbolReference};
 use tauri::{Emitter, State};
 use terminal::TerminalManager;
@@ -20,6 +22,7 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .manage(TerminalManager::new())
+        .manage(LspManager::new())
         .manage(FileSystemManager::new())
         .manage(SearchGeneration::new())
         .manage(SymbolIndex::new())
@@ -38,6 +41,10 @@ pub fn run() {
             terminal::close_terminal,
             terminal::is_terminal_busy,
             force_quit,
+            // LSP commands
+            lsp::lsp_start_server,
+            lsp::lsp_send_message,
+            lsp::lsp_stop_server,
             // File system commands
             filesystem::read_directory,
             filesystem::read_directories,

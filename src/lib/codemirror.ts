@@ -340,6 +340,78 @@ const darkTheme = EditorView.theme(
       color: 'var(--text-tertiary)',
       cursor: 'pointer',
     },
+    // LSP diagnostics — squiggly underlines
+    '.cm-lintRange-error': {
+      backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='3'%3E%3Cpath d='m0 3 l2 -2 l1 0 l2 2 l1 0' stroke='%23ef4444' fill='none' stroke-width='1.2'/%3E%3C/svg%3E")`,
+      backgroundRepeat: 'repeat-x',
+      backgroundPosition: 'bottom',
+      paddingBottom: '0.7px',
+    },
+    '.cm-lintRange-warning': {
+      backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='3'%3E%3Cpath d='m0 3 l2 -2 l1 0 l2 2 l1 0' stroke='%23eab308' fill='none' stroke-width='1.2'/%3E%3C/svg%3E")`,
+      backgroundRepeat: 'repeat-x',
+      backgroundPosition: 'bottom',
+      paddingBottom: '0.7px',
+    },
+    '.cm-lintRange-info': {
+      backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='3'%3E%3Cpath d='m0 3 l2 -2 l1 0 l2 2 l1 0' stroke='%233b82f6' fill='none' stroke-width='1.2'/%3E%3C/svg%3E")`,
+      backgroundRepeat: 'repeat-x',
+      backgroundPosition: 'bottom',
+      paddingBottom: '0.7px',
+    },
+    // LSP diagnostics — tooltip panels
+    '.cm-diagnostic': {
+      padding: '4px 8px',
+      fontSize: '12px',
+      lineHeight: '1.4',
+    },
+    '.cm-diagnostic-error': {
+      borderLeft: '3px solid #ef4444',
+    },
+    '.cm-diagnostic-warning': {
+      borderLeft: '3px solid #eab308',
+    },
+    '.cm-diagnostic-info': {
+      borderLeft: '3px solid #3b82f6',
+    },
+    '.cm-diagnostic-hint': {
+      borderLeft: '3px solid #6b7280',
+    },
+    '.cm-tooltip-lint': {
+      backgroundColor: 'var(--surface-2)',
+      border: '1px solid var(--border)',
+      borderRadius: '6px',
+      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
+      maxWidth: '500px',
+    },
+    // LSP hover tooltip
+    '.cm-tooltip-hover': {
+      backgroundColor: 'var(--surface-2)',
+      border: '1px solid var(--border)',
+      borderRadius: '6px',
+      padding: '8px 12px',
+      maxWidth: '500px',
+      fontSize: '12px',
+      lineHeight: '1.4',
+      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
+    },
+    '.cm-tooltip-hover code': {
+      fontFamily: 'Menlo, Monaco, "Courier New", monospace',
+      fontSize: '11px',
+      backgroundColor: 'var(--surface-1)',
+      padding: '1px 4px',
+      borderRadius: '3px',
+    },
+    '.cm-tooltip-hover pre': {
+      fontFamily: 'Menlo, Monaco, "Courier New", monospace',
+      fontSize: '11px',
+      backgroundColor: 'var(--surface-1)',
+      padding: '6px 8px',
+      borderRadius: '4px',
+      margin: '4px 0',
+      overflow: 'auto',
+      maxHeight: '200px',
+    },
     // Go-to-line dialog (reuses search panel container)
     '.cm-gotoLine': {
       padding: '4px 8px',

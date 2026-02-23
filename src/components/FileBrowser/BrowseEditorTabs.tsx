@@ -21,6 +21,8 @@ import {
   cmdHeldCursorExtension,
 } from '@/extensions/goToDefinition';
 import { symbolHoverTooltip } from '@/extensions/hoverTooltip';
+import { getOrStartLspClient, releaseLspClient } from '@/lsp/manager';
+import type { LSPClient } from '@codemirror/lsp-client';
 import { useDraggableTabs } from '@/hooks/useDraggableTabs';
 import { ReferencesPanel } from './ReferencesPanel';
 import { EditorStatusBar, type EditorInfo } from './EditorStatusBar';
@@ -66,6 +68,10 @@ export const BrowseEditorTabs = forwardRef<BrowseEditorTabsHandle>(
     const editorViewRef = useRef<EditorView | null>(null);
     const [editorInfo, setEditorInfo] = useState<EditorInfo | null>(null);
     const [isMarkdownPreview, setIsMarkdownPreview] = useState(false);
+    const [lspClient, setLspClient] = useState<{
+      client: LSPClient;
+      languageId: string;
+    } | null>(null);
 
     // Reset preview mode when switching to a non-markdown file
     useEffect(() => {
@@ -73,6 +79,28 @@ export const BrowseEditorTabs = forwardRef<BrowseEditorTabsHandle>(
         setIsMarkdownPreview(false);
       }
     }, [browseActiveFilePath, activeFile?.language]);
+
+    // Start/stop LSP client when file or context changes
+    useEffect(() => {
+      if (!activeFile?.path || !contextPath) {
+        setLspClient(null);
+        return;
+      }
+
+      const ext = activeFile.path.split('.').pop() || '';
+      let cancelled = false;
+
+      getOrStartLspClient(ext, contextPath).then((result) => {
+        if (!cancelled) {
+          setLspClient(result);
+        }
+      });
+
+      return () => {
+        cancelled = true;
+        releaseLspClient(ext, contextPath);
+      };
+    }, [activeFile?.path, contextPath]);
     const { getTabDragProps, containerRef, dropIndicatorIndex, dragFromIndex } = useDraggableTabs({
       itemCount: browseOpenFiles.length,
       onReorder: reorderBrowseFiles,
@@ -85,7 +113,7 @@ export const BrowseEditorTabs = forwardRef<BrowseEditorTabsHandle>(
       const currentFilePath = activeFile.path;
       const projectRoot = contextPath || '';
 
-      return [
+      const extensions = [
         goToDefinitionExtension({
           currentFilePath,
           projectRoot,
@@ -122,7 +150,15 @@ export const BrowseEditorTabs = forwardRef<BrowseEditorTabsHandle>(
           }
         }),
       ];
-    }, [activeFile?.path, openBrowseFileAtLine, contextPath, showReferencesPanel]);
+
+      // Wire in LSP diagnostics + hover when a server is available
+      if (lspClient) {
+        const fileUri = `file://${currentFilePath}`;
+        extensions.push(lspClient.client.plugin(fileUri, lspClient.languageId));
+      }
+
+      return extensions;
+    }, [activeFile?.path, openBrowseFileAtLine, contextPath, showReferencesPanel, lspClient]);
 
     // Consume pending scroll-to-line state
     useEffect(() => {
