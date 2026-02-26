@@ -136,6 +136,13 @@ export function useGitPolling(repoPath: string | null) {
     scheduleNext();
   }, [scheduleNext]);
 
+  /** Force an immediate full poll by clearing the cached fingerprint. */
+  const forceCheck = useCallback(() => {
+    fingerprintRef.current = '';
+    intervalRef.current = MIN_INTERVAL;
+    scheduleNext();
+  }, [scheduleNext]);
+
   useEffect(() => {
     if (!repoPath) {
       setStatus(null);
@@ -176,7 +183,7 @@ export function useGitPolling(repoPath: string | null) {
     return fullPoll(false);
   }, [fullPoll, scheduleNext]);
 
-  return { status, diffStats, isLoading, error, refresh: manualRefresh, resetInterval };
+  return { status, diffStats, isLoading, error, refresh: manualRefresh, resetInterval, forceCheck };
 }
 
 export type GitPollingResult = ReturnType<typeof useGitPolling>;

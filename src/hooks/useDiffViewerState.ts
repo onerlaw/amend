@@ -57,9 +57,30 @@ export function useDiffViewerState(gitPolling: GitPollingResult, enabled: boolea
   const diffs = diffMode === 'branch' ? branchDiff.diffs : workingDiffs;
   const activeLoadDiff = diffMode === 'branch' ? branchDiff.loadDiff : loadDiff;
 
+  // Track working files key to detect status changes and invalidate cached diffs
+  const prevWorkingKeyRef = useRef<string | null>(null);
+  const workingKey = useMemo(
+    () => workingFiles.map((f) => `${f.category}:${f.path}`).join('|'),
+    [workingFiles]
+  );
+
+  useEffect(() => {
+    if (!enabled) return;
+    if (prevWorkingKeyRef.current === null) {
+      // Initial render — just record the key, don't clear
+      prevWorkingKeyRef.current = workingKey;
+      return;
+    }
+    if (workingKey !== prevWorkingKeyRef.current) {
+      prevWorkingKeyRef.current = workingKey;
+      clearWorkingDiffs();
+    }
+  }, [workingKey, clearWorkingDiffs, enabled]);
+
   // Reset when context path changes (must run before loadDiff to avoid race)
   useEffect(() => {
     if (!enabled) return;
+    prevWorkingKeyRef.current = null;
     clearWorkingDiffs();
   }, [contextPath, clearWorkingDiffs, enabled]);
 

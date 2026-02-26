@@ -11,7 +11,7 @@ import { DiffViewerProvider } from '@/components/DiffViewer/DiffViewerContext';
 import type { BrowseEditorTabsHandle } from '@/components/FileBrowser/BrowseEditorTabs';
 import { GlobalSearch } from '@/components/GlobalSearch/GlobalSearch';
 import { ModalOverlay } from '@/components/ModalOverlay';
-import { indexProject, getGitRoot, onFsChanged } from '@/lib/tauri';
+import { indexProject, getGitRoot, onFsChanged, startWatchingDirectory } from '@/lib/tauri';
 import { formatShortcut, openFileInBrowseMode } from '@/lib/fileUtils';
 import { useSessionStore } from '@/stores/sessionStore';
 import {
@@ -249,29 +249,44 @@ export function MainLayout() {
     return () => clearTimeout(timer);
   }, [contextPath]);
 
-  // Re-index symbols on file system changes (debounced) to clean up stale entries from deletes/renames
+  // Re-index symbols and refresh git polling on file system changes
   useEffect(() => {
     if (!contextPath) return;
-    let timer: ReturnType<typeof setTimeout> | null = null;
+    let indexTimer: ReturnType<typeof setTimeout> | null = null;
+    let gitTimer: ReturnType<typeof setTimeout> | null = null;
     let unlisten: (() => void) | undefined;
 
+    // Ensure the file watcher is active for this directory
+    startWatchingDirectory(contextPath).catch((err) => {
+      console.error('[MainLayout] Failed to start file watcher:', err);
+    });
+
     onFsChanged(() => {
-      if (timer) clearTimeout(timer);
-      timer = setTimeout(() => {
-        timer = null;
+      // Debounced re-index (5s)
+      if (indexTimer) clearTimeout(indexTimer);
+      indexTimer = setTimeout(() => {
+        indexTimer = null;
         indexProject(contextPath).catch((err) => {
           console.error('[MainLayout] Failed to re-index after fs change:', err);
         });
       }, 5000);
+
+      // Debounced git poll (200ms) for fast diff updates
+      if (gitTimer) clearTimeout(gitTimer);
+      gitTimer = setTimeout(() => {
+        gitTimer = null;
+        gitPolling.forceCheck();
+      }, 200);
     }).then((fn) => {
       unlisten = fn;
     });
 
     return () => {
       unlisten?.();
-      if (timer) clearTimeout(timer);
+      if (indexTimer) clearTimeout(indexTimer);
+      if (gitTimer) clearTimeout(gitTimer);
     };
-  }, [contextPath]);
+  }, [contextPath, gitPolling.forceCheck]);
 
   return (
     <div className="flex h-screen flex-col bg-surface-0">

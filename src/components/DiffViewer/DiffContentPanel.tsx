@@ -216,6 +216,17 @@ function DiffFileList({
   loadDiff: (path: string) => void;
   scrollContainerRef: React.RefObject<HTMLDivElement | null>;
 }) {
+  // Filter out files whose loaded diff shows identical content (no actual diff).
+  // Files still loading, with errors, or not yet fetched remain visible.
+  const filteredFiles = useMemo(() => {
+    return allFiles.filter((file) => {
+      const diff = diffs.get(file.path);
+      if (!diff) return true; // not fetched yet
+      if (diff.isLoading || diff.error) return true;
+      return diff.oldContent !== diff.newContent;
+    });
+  }, [allFiles, diffs]);
+
   const [scrollRoot, setScrollRoot] = useState<HTMLDivElement | null>(null);
 
   const containerRef = useCallback(
@@ -229,7 +240,7 @@ function DiffFileList({
 
   return (
     <div ref={containerRef} className="flex-1 overflow-y-auto">
-      {allFiles.map((file) => (
+      {filteredFiles.map((file) => (
         <LazyDiffFileSection
           key={`${file.category}-${file.path}`}
           filePath={file.path}

@@ -317,7 +317,7 @@ const DiffContent = memo(function DiffContent({
   if (totalLines === 0) {
     return (
       <div className="flex items-center justify-center py-4 text-tertiary text-sm">
-        No differences (new file)
+        No differences
       </div>
     );
   }
@@ -481,8 +481,14 @@ const ConflictContent = memo(function ConflictContent({
 
   if (!segments) {
     return (
-      <div className="flex items-center justify-center py-4 text-tertiary text-sm">
-        No conflict markers found
+      <div className="flex flex-col items-center justify-center py-4 gap-3">
+        <span className="text-tertiary text-sm">All conflicts resolved</span>
+        <button
+          onClick={handleMarkResolved}
+          className="rounded-md px-3 py-1.5 text-xs font-medium text-white bg-green-600 hover:bg-green-700"
+        >
+          Mark as Resolved
+        </button>
       </div>
     );
   }
