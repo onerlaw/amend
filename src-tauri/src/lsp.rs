@@ -77,9 +77,7 @@ impl LspManager {
             .stdout
             .take()
             .ok_or_else(|| LspError::Spawn("Failed to capture stdout".to_string()))?;
-        let stderr = child
-            .stderr
-            .take();
+        let stderr = child.stderr.take();
 
         let session = LspSession { child, stdin };
         self.sessions.lock().insert(server_id.to_string(), session);
@@ -181,10 +179,9 @@ fn resolve_bundled_node(app_handle: &AppHandle) -> Result<String, LspError> {
 
     // Tauri resolves sidecar binaries by appending the target triple.
     // The sidecar is registered as "bin/node", so we look for it in the resource dir.
-    let node_path = resource_dir.join("bin").join(format!(
-        "node-{}",
-        current_target_triple()
-    ));
+    let node_path = resource_dir
+        .join("bin")
+        .join(format!("node-{}", current_target_triple()));
 
     if node_path.exists() {
         return Ok(node_path.to_string_lossy().to_string());
