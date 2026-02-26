@@ -1,7 +1,7 @@
-import { useCallback, useRef, useEffect, useState } from 'react';
+import { useCallback, useRef, useEffect, useState, useMemo } from 'react';
 import { TerminalPane } from './TerminalPane';
 import { DropZoneOverlay } from './DropZoneOverlay';
-import { TerminalTabLabel } from './TerminalTabs';
+import { TerminalTabLabel, groupTabsByProject, ProjectLabel } from './TerminalTabs';
 import { useTerminalLayoutStore } from '@/stores/terminalLayoutStore';
 import { useTerminalDragStore } from '@/stores/terminalDragStore';
 import { useTerminalStore } from '@/stores/terminalStore';
@@ -37,6 +37,12 @@ export function TerminalLeafPane({ leafId, terminalIds, activeTerminalId }: Term
   const isFocused = focusedPaneId === leafId;
   const multipleVisible = layout ? collectLeaves(layout).length > 1 : false;
   const showTabBar = multipleVisible || terminalIds.length > 1;
+
+  const paneTabs = useMemo(
+    () => terminalIds.map((id) => tabs.find((t) => t.id === id)).filter(Boolean) as typeof tabs,
+    [terminalIds, tabs]
+  );
+  const paneGroups = useMemo(() => groupTabsByProject(paneTabs), [paneTabs]);
 
   const handleMouseDown = useCallback(() => {
     if (!isFocused) {
@@ -114,31 +120,42 @@ export function TerminalLeafPane({ leafId, terminalIds, activeTerminalId }: Term
       onMouseDown={handleMouseDown}
     >
       {showTabBar && (
-        <div className="flex items-center bg-surface-1 px-1 gap-0.5 shrink-0 overflow-x-auto">
-          {terminalIds.map((tid) => {
-            const tab = tabs.find((t) => t.id === tid);
-            if (!tab) return null;
-            const isActive = tid === activeTerminalId;
-            return (
-              <button
-                key={tid}
-                onMouseDown={(e) => handleTabMouseDown(e, tid)}
-                onClick={() => handleTabClick(tid)}
-                className={`group flex items-center gap-1 px-1.5 py-0.5 text-[11px] shrink-0 ${
-                  isActive ? 'bg-terminal-bg text-primary' : 'text-secondary hover:bg-surface-2 opacity-50 hover:opacity-75'
-                } ${draggingTabId === tid ? 'opacity-50' : ''}`}
-              >
-                <TerminalTabLabel tab={tab} />
-                <span
-                  onMouseDown={(e) => e.stopPropagation()}
-                  onClick={(e) => handleCloseTab(e, tid)}
-                  className="ml-0.5 rounded-full p-0.5 opacity-0 hover:bg-surface-3 group-hover:opacity-100"
-                >
-                  <CloseIcon className="h-2.5 w-2.5" />
-                </span>
-              </button>
-            );
-          })}
+        <div className="flex items-center bg-surface-1 px-1 gap-0.5 shrink-0 overflow-x-auto items-end">
+          {paneGroups.map((group, groupIdx) => (
+            <div
+              key={group.projectName + (group.gitRoot ?? '~')}
+              className="flex items-end shrink-0"
+            >
+              {groupIdx > 0 && <div className="w-px h-5 bg-surface-3 shrink-0 mb-0.5" />}
+              <div className="flex flex-col">
+                {paneGroups.length > 1 && <ProjectLabel name={group.projectName} />}
+                <div className="flex gap-0.5">
+                  {group.tabs.map((tab) => {
+                    const isActive = tab.id === activeTerminalId;
+                    return (
+                      <button
+                        key={tab.id}
+                        onMouseDown={(e) => handleTabMouseDown(e, tab.id)}
+                        onClick={() => handleTabClick(tab.id)}
+                        className={`group flex items-center gap-1 px-1.5 py-0.5 text-[11px] shrink-0 ${
+                          isActive ? 'bg-terminal-bg text-primary' : 'text-secondary hover:bg-surface-2 opacity-50 hover:opacity-75'
+                        } ${draggingTabId === tab.id ? 'opacity-50' : ''}`}
+                      >
+                        <TerminalTabLabel tab={tab} />
+                        <span
+                          onMouseDown={(e) => e.stopPropagation()}
+                          onClick={(e) => handleCloseTab(e, tab.id)}
+                          className="ml-0.5 rounded-full p-0.5 opacity-0 hover:bg-surface-3 group-hover:opacity-100"
+                        >
+                          <CloseIcon className="h-2.5 w-2.5" />
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       )}
       {closingTabId && (

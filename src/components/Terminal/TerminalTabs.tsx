@@ -48,7 +48,7 @@ interface TabGroup {
   globalIndices: number[];
 }
 
-function groupTabsByProject(tabs: TerminalTab[]): TabGroup[] {
+export function groupTabsByProject(tabs: TerminalTab[]): TabGroup[] {
   const groups: TabGroup[] = [];
   const groupMap = new Map<string, TabGroup>();
 
@@ -77,7 +77,7 @@ function groupTabsByProject(tabs: TerminalTab[]): TabGroup[] {
   return groups;
 }
 
-function ProjectLabel({ name }: { name: string }) {
+export function ProjectLabel({ name }: { name: string }) {
   return (
     <div className="px-2 pb-0.5 text-[10px] text-tertiary font-medium select-none leading-none truncate">
       {name}
