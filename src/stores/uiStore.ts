@@ -31,6 +31,7 @@ interface UIState {
   toggleDiffFileList: () => void;
   toggleBrowseFileList: () => void;
   toggleBrowseExpandedDir: (path: string) => void;
+  clearBrowseExpandedDirs: () => void;
   toggleDiffTreePath: (path: string) => void;
   increaseFontSize: () => void;
   decreaseFontSize: () => void;
@@ -71,6 +72,7 @@ export const useUIStore = create<UIState>()(
         set((state) => ({
           browseExpandedDirs: toggleSetItem(state.browseExpandedDirs, path),
         })),
+      clearBrowseExpandedDirs: () => set({ browseExpandedDirs: new Set() }),
       toggleDiffTreePath: (path: string) =>
         set((state) => ({
           collapsedDiffTreePaths: toggleSetItem(state.collapsedDiffTreePaths, path),

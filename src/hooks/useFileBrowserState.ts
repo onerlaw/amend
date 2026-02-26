@@ -4,8 +4,6 @@ import {
   readDirectory,
   readFile,
   writeFile,
-  startWatchingDirectory,
-  stopWatchingDirectory,
   onFsChanged,
   FileEntry,
 } from '@/lib/tauri';
@@ -37,18 +35,23 @@ export function useFileBrowserState() {
   const recentSelfWrites = useRef<Map<string, number>>(new Map());
 
   const initialLoadDone = useRef(false);
+  const loadGenerationRef = useRef(0);
 
   const loadDirectory = useCallback(async () => {
     if (!contextPath) return;
+    const generation = ++loadGenerationRef.current;
     // Only show loading spinner on initial load, not on refreshes
     if (!initialLoadDone.current) {
       setIsLoading(true);
     }
     try {
       const contents = await readDirectory(contextPath);
+      // Discard results from stale generations
+      if (generation !== loadGenerationRef.current) return;
       setEntries(contents);
       initialLoadDone.current = true;
     } catch (err) {
+      if (generation !== loadGenerationRef.current) return;
       console.error('Failed to read directory:', err);
     }
     setIsLoading(false);
@@ -71,10 +74,6 @@ export function useFileBrowserState() {
 
   useEffect(() => {
     if (!contextPath) return;
-
-    startWatchingDirectory(contextPath).catch((err) => {
-      console.error('[FileWatcher] Failed to start watching:', err);
-    });
 
     let unlisten: (() => void) | undefined;
     onFsChanged(() => {
@@ -135,9 +134,6 @@ export function useFileBrowserState() {
     });
 
     return () => {
-      stopWatchingDirectory().catch((err) => {
-        console.error('[FileWatcher] Failed to stop watching:', err);
-      });
       unlisten?.();
       if (fsDebounceTimer.current) {
         clearTimeout(fsDebounceTimer.current);
@@ -240,7 +236,10 @@ export function useFileBrowserState() {
     handleSelectFile,
     handleCloseFile,
     handleContentChange,
-    handleRefresh: invalidateFileTree,
+    handleRefresh: useCallback(() => {
+      invalidateFileTree();
+      loadDirectory();
+    }, [invalidateFileTree, loadDirectory]),
     setBrowseActiveFile,
     getSaveStatus,
   };

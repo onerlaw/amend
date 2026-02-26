@@ -33,6 +33,7 @@ function flattenTree(entries: FileEntry[], expandedDirs: Set<string>, depth: num
 
 interface BrowseFileListProps {
   entries: FileEntry[];
+  contextPath: string | null;
   activeFilePath: string | null;
   openFilePaths: Set<string>;
   onSelectFile: (path: string) => void;
@@ -41,6 +42,7 @@ interface BrowseFileListProps {
 
 function BrowseFileList({
   entries,
+  contextPath,
   activeFilePath,
   openFilePaths,
   onSelectFile,
@@ -50,8 +52,16 @@ function BrowseFileList({
   const contextTargetPath = targetEntry?.path ?? null;
   const expandedDirs = useUIStore((s) => s.browseExpandedDirs);
   const toggleBrowseExpandedDir = useUIStore((s) => s.toggleBrowseExpandedDir);
+  const clearBrowseExpandedDirs = useUIStore((s) => s.clearBrowseExpandedDirs);
   const fileTreeVersion = useFileStore((s) => s.fileTreeVersion);
   const [cacheVersion, setCacheVersion] = useState(0);
+
+  // Clear stale cache and expanded dirs when context changes
+  useEffect(() => {
+    dirContentsCache.clear();
+    clearBrowseExpandedDirs();
+    setCacheVersion((v) => v + 1);
+  }, [contextPath, clearBrowseExpandedDirs]);
 
   const [selectedPaths, setSelectedPaths] = useState<Set<string>>(new Set());
   const lastClickedPathRef = useRef<string | null>(null);
@@ -348,6 +358,7 @@ export function BrowseFileListPanel() {
       ) : (
         <BrowseFileList
           entries={entries}
+          contextPath={contextPath}
           activeFilePath={browseActiveFilePath}
           openFilePaths={openFilePaths}
           onSelectFile={handleSelectFile}
