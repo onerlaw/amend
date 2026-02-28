@@ -2,8 +2,10 @@ import { useEffect, useRef } from 'react';
 import { EditorState, Extension } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
 import { OpenFile } from '@/stores/fileStore';
-import { createBaseExtensions, loadLanguageExtension } from '@/lib/codemirror';
+import { createBaseExtensions, createLargeFileExtensions, loadLanguageExtension } from '@/lib/codemirror';
 import { buildImageDataUrl } from '@/lib/fileUtils';
+
+const LARGE_FILE_DEBOUNCE_MS = 500;
 
 interface FileContentPanelProps {
   file: OpenFile;
@@ -44,16 +46,30 @@ export function FileContentPanel({
       viewRef.current = null;
     }
 
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+
     const updateListener = EditorView.updateListener.of((update) => {
       if (update.docChanged) {
-        const newContent = update.state.doc.toString();
-        onContentChangeRef.current(newContent);
+        if (file.isLargeFile) {
+          // Debounce doc.toString() for large files to avoid serializing
+          // multi-MB content on every keystroke
+          if (debounceTimer) clearTimeout(debounceTimer);
+          debounceTimer = setTimeout(() => {
+            onContentChangeRef.current(update.state.doc.toString());
+          }, LARGE_FILE_DEBOUNCE_MS);
+        } else {
+          onContentChangeRef.current(update.state.doc.toString());
+        }
       }
     });
 
+    const baseExtensions = file.isLargeFile
+      ? createLargeFileExtensions()
+      : createBaseExtensions(file.language);
+
     const state = EditorState.create({
       doc: file.content,
-      extensions: [...createBaseExtensions(file.language), updateListener, ...additionalExtensions],
+      extensions: [...baseExtensions, updateListener, ...additionalExtensions],
     });
 
     const view = new EditorView({
@@ -63,14 +79,18 @@ export function FileContentPanel({
 
     viewRef.current = view;
     onEditorViewRef.current?.(view);
-    loadLanguageExtension(view, file.language);
+
+    if (!file.isLargeFile) {
+      loadLanguageExtension(view, file.language);
+    }
 
     return () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
       view.destroy();
       onEditorViewRef.current?.(null);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- file.content is handled by the sync effect below; file.language changes with file.path
-  }, [file.path, file.isImage, additionalExtensions]);
+  }, [file.path, file.isImage, file.isLargeFile, additionalExtensions]);
 
   // Update content when file content changes externally (not from typing)
   useEffect(() => {

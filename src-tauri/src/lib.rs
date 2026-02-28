@@ -50,6 +50,7 @@ pub fn run() {
             filesystem::read_directories,
             filesystem::read_file,
             filesystem::read_file_base64,
+            filesystem::get_file_size,
             filesystem::write_file,
             filesystem::search_files,
             filesystem::rename_entry,

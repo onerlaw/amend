@@ -259,6 +259,15 @@ impl FileSystemManager {
         Ok(fs::read_to_string(&path)?)
     }
 
+    pub fn get_file_size(&self, path: &str) -> Result<u64, FileSystemError> {
+        let path = validate_path(path)?;
+        if !path.exists() {
+            return Err(FileSystemError::NotFound(path.display().to_string()));
+        }
+        let metadata = fs::metadata(&path)?;
+        Ok(metadata.len())
+    }
+
     pub fn read_file_base64(&self, path: &str) -> Result<String, FileSystemError> {
         let path = validate_path(path)?;
         if !path.exists() {
@@ -519,6 +528,17 @@ pub async fn read_file_base64(
 ) -> Result<String, FileSystemError> {
     let mgr = state.inner().clone();
     spawn_blocking(move || mgr.read_file_base64(&path))
+        .await
+        .map_err(|e| FileSystemError::TaskJoin(e.to_string()))?
+}
+
+#[tauri::command]
+pub async fn get_file_size(
+    state: tauri::State<'_, FileSystemManager>,
+    path: String,
+) -> Result<u64, FileSystemError> {
+    let mgr = state.inner().clone();
+    spawn_blocking(move || mgr.get_file_size(&path))
         .await
         .map_err(|e| FileSystemError::TaskJoin(e.to_string()))?
 }

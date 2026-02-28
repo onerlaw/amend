@@ -1,7 +1,13 @@
-import { readFile, readFileBase64 } from '@/lib/tauri';
+import { readFile, readFileBase64, getFileSize } from '@/lib/tauri';
+import { ask, message } from '@tauri-apps/plugin-dialog';
 import { basename } from '@/lib/pathUtils';
 import { getLanguageFromPath } from '@/lib/highlight';
 import { useFileStore, OpenFile } from '@/stores/fileStore';
+
+// Size thresholds for large file handling
+const LARGE_FILE_THRESHOLD = 1_000_000; // 1 MB — lightweight mode
+const WARN_FILE_THRESHOLD = 10_000_000; // 10 MB — confirmation dialog
+const MAX_FILE_THRESHOLD = 50_000_000; // 50 MB — refuse to open
 
 // Platform detection
 export const isMac = navigator.platform.toUpperCase().includes('MAC');
@@ -75,8 +81,23 @@ export function getFileIconColor(fileName: string, defaultColor = 'text-tertiary
 }
 
 /**
+ * Format a byte count into a human-readable string (e.g. "2.4 MB").
+ */
+export function formatFileSize(bytes: number): string {
+  if (bytes < 1000) return `${bytes} B`;
+  if (bytes < 1_000_000) return `${(bytes / 1_000).toFixed(1)} KB`;
+  if (bytes < 1_000_000_000) return `${(bytes / 1_000_000).toFixed(1)} MB`;
+  return `${(bytes / 1_000_000_000).toFixed(1)} GB`;
+}
+
+/**
  * Open a file in browse mode. If the file is already open, just activate it.
  * Otherwise, read the file content and open it as a new browse tab.
+ *
+ * Performs size checks before reading:
+ * - > 50 MB: refuse to open
+ * - > 10 MB: show confirmation dialog
+ * - > 1 MB: open in lightweight mode (no syntax highlighting, no LSP)
  */
 export async function openFileInBrowseMode(fullPath: string, displayName?: string): Promise<void> {
   const { browseOpenFiles, openBrowseFile, setBrowseActiveFile } = useFileStore.getState();
@@ -101,18 +122,46 @@ export async function openFileInBrowseMode(fullPath: string, displayName?: strin
       isImage: true,
     };
     openBrowseFile(newFile);
-  } else {
-    const content = await readFile(fullPath);
-    const language = getLanguageFromPath(fullPath) || '';
-    const newFile: OpenFile = {
-      path: fullPath,
-      name,
-      content,
-      isDirty: false,
-      language,
-    };
-    openBrowseFile(newFile);
+    return;
   }
+
+  // Check file size before reading content
+  let fileSize: number;
+  try {
+    fileSize = await getFileSize(fullPath);
+  } catch {
+    // If we can't get the size, proceed normally
+    fileSize = 0;
+  }
+
+  if (fileSize > MAX_FILE_THRESHOLD) {
+    await message(
+      `This file is ${formatFileSize(fileSize)}, which exceeds the 50 MB limit. It cannot be opened in the editor.`,
+      { title: 'File Too Large', kind: 'error' }
+    );
+    return;
+  }
+
+  if (fileSize > WARN_FILE_THRESHOLD) {
+    const confirmed = await ask(
+      `This file is ${formatFileSize(fileSize)}. Opening large files may affect performance.\n\nSyntax highlighting, code folding, and LSP features will be disabled.\n\nOpen anyway?`,
+      { title: 'Large File', kind: 'warning' }
+    );
+    if (!confirmed) return;
+  }
+
+  const isLargeFile = fileSize > LARGE_FILE_THRESHOLD;
+  const content = await readFile(fullPath);
+  const language = getLanguageFromPath(fullPath) || '';
+  const newFile: OpenFile = {
+    path: fullPath,
+    name,
+    content,
+    isDirty: false,
+    language,
+    isLargeFile,
+  };
+  openBrowseFile(newFile);
 }
 
 /**

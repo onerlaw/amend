@@ -24,6 +24,14 @@ export function EditorStatusBar({ file, contextPath, editorInfo }: EditorStatusB
   return (
     <div className="flex items-center justify-between px-2 py-0.5 bg-surface-2 text-tertiary text-xs border-t border-border select-text">
       <span className="truncate mr-4">{relativePath}</span>
+      {file.isLargeFile && (
+        <span
+          className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-yellow-500/20 text-yellow-400 mr-2 shrink-0"
+          title="Syntax highlighting, code folding, bracket matching, and LSP features are disabled for performance"
+        >
+          Large File Mode
+        </span>
+      )}
       {editorInfo && (
         <div className="flex items-center gap-3 shrink-0">
           <span>

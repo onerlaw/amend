@@ -584,6 +584,34 @@ export function createBaseExtensions(language: string | undefined): Extension[] 
   ];
 }
 
+/**
+ * Creates a lightweight set of CodeMirror extensions for large files.
+ * Strips syntax highlighting, language modes, fold gutter, bracket matching,
+ * close brackets, indent-on-input, indentation markers, and tooltips to keep
+ * the editor responsive on multi-MB documents.
+ */
+export function createLargeFileExtensions(): Extension[] {
+  return [
+    lineNumbers(),
+    history(),
+    search(),
+    highlightSelectionMatches(),
+    drawSelection(),
+    dropCursor(),
+
+    keymap.of([
+      { key: 'Tab', run: tabIndentIfMultiline },
+      { key: 'Shift-Tab', run: indentLess },
+    ]),
+    keymap.of([{ key: 'Mod-g', run: gotoLine }]),
+    keymap.of([{ key: 'Mod-/', run: toggleComment }]),
+    keymap.of([...defaultKeymap, ...historyKeymap, ...searchKeymap]),
+
+    darkTheme,
+    stickyGutters,
+  ];
+}
+
 // Returns a native CodeMirror language extension synchronously, or null for legacy modes.
 function getNativeLanguageExtension(language: string | undefined): Extension | null {
   if (!language) return null;

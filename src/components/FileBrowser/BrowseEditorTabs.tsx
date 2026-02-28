@@ -80,9 +80,9 @@ export const BrowseEditorTabs = forwardRef<BrowseEditorTabsHandle>(
       }
     }, [browseActiveFilePath, activeFile?.language]);
 
-    // Start/stop LSP client when file or context changes
+    // Start/stop LSP client when file or context changes (skip for large files)
     useEffect(() => {
-      if (!activeFile?.path || !contextPath) {
+      if (!activeFile?.path || !contextPath || activeFile.isLargeFile) {
         setLspClient(null);
         return;
       }
@@ -100,7 +100,7 @@ export const BrowseEditorTabs = forwardRef<BrowseEditorTabsHandle>(
         cancelled = true;
         releaseLspClient(ext, contextPath);
       };
-    }, [activeFile?.path, contextPath]);
+    }, [activeFile?.path, activeFile?.isLargeFile, contextPath]);
     const { getTabDragProps, containerRef, dropIndicatorIndex, dragFromIndex } = useDraggableTabs({
       itemCount: browseOpenFiles.length,
       onReorder: reorderBrowseFiles,
@@ -112,20 +112,10 @@ export const BrowseEditorTabs = forwardRef<BrowseEditorTabsHandle>(
 
       const currentFilePath = activeFile.path;
       const projectRoot = contextPath || '';
+      const isLarge = activeFile.isLargeFile;
 
       const extensions = [
-        goToDefinitionExtension({
-          currentFilePath,
-          projectRoot,
-          onNavigate: (file, line) => openBrowseFileAtLine(file, line),
-          onLocalNavigate: (line) => {
-            const view = editorViewRef.current;
-            if (view) scrollToLine(view, line);
-          },
-          onShowReferences: (symbolName) => showReferencesPanel(symbolName),
-        }),
-        symbolHoverTooltip({ currentFilePath }),
-        cmdHeldCursorExtension(),
+        // Cursor position listener (always active, for status bar line/col info)
         EditorView.updateListener.of((update) => {
           if (update.selectionSet || update.docChanged) {
             const state = update.state;
@@ -151,14 +141,32 @@ export const BrowseEditorTabs = forwardRef<BrowseEditorTabsHandle>(
         }),
       ];
 
-      // Wire in LSP diagnostics + hover when a server is available
-      if (lspClient) {
-        const fileUri = `file://${currentFilePath}`;
-        extensions.push(lspClient.client.plugin(fileUri, lspClient.languageId));
+      // Skip navigation and LSP extensions for large files
+      if (!isLarge) {
+        extensions.push(
+          goToDefinitionExtension({
+            currentFilePath,
+            projectRoot,
+            onNavigate: (file, line) => openBrowseFileAtLine(file, line),
+            onLocalNavigate: (line) => {
+              const view = editorViewRef.current;
+              if (view) scrollToLine(view, line);
+            },
+            onShowReferences: (symbolName) => showReferencesPanel(symbolName),
+          }),
+          symbolHoverTooltip({ currentFilePath }),
+          cmdHeldCursorExtension()
+        );
+
+        // Wire in LSP diagnostics + hover when a server is available
+        if (lspClient) {
+          const fileUri = `file://${currentFilePath}`;
+          extensions.push(lspClient.client.plugin(fileUri, lspClient.languageId));
+        }
       }
 
       return extensions;
-    }, [activeFile?.path, openBrowseFileAtLine, contextPath, showReferencesPanel, lspClient]);
+    }, [activeFile?.path, activeFile?.isLargeFile, openBrowseFileAtLine, contextPath, showReferencesPanel, lspClient]);
 
     // Consume pending scroll-to-line state
     useEffect(() => {

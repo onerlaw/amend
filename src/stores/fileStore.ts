@@ -8,6 +8,7 @@ export interface OpenFile {
   isDirty: boolean;
   language: string;
   isImage?: boolean;
+  isLargeFile?: boolean;
   /** Timestamp of the last in-memory edit (Date.now()) */
   lastLocalEditAt?: number;
   /** Timestamp when we last initiated a save to disk */

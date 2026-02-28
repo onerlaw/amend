@@ -82,6 +82,10 @@ export async function readFileBase64(path: string): Promise<string> {
   return invoke('read_file_base64', { path });
 }
 
+export async function getFileSize(path: string): Promise<number> {
+  return invoke('get_file_size', { path });
+}
+
 export async function writeFile(path: string, contents: string): Promise<void> {
   return invoke('write_file', { path, contents });
 }
