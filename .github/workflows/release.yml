@@ -239,8 +239,8 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
-      - name: Download LSP dependencies (Unix)
-        if: matrix.platform != 'windows-latest'
+      - name: Download cross-target Node.js sidecar
+        if: matrix.platform == 'macos-latest'
         run: bash scripts/download-lsp-deps.sh ${{ matrix.node_triple }}
 
       - name: Download LSP dependencies (Windows)

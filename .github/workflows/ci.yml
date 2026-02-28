@@ -90,9 +90,6 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
-      - name: Download LSP dependencies
-        run: bash scripts/download-lsp-deps.sh
-
       - name: Build the app
         uses: tauri-apps/tauri-action@v0
         env:
