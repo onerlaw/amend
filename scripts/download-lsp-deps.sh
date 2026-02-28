@@ -43,11 +43,13 @@ node_platform() {
     aarch64-apple-darwin)   echo "darwin-arm64" ;;
     x86_64-unknown-linux-gnu)  echo "linux-x64" ;;
     aarch64-unknown-linux-gnu) echo "linux-arm64" ;;
+    x86_64-pc-windows-msvc) echo "win-x64" ;;
     *) echo "Unsupported target for Node.js: $target" >&2; exit 1 ;;
   esac
 }
 
-TARGET="$(detect_target)"
+# Accept optional target triple as first argument (for cross-compilation in CI)
+TARGET="${1:-$(detect_target)}"
 NODE_PLAT="$(node_platform "$TARGET")"
 
 echo "==> Target: $TARGET"

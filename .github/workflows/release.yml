@@ -192,15 +192,23 @@ jobs:
           - platform: 'macos-latest'
             args: '--target aarch64-apple-darwin'
             name: 'macOS (Apple Silicon)'
+            node_arch: 'darwin-arm64'
+            node_triple: 'aarch64-apple-darwin'
           - platform: 'macos-latest'
             args: '--target x86_64-apple-darwin'
             name: 'macOS (Intel)'
+            node_arch: 'darwin-x64'
+            node_triple: 'x86_64-apple-darwin'
           - platform: 'ubuntu-22.04'
             args: ''
             name: 'Linux'
+            node_arch: 'linux-x64'
+            node_triple: 'x86_64-unknown-linux-gnu'
           - platform: 'windows-latest'
             args: ''
             name: 'Windows'
+            node_arch: 'win-x64'
+            node_triple: 'x86_64-pc-windows-msvc'
 
     runs-on: ${{ matrix.platform }}
     name: Build - ${{ matrix.name }}
@@ -230,6 +238,22 @@ jobs:
 
       - name: Install frontend dependencies
         run: npm ci
+
+      - name: Download LSP dependencies (Unix)
+        if: matrix.platform != 'windows-latest'
+        run: bash scripts/download-lsp-deps.sh ${{ matrix.node_triple }}
+
+      - name: Download LSP dependencies (Windows)
+        if: matrix.platform == 'windows-latest'
+        shell: pwsh
+        run: |
+          $NODE_VERSION = "v22.14.0"
+          New-Item -ItemType Directory -Force -Path src-tauri/bin | Out-Null
+          Invoke-WebRequest -Uri "https://nodejs.org/dist/$NODE_VERSION/node-$NODE_VERSION-${{ matrix.node_arch }}.zip" -OutFile node.zip
+          Expand-Archive node.zip -DestinationPath node-extract
+          Copy-Item "node-extract/node-$NODE_VERSION-${{ matrix.node_arch }}/node.exe" "src-tauri/bin/node-${{ matrix.node_triple }}.exe"
+          New-Item -ItemType Directory -Force -Path src-tauri/resources/lsp-servers/typescript | Out-Null
+          npm install --prefix src-tauri/resources/lsp-servers/typescript typescript-language-server typescript --save
 
       - name: Generate macOS icon with proper padding
         if: matrix.platform == 'macos-latest'
