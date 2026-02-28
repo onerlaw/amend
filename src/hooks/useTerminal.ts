@@ -3,6 +3,7 @@ import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebglAddon } from '@xterm/addon-webgl';
 import { WebLinksAddon } from '@xterm/addon-web-links';
+import { SearchAddon } from '@xterm/addon-search';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import {
   writeToTerminal,
@@ -75,6 +76,7 @@ function getTerminalTheme(isDark: boolean) {
 interface TerminalEntry {
   terminal: Terminal;
   fitAddon: FitAddon;
+  searchAddon: SearchAddon;
   decoder: TextDecoder;
   unlisteners: (() => void)[];
 }
@@ -90,6 +92,11 @@ export function destroyTerminalInstance(id: string) {
   }
   entry.terminal.dispose();
   terminalRegistry.delete(id);
+}
+
+/** Get the SearchAddon for a terminal instance. */
+export function getSearchAddon(id: string): SearchAddon | null {
+  return terminalRegistry.get(id)?.searchAddon ?? null;
 }
 
 export function useTerminal(containerId: string | null) {
@@ -208,6 +215,9 @@ export function useTerminal(containerId: string | null) {
       const fitAddon = new FitAddon();
       terminal.loadAddon(fitAddon);
 
+      const searchAddon = new SearchAddon();
+      terminal.loadAddon(searchAddon);
+
       terminal.open(container);
 
       // Try to load WebGL addon with proper error handling
@@ -238,10 +248,13 @@ export function useTerminal(containerId: string | null) {
       terminalRef.current = terminal;
       fitAddonRef.current = fitAddon;
 
-      // Handle Cmd/Ctrl+K to clear terminal
+      // Handle Cmd/Ctrl+K to clear terminal; let Cmd/Ctrl+F bubble for search
       terminal.attachCustomKeyEventHandler((e) => {
         if ((e.metaKey || e.ctrlKey) && e.key === 'k' && e.type === 'keydown') {
           terminal.clear();
+          return false;
+        }
+        if ((e.metaKey || e.ctrlKey) && e.key === 'f' && e.type === 'keydown') {
           return false;
         }
         return true;
@@ -301,6 +314,7 @@ export function useTerminal(containerId: string | null) {
       terminalRegistry.set(containerId, {
         terminal,
         fitAddon,
+        searchAddon,
         decoder,
         unlisteners: [
           unlistenOutput,

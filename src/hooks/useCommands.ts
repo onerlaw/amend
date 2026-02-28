@@ -130,9 +130,18 @@ export function useCommands({ terminalTabsRef, browseEditorTabsRef }: CommandRef
           return;
         }
 
-        // Cmd/Ctrl + F (without Shift): Find in file (browse mode)
+        // Cmd/Ctrl + F (without Shift): Find in file (browse mode) or terminal search
         case 'f': {
-          if (!e.shiftKey && panelMode === 'browse' && browseActiveFilePath) {
+          if (e.shiftKey) return;
+          const { focusedPanel } = useUIStore.getState();
+          if (focusedPanel === 'terminal') {
+            e.preventDefault();
+            const { focusedPaneId, searchingPaneId, setSearchingPaneId } =
+              useTerminalLayoutStore.getState();
+            if (focusedPaneId) {
+              setSearchingPaneId(searchingPaneId === focusedPaneId ? null : focusedPaneId);
+            }
+          } else if (panelMode === 'browse' && browseActiveFilePath) {
             e.preventDefault();
             browseEditorTabsRef.current?.openSearch();
           }

@@ -10,6 +10,8 @@ import { collectLeaves } from '@/lib/layoutTree';
 import { CloseIcon } from '@/components/Icons';
 import { isTerminalBusy } from '@/lib/tauri';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { TerminalSearchBar } from './TerminalSearchBar';
+import { getSearchAddon } from '@/hooks/useTerminal';
 
 const DRAG_THRESHOLD = 5;
 
@@ -21,6 +23,8 @@ interface TerminalLeafPaneProps {
 
 export function TerminalLeafPane({ leafId, terminalIds, activeTerminalId }: TerminalLeafPaneProps) {
   const focusedPaneId = useTerminalLayoutStore((s) => s.focusedPaneId);
+  const searchingPaneId = useTerminalLayoutStore((s) => s.searchingPaneId);
+  const setSearchingPaneId = useTerminalLayoutStore((s) => s.setSearchingPaneId);
   const layout = useTerminalLayoutStore((s) => s.layout);
   const setFocusedPane = useTerminalLayoutStore((s) => s.setFocusedPane);
   const setActiveTerminalInPane = useTerminalLayoutStore((s) => s.setActiveTerminalInPane);
@@ -35,8 +39,14 @@ export function TerminalLeafPane({ leafId, terminalIds, activeTerminalId }: Term
   const [draggingTabId, setDraggingTabId] = useState<string | null>(null);
 
   const isFocused = focusedPaneId === leafId;
+  const isSearching = searchingPaneId === leafId;
   const multipleVisible = layout ? collectLeaves(layout).length > 1 : false;
   const showTabBar = multipleVisible || terminalIds.length > 1;
+
+  const handleSearchClose = useCallback(() => {
+    setSearchingPaneId(null);
+    getSearchAddon(activeTerminalId)?.clearDecorations();
+  }, [setSearchingPaneId, activeTerminalId]);
 
   const paneTabs = useMemo(
     () => terminalIds.map((id) => tabs.find((t) => t.id === id)).filter(Boolean) as typeof tabs,
@@ -186,6 +196,9 @@ export function TerminalLeafPane({ leafId, terminalIds, activeTerminalId }: Term
         />
       )}
       <div className="flex-1 overflow-hidden relative">
+        {isSearching && (
+          <TerminalSearchBar terminalId={activeTerminalId} onClose={handleSearchClose} />
+        )}
         <TerminalPane key={activeTerminalId} id={activeTerminalId} isActive={true} />
         {terminalIds
           .filter((id) => id !== activeTerminalId)

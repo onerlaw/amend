@@ -15,6 +15,7 @@ import { useTerminalStore } from '@/stores/terminalStore';
 interface TerminalLayoutState {
   layout: LayoutNode | null;
   focusedPaneId: string | null;
+  searchingPaneId: string | null;
 
   initLayout: (terminalId: string) => void;
   setLayout: (layout: LayoutNode | null) => void;
@@ -41,11 +42,13 @@ interface TerminalLayoutState {
     side: 'first' | 'second',
     terminalId: string
   ) => void;
+  setSearchingPaneId: (id: string | null) => void;
 }
 
 export const useTerminalLayoutStore = create<TerminalLayoutState>((set, get) => ({
   layout: null,
   focusedPaneId: null,
+  searchingPaneId: null,
 
   initLayout: (terminalId: string) => {
     const leaf = makeLeaf(terminalId);
@@ -286,6 +289,8 @@ export const useTerminalLayoutStore = create<TerminalLayoutState>((set, get) => 
     set({ layout: newLayout, focusedPaneId: newLeaf.id });
     useTerminalStore.getState().setActiveTab(terminalId);
   },
+
+  setSearchingPaneId: (id: string | null) => set({ searchingPaneId: id }),
 
   ensureTerminalInLayout: (terminalId: string) => {
     const { layout } = get();
