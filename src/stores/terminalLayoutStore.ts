@@ -209,7 +209,12 @@ export const useTerminalLayoutStore = create<TerminalLayoutState>((set, get) => 
     const sourceLeaf = findLeafByTerminalId(layout, terminalId);
 
     // Guard: self-split of a single-terminal pane is a no-op
-    if (sourceLeaf && sourceLeaf.id === targetLeafId && sourceLeaf.type === 'leaf' && sourceLeaf.terminalIds.length === 1) {
+    if (
+      sourceLeaf &&
+      sourceLeaf.id === targetLeafId &&
+      sourceLeaf.type === 'leaf' &&
+      sourceLeaf.terminalIds.length === 1
+    ) {
       return;
     }
 

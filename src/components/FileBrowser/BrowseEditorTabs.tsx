@@ -166,7 +166,14 @@ export const BrowseEditorTabs = forwardRef<BrowseEditorTabsHandle>(
       }
 
       return extensions;
-    }, [activeFile?.path, activeFile?.isLargeFile, openBrowseFileAtLine, contextPath, showReferencesPanel, lspClient]);
+    }, [
+      activeFile?.path,
+      activeFile?.isLargeFile,
+      openBrowseFileAtLine,
+      contextPath,
+      showReferencesPanel,
+      lspClient,
+    ]);
 
     // Consume pending scroll-to-line state
     useEffect(() => {

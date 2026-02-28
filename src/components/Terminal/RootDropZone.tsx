@@ -79,8 +79,7 @@ export function RootDropZone({ children }: RootDropZoneProps) {
 
       const direction: 'horizontal' | 'vertical' =
         edge === 'left' || edge === 'right' ? 'horizontal' : 'vertical';
-      const side: 'first' | 'second' =
-        edge === 'left' || edge === 'top' ? 'first' : 'second';
+      const side: 'first' | 'second' = edge === 'left' || edge === 'top' ? 'first' : 'second';
 
       splitAtRoot(direction, side, draggedTerminalId);
       endDrag();

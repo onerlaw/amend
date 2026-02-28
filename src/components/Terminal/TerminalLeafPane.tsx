@@ -1,7 +1,12 @@
 import { useCallback, useRef, useEffect, useState, useMemo } from 'react';
 import { TerminalPane } from './TerminalPane';
 import { DropZoneOverlay } from './DropZoneOverlay';
-import { TerminalTabLabel, groupTabsByProject, ProjectLabel, WorktreeSubLabel } from './TerminalTabs';
+import {
+  TerminalTabLabel,
+  groupTabsByProject,
+  ProjectLabel,
+  WorktreeSubLabel,
+} from './TerminalTabs';
 import { useTerminalLayoutStore } from '@/stores/terminalLayoutStore';
 import { useTerminalDragStore } from '@/stores/terminalDragStore';
 import { useTerminalStore } from '@/stores/terminalStore';
@@ -158,7 +163,9 @@ export function TerminalLeafPane({ leafId, terminalIds, activeTerminalId }: Term
                                 onMouseDown={(e) => handleTabMouseDown(e, tab.id)}
                                 onClick={() => handleTabClick(tab.id)}
                                 className={`group flex items-center gap-1 px-1.5 py-0.5 text-[11px] shrink-0 ${
-                                  isActive ? 'bg-terminal-bg text-primary' : 'text-secondary hover:bg-surface-2 opacity-50 hover:opacity-75'
+                                  isActive
+                                    ? 'bg-terminal-bg text-primary'
+                                    : 'text-secondary hover:bg-surface-2 opacity-50 hover:opacity-75'
                                 } ${draggingTabId === tab.id ? 'opacity-50' : ''}`}
                               >
                                 <TerminalTabLabel tab={tab} />

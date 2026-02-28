@@ -22,7 +22,12 @@ export const useTerminalDragStore = create<TerminalDragState>((set) => ({
   },
 
   endDrag: () => {
-    set({ isDragging: false, draggedTerminalId: null, dragSourceLeafId: null, rootDropActive: false });
+    set({
+      isDragging: false,
+      draggedTerminalId: null,
+      dragSourceLeafId: null,
+      rootDropActive: false,
+    });
   },
 
   setRootDropActive: (active) => {

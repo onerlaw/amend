@@ -2,7 +2,11 @@ import { useEffect, useRef } from 'react';
 import { EditorState, Extension } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
 import { OpenFile } from '@/stores/fileStore';
-import { createBaseExtensions, createLargeFileExtensions, loadLanguageExtension } from '@/lib/codemirror';
+import {
+  createBaseExtensions,
+  createLargeFileExtensions,
+  loadLanguageExtension,
+} from '@/lib/codemirror';
 import { buildImageDataUrl } from '@/lib/fileUtils';
 
 const LARGE_FILE_DEBOUNCE_MS = 500;
