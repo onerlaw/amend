@@ -19,7 +19,7 @@ interface ContextMenuState {
   renameTarget: FileEntry | null;
   deleteTarget: FileEntry | null;
   newEntryTarget: NewEntryTarget | null;
-  openMenu: (entry: FileEntry, x: number, y: number) => void;
+  openMenu: (entry: FileEntry | null, x: number, y: number) => void;
   closeMenu: () => void;
   setCutEntry: (entry: FileEntry) => void;
   setCopyEntry: (entry: FileEntry) => void;

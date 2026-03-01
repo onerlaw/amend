@@ -171,12 +171,13 @@ function BrowseFileList({
     [entries, expandedDirs, cacheVersion]
   );
 
-  const { getDragProps, wasDragRef, ghost } = useFileBrowserDrag({
+  const { getDragProps, wasDragRef, isRootDropTarget, ghost } = useFileBrowserDrag({
     flatRows,
     expandedDirs,
     onExpand: toggleDir,
     selectedPaths,
     onClearSelection: () => setSelectedPaths(new Set()),
+    contextPath,
   });
 
   if (isLoading) {
@@ -185,123 +186,143 @@ function BrowseFileList({
 
   if (entries.length === 0) {
     return (
-      <div className="flex items-center justify-center h-full text-tertiary text-sm">No files</div>
+      <div
+        className={`flex items-center justify-center h-full text-tertiary text-sm ${isRootDropTarget ? 'ring-1 ring-inset ring-accent bg-accent/5' : ''}`}
+        data-file-list-root
+        data-drag-path={contextPath ?? undefined}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          openMenu(null, e.clientX, e.clientY);
+        }}
+      >
+        No files
+      </div>
     );
   }
 
   return (
     <>
-      <Virtuoso
-        className="h-full"
-        data={flatRows}
-        overscan={200}
-        itemContent={(_index, { entry, depth }) => {
-          const isExpanded = expandedDirs.has(entry.path);
-          const isOpen = openFilePaths.has(entry.path);
-          const isActive = activeFilePath === entry.path;
-          const isContextTarget = contextMenuOpen && contextTargetPath === entry.path;
-          const { onMouseDown, isDragging: rowIsDragging, isDropTarget } = getDragProps(entry);
+      <div
+        className={`h-full ${isRootDropTarget ? 'ring-1 ring-inset ring-accent bg-accent/5' : ''}`}
+        data-file-list-root
+        data-drag-path={contextPath ?? undefined}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          openMenu(null, e.clientX, e.clientY);
+        }}
+      >
+        <Virtuoso
+          className="h-full"
+          data={flatRows}
+          overscan={200}
+          itemContent={(_index, { entry, depth }) => {
+            const isExpanded = expandedDirs.has(entry.path);
+            const isOpen = openFilePaths.has(entry.path);
+            const isActive = activeFilePath === entry.path;
+            const isContextTarget = contextMenuOpen && contextTargetPath === entry.path;
+            const { onMouseDown, isDragging: rowIsDragging, isDropTarget } = getDragProps(entry);
 
-          if (renamingPath === entry.path) {
+            if (renamingPath === entry.path) {
+              return (
+                <div
+                  className={`flex w-full select-none items-center gap-1 py-0.5 text-sm bg-surface-3 pr-2 ${entry.isGitignored ? 'opacity-50' : ''}`}
+                  style={{ paddingLeft: `${depth * 12 + 8}px` }}
+                >
+                  {entry.isDirectory ? (
+                    <DirectoryIndicator isExpanded={expandedDirs.has(entry.path)} />
+                  ) : (
+                    <>
+                      <span className="w-3" />
+                      <FileIcon className={`h-4 w-4 ${getFileIconColor(entry.name)}`} />
+                    </>
+                  )}
+                  <input
+                    ref={renameInputRef}
+                    type="text"
+                    value={renamingName}
+                    onChange={(e) => setRenamingName(e.target.value)}
+                    onKeyDown={handleRenameKeyDown}
+                    onBlur={submitRename}
+                    className="flex-1 min-w-0 bg-surface-1 border border-accent rounded px-1 text-sm text-primary outline-none"
+                  />
+                </div>
+              );
+            }
+
             return (
-              <div
-                className={`flex w-full select-none items-center gap-1 py-0.5 text-sm bg-surface-3 pr-2 ${entry.isGitignored ? 'opacity-50' : ''}`}
-                style={{ paddingLeft: `${depth * 12 + 8}px` }}
+              <TreeRow
+                depth={depth}
+                isSelected={isActive || isContextTarget || selectedPaths.has(entry.path)}
+                isSubtle={isOpen && !isActive && !isContextTarget}
+                isDragging={rowIsDragging}
+                isDropTarget={isDropTarget}
+                dragPath={entry.path}
+                className={`pr-2 text-left ${entry.isGitignored ? 'opacity-50' : ''}`}
+                onMouseDown={onMouseDown}
+                onClick={(e) => {
+                  if (wasDragRef.current) return;
+
+                  if (e.detail === 2) {
+                    startRename(entry);
+                    return;
+                  }
+
+                  if (e.shiftKey && lastClickedPathRef.current) {
+                    const lastIdx = flatRows.findIndex(
+                      (r) => r.entry.path === lastClickedPathRef.current
+                    );
+                    const currIdx = flatRows.findIndex((r) => r.entry.path === entry.path);
+                    if (lastIdx !== -1) {
+                      const [start, end] =
+                        lastIdx <= currIdx ? [lastIdx, currIdx] : [currIdx, lastIdx];
+                      const next = new Set(selectedPaths);
+                      for (let i = start; i <= end; i++) next.add(flatRows[i].entry.path);
+                      setSelectedPaths(next);
+                    }
+                    return;
+                  }
+
+                  if (e.metaKey || e.ctrlKey) {
+                    const next = new Set(selectedPaths);
+                    if (next.has(entry.path)) {
+                      next.delete(entry.path);
+                    } else {
+                      next.add(entry.path);
+                    }
+                    setSelectedPaths(next);
+                    lastClickedPathRef.current = entry.path;
+                    return;
+                  }
+
+                  // Regular click
+                  if (entry.isDirectory) {
+                    toggleDir(entry.path);
+                    return;
+                  }
+                  setSelectedPaths(new Set([entry.path]));
+                  lastClickedPathRef.current = entry.path;
+                  onSelectFile(entry.path);
+                }}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  openMenu(entry, e.clientX, e.clientY);
+                }}
               >
                 {entry.isDirectory ? (
-                  <DirectoryIndicator isExpanded={expandedDirs.has(entry.path)} />
+                  <DirectoryIndicator isExpanded={isExpanded} />
                 ) : (
                   <>
                     <span className="w-3" />
                     <FileIcon className={`h-4 w-4 ${getFileIconColor(entry.name)}`} />
                   </>
                 )}
-                <input
-                  ref={renameInputRef}
-                  type="text"
-                  value={renamingName}
-                  onChange={(e) => setRenamingName(e.target.value)}
-                  onKeyDown={handleRenameKeyDown}
-                  onBlur={submitRename}
-                  className="flex-1 min-w-0 bg-surface-1 border border-accent rounded px-1 text-sm text-primary outline-none"
-                />
-              </div>
+                <span className="truncate text-primary">{entry.name}</span>
+              </TreeRow>
             );
-          }
-
-          return (
-            <TreeRow
-              depth={depth}
-              isSelected={isActive || isContextTarget || selectedPaths.has(entry.path)}
-              isSubtle={isOpen && !isActive && !isContextTarget}
-              isDragging={rowIsDragging}
-              isDropTarget={isDropTarget}
-              dragPath={entry.path}
-              className={`pr-2 text-left ${entry.isGitignored ? 'opacity-50' : ''}`}
-              onMouseDown={onMouseDown}
-              onClick={(e) => {
-                if (wasDragRef.current) return;
-
-                if (e.detail === 2) {
-                  startRename(entry);
-                  return;
-                }
-
-                if (e.shiftKey && lastClickedPathRef.current) {
-                  const lastIdx = flatRows.findIndex(
-                    (r) => r.entry.path === lastClickedPathRef.current
-                  );
-                  const currIdx = flatRows.findIndex((r) => r.entry.path === entry.path);
-                  if (lastIdx !== -1) {
-                    const [start, end] =
-                      lastIdx <= currIdx ? [lastIdx, currIdx] : [currIdx, lastIdx];
-                    const next = new Set(selectedPaths);
-                    for (let i = start; i <= end; i++) next.add(flatRows[i].entry.path);
-                    setSelectedPaths(next);
-                  }
-                  return;
-                }
-
-                if (e.metaKey || e.ctrlKey) {
-                  const next = new Set(selectedPaths);
-                  if (next.has(entry.path)) {
-                    next.delete(entry.path);
-                  } else {
-                    next.add(entry.path);
-                  }
-                  setSelectedPaths(next);
-                  lastClickedPathRef.current = entry.path;
-                  return;
-                }
-
-                // Regular click
-                if (entry.isDirectory) {
-                  toggleDir(entry.path);
-                  return;
-                }
-                setSelectedPaths(new Set([entry.path]));
-                lastClickedPathRef.current = entry.path;
-                onSelectFile(entry.path);
-              }}
-              onContextMenu={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                openMenu(entry, e.clientX, e.clientY);
-              }}
-            >
-              {entry.isDirectory ? (
-                <DirectoryIndicator isExpanded={isExpanded} />
-              ) : (
-                <>
-                  <span className="w-3" />
-                  <FileIcon className={`h-4 w-4 ${getFileIconColor(entry.name)}`} />
-                </>
-              )}
-              <span className="truncate text-primary">{entry.name}</span>
-            </TreeRow>
-          );
-        }}
-      />
+          }}
+        />
+      </div>
       {ghost &&
         createPortal(
           <div

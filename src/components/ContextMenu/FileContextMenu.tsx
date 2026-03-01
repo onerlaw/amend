@@ -249,9 +249,14 @@ export function FileContextMenu() {
   }, [targetEntry, setCopyEntry]);
 
   const handlePaste = useCallback(async () => {
-    if (!targetEntry || !clipboard.entry || !clipboard.operation) return;
+    if (!clipboard.entry || !clipboard.operation) return;
 
-    const destDir = targetEntry.isDirectory ? targetEntry.path : dirname(targetEntry.path);
+    const destDir = targetEntry
+      ? targetEntry.isDirectory
+        ? targetEntry.path
+        : dirname(targetEntry.path)
+      : contextPath;
+    if (!destDir) return;
     const destPath = join(destDir, clipboard.entry.name);
 
     try {
@@ -265,7 +270,7 @@ export function FileContextMenu() {
     } catch (error) {
       console.error('Failed to paste:', error);
     }
-  }, [targetEntry, clipboard, clearClipboard]);
+  }, [targetEntry, contextPath, clipboard, clearClipboard]);
 
   const handleCopyRelativePath = useCallback(async () => {
     if (!targetEntry || !contextPath) return;
@@ -302,19 +307,40 @@ export function FileContextMenu() {
   }, [targetEntry]);
 
   const handleNewFile = useCallback(() => {
-    if (!targetEntry) return;
-    const dirPath = targetEntry.isDirectory ? targetEntry.path : dirname(targetEntry.path);
+    const dirPath = targetEntry
+      ? targetEntry.isDirectory
+        ? targetEntry.path
+        : dirname(targetEntry.path)
+      : contextPath;
+    if (!dirPath) return;
     openNewEntryDialog(dirPath, 'file');
-  }, [targetEntry, openNewEntryDialog]);
+  }, [targetEntry, contextPath, openNewEntryDialog]);
 
   const handleNewFolder = useCallback(() => {
-    if (!targetEntry) return;
-    const dirPath = targetEntry.isDirectory ? targetEntry.path : dirname(targetEntry.path);
+    const dirPath = targetEntry
+      ? targetEntry.isDirectory
+        ? targetEntry.path
+        : dirname(targetEntry.path)
+      : contextPath;
+    if (!dirPath) return;
     openNewEntryDialog(dirPath, 'folder');
-  }, [targetEntry, openNewEntryDialog]);
+  }, [targetEntry, contextPath, openNewEntryDialog]);
 
   const items: ContextMenuItem[] = useMemo(() => {
-    if (!targetEntry) return [];
+    // Root-level menu (right-click on empty space)
+    if (!targetEntry) {
+      const menuItems: ContextMenuItem[] = [
+        { label: 'New File', onClick: handleNewFile },
+        { label: 'New Folder', onClick: handleNewFolder },
+      ];
+      if (clipboard.entry && clipboard.operation) {
+        menuItems.push(
+          { label: '', onClick: () => {}, separator: true },
+          { label: 'Paste', onClick: handlePaste }
+        );
+      }
+      return menuItems;
+    }
 
     const menuItems: ContextMenuItem[] = [
       { label: 'New File', onClick: handleNewFile },

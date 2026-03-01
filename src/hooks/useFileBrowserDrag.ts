@@ -14,6 +14,7 @@ interface UseFileBrowserDragOptions {
   onExpand: (path: string) => void;
   selectedPaths: Set<string>;
   onClearSelection: () => void;
+  contextPath: string | null;
 }
 
 function filterTopLevelPaths(paths: string[]): string[] {
@@ -26,14 +27,17 @@ export function useFileBrowserDrag({
   onExpand,
   selectedPaths,
   onClearSelection,
+  contextPath,
 }: UseFileBrowserDragOptions) {
   // Refs — never cause re-renders (same pattern as useDraggableTabs)
   const flatRowsRef = useRef(flatRows);
   const expandedDirsRef = useRef(expandedDirs);
   const onExpandRef = useRef(onExpand);
+  const contextPathRef = useRef(contextPath);
   flatRowsRef.current = flatRows;
   expandedDirsRef.current = expandedDirs;
   onExpandRef.current = onExpand;
+  contextPathRef.current = contextPath;
 
   const selectedPathsRef = useRef(selectedPaths);
   selectedPathsRef.current = selectedPaths;
@@ -52,6 +56,7 @@ export function useFileBrowserDrag({
   const [dragPath, setDragPath] = useState<string | null>(null);
   const [dropTargetPath, setDropTargetPath] = useState<string | null>(null);
   const [ghostPos, setGhostPos] = useState<{ x: number; y: number } | null>(null);
+  const [isRootDropTarget, setIsRootDropTarget] = useState(false);
 
   useEffect(() => {
     function isValidDrop(src: string, destDir: string): boolean {
@@ -73,16 +78,37 @@ export function useFileBrowserDrag({
       setDragPath(null);
       setDropTargetPath(null);
       setGhostPos(null);
+      setIsRootDropTarget(false);
     }
 
-    function getDirectoryAtPoint(clientX: number, clientY: number): FileEntry | null {
+    function getDirectoryAtPoint(
+      clientX: number,
+      clientY: number
+    ): { path: string; isRoot: boolean } | null {
       const el = document.elementFromPoint(clientX, clientY);
+      // Check for a directory row first
       const rowEl = el?.closest('[data-drag-path]') as HTMLElement | null;
-      if (!rowEl) return null;
-      const path = rowEl.dataset.dragPath;
-      if (!path) return null;
-      const row = flatRowsRef.current.find((r) => r.entry.path === path);
-      return row?.entry?.isDirectory ? row.entry : null;
+      if (rowEl) {
+        const path = rowEl.dataset.dragPath;
+        if (path) {
+          // If it's the root container, return it as root
+          if (rowEl.hasAttribute('data-file-list-root')) {
+            return { path, isRoot: true };
+          }
+          const row = flatRowsRef.current.find((r) => r.entry.path === path);
+          if (row?.entry?.isDirectory) {
+            return { path: row.entry.path, isRoot: false };
+          }
+        }
+        return null;
+      }
+      // Check if we're over the root container
+      const rootEl = el?.closest('[data-file-list-root]') as HTMLElement | null;
+      if (rootEl) {
+        const path = rootEl.dataset.dragPath;
+        if (path) return { path, isRoot: true };
+      }
+      return null;
     }
 
     function handleMouseMove(e: MouseEvent) {
@@ -110,12 +136,14 @@ export function useFileBrowserDrag({
         }
         dropTargetPathRef.current = newTargetPath;
         setDropTargetPath(newTargetPath);
+        setIsRootDropTarget(hoveredDir?.isRoot ?? false);
 
-        if (hoveredDir && !expandedDirsRef.current.has(hoveredDir.path)) {
-          const dirToExpand = hoveredDir;
+        // Only auto-expand actual directory rows, not the root container
+        if (hoveredDir && !hoveredDir.isRoot && !expandedDirsRef.current.has(hoveredDir.path)) {
+          const pathToExpand = hoveredDir.path;
           autoExpandTimerRef.current = setTimeout(() => {
             autoExpandTimerRef.current = null;
-            onExpandRef.current(dirToExpand.path);
+            onExpandRef.current(pathToExpand);
           }, 600);
         }
       }
@@ -192,6 +220,7 @@ export function useFileBrowserDrag({
   return {
     getDragProps,
     wasDragRef,
+    isRootDropTarget,
     ghost:
       ghostPos && dragPath
         ? { name: basename(dragPath), count, x: ghostPos.x, y: ghostPos.y }
