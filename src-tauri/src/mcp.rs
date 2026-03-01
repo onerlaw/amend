@@ -280,15 +280,9 @@ async fn handle_tools_call(
         }
     };
 
-    let tool_name = params
-        .get("name")
-        .and_then(|v| v.as_str())
-        .unwrap_or("");
+    let tool_name = params.get("name").and_then(|v| v.as_str()).unwrap_or("");
 
-    let arguments = params
-        .get("arguments")
-        .cloned()
-        .unwrap_or(json!({}));
+    let arguments = params.get("arguments").cloned().unwrap_or(json!({}));
 
     match tool_name {
         "list_terminals" => tool_list_terminals(id, state).await,
@@ -348,10 +342,7 @@ async fn tool_read_terminal_output(
         }
     };
 
-    let lines = args
-        .get("lines")
-        .and_then(|v| v.as_u64())
-        .unwrap_or(200) as usize;
+    let lines = args.get("lines").and_then(|v| v.as_u64()).unwrap_or(200) as usize;
     let lines = lines.min(MAX_READ_LINES);
 
     let buf = match state.output_buffers.get(terminal_id).await {
@@ -379,11 +370,7 @@ async fn tool_read_terminal_output(
     )
 }
 
-async fn tool_is_terminal_busy(
-    id: Value,
-    args: &Value,
-    state: &McpServerState,
-) -> JsonRpcResponse {
+async fn tool_is_terminal_busy(id: Value, args: &Value, state: &McpServerState) -> JsonRpcResponse {
     let terminal_id = match args.get("terminal_id").and_then(|v| v.as_str()) {
         Some(id) => id,
         None => {

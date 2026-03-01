@@ -22,7 +22,7 @@ export function startTerminalMetadataSync() {
   if (unsubscribe) return;
 
   let prevTabIds = new Set<string>();
-  let prevSnapshots = new Map<string, string>();
+  const prevSnapshots = new Map<string, string>();
 
   // Sync all current tabs immediately
   const { tabs } = useTerminalStore.getState();

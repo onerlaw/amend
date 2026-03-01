@@ -40,7 +40,11 @@ impl TerminalOutputBuffer {
     /// Return the last `n` lines of output.
     pub fn last_lines(&self, n: usize) -> Vec<String> {
         let n = n.min(self.lines.len());
-        self.lines.iter().skip(self.lines.len() - n).cloned().collect()
+        self.lines
+            .iter()
+            .skip(self.lines.len() - n)
+            .cloned()
+            .collect()
     }
 
     /// Return the most recent complete line.
