@@ -1,4 +1,5 @@
 use crate::error::impl_serialize_as_string;
+use crate::terminal_buffer::OutputBufferRegistry;
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use parking_lot::Mutex;
 use portable_pty::{native_pty_system, CommandBuilder, MasterPty, PtySize};
@@ -169,17 +170,31 @@ impl TerminalManager {
 
         self.sessions.lock().insert(id.clone(), session);
 
+        // Get the output buffer for this terminal
+        let buffer_registry: tauri::State<'_, Arc<OutputBufferRegistry>> = app_handle.state();
+        let buffer_registry = Arc::clone(buffer_registry.inner());
+        let id_for_buffer = id.clone();
+
         // Spawn reader thread
         let id_clone = id.clone();
         let app_handle_clone = app_handle.clone();
 
         thread::spawn(move || {
+            // Create a tokio runtime handle for async buffer operations
+            let rt = tokio::runtime::Handle::current();
+            let output_buffer = rt.block_on(buffer_registry.get_or_create(&id_for_buffer));
+
             let mut buffer = [0u8; 4096];
             let event_name = format!("terminal-output-{}", id_clone);
             loop {
                 match reader.read(&mut buffer) {
                     Ok(0) => break,
                     Ok(n) => {
+                        // Push raw bytes into ring buffer (strips ANSI, splits lines)
+                        rt.block_on(async {
+                            output_buffer.write().await.push(&buffer[..n]);
+                        });
+
                         let encoded = STANDARD.encode(&buffer[..n]);
                         let _ = app_handle_clone.emit(&event_name, encoded);
                     }
@@ -237,13 +252,29 @@ impl TerminalManager {
 
         Ok(())
     }
+
+    /// Check if a terminal has a foreground child process running.
+    pub fn is_busy(&self, id: &str) -> bool {
+        let sessions = self.sessions.lock();
+        let Some(session) = sessions.get(id) else {
+            return false;
+        };
+        let Some(pid) = session.shell_pid else {
+            return false;
+        };
+        std::process::Command::new("pgrep")
+            .args(["-P", &pid.to_string()])
+            .status()
+            .map(|s| s.success())
+            .unwrap_or(false)
+    }
 }
 
 // Tauri commands
 #[tauri::command]
 pub fn create_terminal(
     app_handle: AppHandle,
-    state: tauri::State<'_, TerminalManager>,
+    state: tauri::State<'_, Arc<TerminalManager>>,
     cwd: Option<String>,
 ) -> Result<String, TerminalError> {
     state.create_terminal(&app_handle, cwd)
@@ -251,7 +282,7 @@ pub fn create_terminal(
 
 #[tauri::command]
 pub fn write_to_terminal(
-    state: tauri::State<'_, TerminalManager>,
+    state: tauri::State<'_, Arc<TerminalManager>>,
     id: String,
     data: String,
 ) -> Result<(), TerminalError> {
@@ -260,7 +291,7 @@ pub fn write_to_terminal(
 
 #[tauri::command]
 pub fn resize_terminal(
-    state: tauri::State<'_, TerminalManager>,
+    state: tauri::State<'_, Arc<TerminalManager>>,
     id: String,
     cols: u16,
     rows: u16,
@@ -269,25 +300,16 @@ pub fn resize_terminal(
 }
 
 #[tauri::command]
-pub fn close_terminal(
-    state: tauri::State<'_, TerminalManager>,
+pub async fn close_terminal(
+    state: tauri::State<'_, Arc<TerminalManager>>,
+    buffer_registry: tauri::State<'_, Arc<OutputBufferRegistry>>,
     id: String,
 ) -> Result<(), TerminalError> {
+    buffer_registry.remove(&id).await;
     state.close_terminal(&id)
 }
 
 #[tauri::command]
-pub fn is_terminal_busy(id: String, state: tauri::State<'_, TerminalManager>) -> bool {
-    let sessions = state.sessions.lock();
-    let Some(session) = sessions.get(&id) else {
-        return false;
-    };
-    let Some(pid) = session.shell_pid else {
-        return false;
-    };
-    std::process::Command::new("pgrep")
-        .args(["-P", &pid.to_string()])
-        .status()
-        .map(|s| s.success())
-        .unwrap_or(false)
+pub fn is_terminal_busy(id: String, state: tauri::State<'_, Arc<TerminalManager>>) -> bool {
+    state.is_busy(&id)
 }

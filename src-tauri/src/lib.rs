@@ -2,31 +2,69 @@ mod error;
 mod filesystem;
 mod git;
 mod lsp;
+mod mcp;
 mod symbols;
 mod terminal;
+mod terminal_buffer;
+mod terminal_metadata;
 mod watcher;
 
 use filesystem::{FileSystemManager, SearchGeneration};
 use lsp::LspManager;
+use mcp::{McpServer, McpServerHandle};
+use std::sync::Arc;
 use symbols::{SymbolDefinition, SymbolIndex, SymbolReference};
-use tauri::{Emitter, State};
+use tauri::{Emitter, Manager, State};
 use terminal::TerminalManager;
+use terminal_buffer::OutputBufferRegistry;
+use terminal_metadata::TerminalMetadataStore;
 use tokio::task::spawn_blocking;
 use watcher::FileWatcher;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let terminal_manager = Arc::new(TerminalManager::new());
+    let output_buffers = Arc::new(OutputBufferRegistry::new());
+    let metadata_store = Arc::new(TerminalMetadataStore::new());
+    let mcp_handle = McpServerHandle::new();
+
+    // Clone Arcs for the setup hook
+    let tm_for_mcp = Arc::clone(&terminal_manager);
+    let ob_for_mcp = Arc::clone(&output_buffers);
+    let ms_for_mcp = Arc::clone(&metadata_store);
+
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
-        .manage(TerminalManager::new())
+        .manage(terminal_manager)
+        .manage(output_buffers)
+        .manage(metadata_store)
+        .manage(mcp_handle)
         .manage(LspManager::new())
         .manage(FileSystemManager::new())
         .manage(SearchGeneration::new())
         .manage(SymbolIndex::new())
         .manage(FileWatcher::new())
+        .setup(move |app| {
+            let mcp_handle: tauri::State<'_, McpServerHandle> = app.state();
+            let mcp_handle_inner = mcp_handle.inner().clone();
+
+            // Spawn MCP server on the async runtime
+            tauri::async_runtime::spawn(async move {
+                match McpServer::start(ob_for_mcp, ms_for_mcp, tm_for_mcp).await {
+                    Ok(port) => {
+                        mcp_handle_inner.set_port(port).await;
+                    }
+                    Err(e) => {
+                        eprintln!("[MCP] Failed to start server: {}", e);
+                    }
+                }
+            });
+
+            Ok(())
+        })
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                 api.prevent_close();
@@ -41,6 +79,11 @@ pub fn run() {
             terminal::close_terminal,
             terminal::is_terminal_busy,
             force_quit,
+            // MCP commands
+            mcp::get_mcp_server_port,
+            // Terminal metadata commands
+            terminal_metadata::sync_terminal_metadata,
+            terminal_metadata::remove_terminal_metadata,
             // LSP commands
             lsp::lsp_start_server,
             lsp::lsp_send_message,
@@ -96,6 +139,7 @@ pub fn run() {
 
 #[tauri::command]
 fn force_quit(app: tauri::AppHandle) {
+    mcp::remove_discovery_file();
     app.exit(0);
 }
 

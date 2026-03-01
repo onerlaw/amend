@@ -41,6 +41,32 @@ export async function forceQuitApp(): Promise<void> {
   return invoke('force_quit');
 }
 
+// Terminal metadata sync
+export interface TerminalMetadataPayload {
+  cwd: string | null;
+  title: string | null;
+  gitRoot: string | null;
+  repoName: string | null;
+  mainRepoRoot: string | null;
+  worktreeName: string | null;
+}
+
+export async function syncTerminalMetadata(
+  id: string,
+  metadata: TerminalMetadataPayload
+): Promise<void> {
+  return invoke('sync_terminal_metadata', { id, metadata });
+}
+
+export async function removeTerminalMetadata(id: string): Promise<void> {
+  return invoke('remove_terminal_metadata', { id });
+}
+
+// MCP server
+export async function getMcpServerPort(): Promise<number | null> {
+  return invoke('get_mcp_server_port');
+}
+
 export async function onWindowCloseRequested(callback: () => void): Promise<UnlistenFn> {
   return listen('window-close-requested', () => {
     callback();

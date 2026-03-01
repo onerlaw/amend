@@ -12,6 +12,7 @@ import type { BrowseEditorTabsHandle } from '@/components/FileBrowser/BrowseEdit
 import { GlobalSearch } from '@/components/GlobalSearch/GlobalSearch';
 import { ModalOverlay } from '@/components/ModalOverlay';
 import { indexProject, getGitRoot, onFsChanged, startWatchingDirectory } from '@/lib/tauri';
+import { startTerminalMetadataSync, stopTerminalMetadataSync } from '@/lib/terminalMetadataSync';
 import { formatShortcut, openFileInBrowseMode } from '@/lib/fileUtils';
 import { useSessionStore } from '@/stores/sessionStore';
 import {
@@ -167,6 +168,12 @@ export function MainLayout() {
   useEffect(() => {
     localStorage.removeItem('amend-projects');
     localStorage.removeItem('amend-files');
+  }, []);
+
+  // Start terminal metadata sync (frontend → backend for MCP server)
+  useEffect(() => {
+    startTerminalMetadataSync();
+    return () => stopTerminalMetadataSync();
   }, []);
 
   // Save browse state to session whenever it changes
