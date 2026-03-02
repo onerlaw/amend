@@ -15,18 +15,19 @@ interface ContextMenuState {
   isOpen: boolean;
   position: { x: number; y: number };
   targetEntry: FileEntry | null;
+  selectedEntries: FileEntry[];
   clipboard: ClipboardState;
   renameTarget: FileEntry | null;
-  deleteTarget: FileEntry | null;
+  deleteTargets: FileEntry[];
   newEntryTarget: NewEntryTarget | null;
-  openMenu: (entry: FileEntry | null, x: number, y: number) => void;
+  openMenu: (entry: FileEntry | null, x: number, y: number, selectedEntries?: FileEntry[]) => void;
   closeMenu: () => void;
   setCutEntry: (entry: FileEntry) => void;
   setCopyEntry: (entry: FileEntry) => void;
   clearClipboard: () => void;
   openRenameDialog: (entry: FileEntry) => void;
   closeRenameDialog: () => void;
-  openDeleteDialog: (entry: FileEntry) => void;
+  openDeleteDialog: (entries: FileEntry[]) => void;
   closeDeleteDialog: () => void;
   openNewEntryDialog: (dirPath: string, kind: 'file' | 'folder') => void;
   closeNewEntryDialog: () => void;
@@ -36,16 +37,18 @@ export const useContextMenuStore = create<ContextMenuState>((set) => ({
   isOpen: false,
   position: { x: 0, y: 0 },
   targetEntry: null,
+  selectedEntries: [],
   clipboard: { entry: null, operation: null },
   renameTarget: null,
-  deleteTarget: null,
+  deleteTargets: [],
   newEntryTarget: null,
 
-  openMenu: (entry, x, y) =>
+  openMenu: (entry, x, y, selectedEntries) =>
     set({
       isOpen: true,
       position: { x, y },
       targetEntry: entry,
+      selectedEntries: selectedEntries ?? [],
     }),
 
   closeMenu: () =>
@@ -81,16 +84,16 @@ export const useContextMenuStore = create<ContextMenuState>((set) => ({
       renameTarget: null,
     }),
 
-  openDeleteDialog: (entry) =>
+  openDeleteDialog: (entries) =>
     set({
-      deleteTarget: entry,
+      deleteTargets: entries,
       isOpen: false,
       targetEntry: null,
     }),
 
   closeDeleteDialog: () =>
     set({
-      deleteTarget: null,
+      deleteTargets: [],
     }),
 
   openNewEntryDialog: (dirPath, kind) =>

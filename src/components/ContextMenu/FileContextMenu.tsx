@@ -100,16 +100,18 @@ function RenameDialog() {
 }
 
 function ConfirmDeleteDialog() {
-  const { deleteTarget, closeDeleteDialog } = useContextMenuStore();
+  const { deleteTargets, closeDeleteDialog } = useContextMenuStore();
 
-  if (!deleteTarget) return null;
+  if (deleteTargets.length === 0) return null;
 
   const handleConfirm = async () => {
     try {
-      if (deleteTarget.isDirectory) {
-        await deleteDirectory(deleteTarget.path);
-      } else {
-        await deleteFile(deleteTarget.path);
+      for (const target of deleteTargets) {
+        if (target.isDirectory) {
+          await deleteDirectory(target.path);
+        } else {
+          await deleteFile(target.path);
+        }
       }
       useFileStore.getState().invalidateFileTree();
     } catch (error) {
@@ -118,10 +120,17 @@ function ConfirmDeleteDialog() {
     closeDeleteDialog();
   };
 
+  const message =
+    deleteTargets.length === 1 ? (
+      <>Are you sure you want to delete &ldquo;{deleteTargets[0].name}&rdquo;?</>
+    ) : (
+      <>Are you sure you want to delete {deleteTargets.length} items?</>
+    );
+
   return (
     <ConfirmDialog
       title="Delete"
-      message={<>Are you sure you want to delete &ldquo;{deleteTarget.name}&rdquo;?</>}
+      message={message}
       confirmLabel="Delete"
       confirmClassName="bg-red-600 hover:bg-red-700"
       onConfirm={handleConfirm}
@@ -217,6 +226,7 @@ export function FileContextMenu() {
     isOpen,
     position,
     targetEntry,
+    selectedEntries,
     clipboard,
     closeMenu,
     setCutEntry,
@@ -235,8 +245,9 @@ export function FileContextMenu() {
 
   const handleDelete = useCallback(() => {
     if (!targetEntry) return;
-    openDeleteDialog(targetEntry);
-  }, [targetEntry, openDeleteDialog]);
+    const isInSelection = selectedEntries.some((e) => e.path === targetEntry.path);
+    openDeleteDialog(isInSelection && selectedEntries.length > 0 ? selectedEntries : [targetEntry]);
+  }, [targetEntry, selectedEntries, openDeleteDialog]);
 
   const handleCut = useCallback(() => {
     if (!targetEntry) return;

@@ -306,7 +306,10 @@ function BrowseFileList({
                 onContextMenu={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  openMenu(entry, e.clientX, e.clientY);
+                  const selected = selectedPaths.has(entry.path)
+                    ? flatRows.filter((r) => selectedPaths.has(r.entry.path)).map((r) => r.entry)
+                    : [];
+                  openMenu(entry, e.clientX, e.clientY, selected);
                 }}
               >
                 {entry.isDirectory ? (
