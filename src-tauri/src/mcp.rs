@@ -430,6 +430,10 @@ fn discovery_file_path() -> Option<std::path::PathBuf> {
     dirs::home_dir().map(|h| h.join(".amend").join("mcp.json"))
 }
 
+fn claude_code_config_path() -> Option<std::path::PathBuf> {
+    dirs::home_dir().map(|h| h.join(".claude.json"))
+}
+
 fn write_discovery_file(port: u16) {
     if let Some(path) = discovery_file_path() {
         if let Some(parent) = path.parent() {
@@ -442,11 +446,107 @@ fn write_discovery_file(port: u16) {
             eprintln!("[MCP] Failed to write discovery file: {}", e);
         }
     }
+
+    write_claude_code_config(port);
 }
 
-pub fn remove_discovery_file() {
+pub fn remove_discovery_file(port: Option<u16>) {
     if let Some(path) = discovery_file_path() {
         let _ = std::fs::remove_file(path);
+    }
+
+    if let Some(port) = port {
+        remove_claude_code_config(port);
+    }
+}
+
+fn write_claude_code_config(port: u16) {
+    let Some(path) = claude_code_config_path() else {
+        return;
+    };
+
+    let mut config: Value = std::fs::read_to_string(&path)
+        .ok()
+        .and_then(|s| serde_json::from_str(&s).ok())
+        .unwrap_or_else(|| json!({}));
+
+    let obj = match config.as_object_mut() {
+        Some(o) => o,
+        None => return,
+    };
+
+    let servers = obj
+        .entry("mcpServers")
+        .or_insert_with(|| json!({}));
+
+    if let Some(servers_obj) = servers.as_object_mut() {
+        servers_obj.insert(
+            "amend-terminal".to_string(),
+            json!({
+                "type": "sse",
+                "url": format!("http://127.0.0.1:{}/sse", port)
+            }),
+        );
+    }
+
+    match serde_json::to_string_pretty(&config) {
+        Ok(json_str) => {
+            if let Err(e) = std::fs::write(&path, json_str) {
+                eprintln!("[MCP] Failed to write Claude Code config: {}", e);
+            }
+        }
+        Err(e) => eprintln!("[MCP] Failed to serialize Claude Code config: {}", e),
+    }
+}
+
+fn remove_claude_code_config(port: u16) {
+    let Some(path) = claude_code_config_path() else {
+        return;
+    };
+
+    let content = match std::fs::read_to_string(&path) {
+        Ok(s) => s,
+        Err(_) => return,
+    };
+
+    let mut config: Value = match serde_json::from_str(&content) {
+        Ok(v) => v,
+        Err(_) => return,
+    };
+
+    let obj = match config.as_object_mut() {
+        Some(o) => o,
+        None => return,
+    };
+
+    let should_remove_servers = {
+        let servers = match obj.get_mut("mcpServers").and_then(|v| v.as_object_mut()) {
+            Some(s) => s,
+            None => return,
+        };
+
+        // Only remove if the URL matches our port
+        let expected_url = format!("http://127.0.0.1:{}/sse", port);
+        if let Some(entry) = servers.get("amend-terminal") {
+            if entry.get("url").and_then(|u| u.as_str()) == Some(&expected_url) {
+                servers.remove("amend-terminal");
+            }
+        }
+
+        servers.is_empty()
+    };
+
+    if should_remove_servers {
+        obj.remove("mcpServers");
+    }
+
+    match serde_json::to_string_pretty(&config) {
+        Ok(json_str) => {
+            if let Err(e) = std::fs::write(&path, json_str) {
+                eprintln!("[MCP] Failed to write Claude Code config: {}", e);
+            }
+        }
+        Err(e) => eprintln!("[MCP] Failed to serialize Claude Code config: {}", e),
     }
 }
 

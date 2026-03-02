@@ -138,9 +138,14 @@ pub fn run() {
 }
 
 #[tauri::command]
-fn force_quit(app: tauri::AppHandle) {
-    mcp::remove_discovery_file();
+async fn force_quit(
+    app: tauri::AppHandle,
+    mcp_handle: State<'_, McpServerHandle>,
+) -> Result<(), String> {
+    let port = mcp_handle.get_port().await;
+    mcp::remove_discovery_file(port);
     app.exit(0);
+    Ok(())
 }
 
 // Symbol navigation commands
