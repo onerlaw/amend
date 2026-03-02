@@ -29,6 +29,7 @@ import { EditorStatusBar, type EditorInfo } from './EditorStatusBar';
 
 export interface BrowseEditorTabsHandle {
   openSearch: () => void;
+  saveActiveFile: () => void;
 }
 
 const STATUS_CONFIG: Record<string, { color: string; title: string }> = {
@@ -53,6 +54,7 @@ export const BrowseEditorTabs = forwardRef<BrowseEditorTabsHandle>(
       handleCloseFile,
       handleContentChange,
       getSaveStatus,
+      saveFile,
     } = useFileBrowserState();
     const { setFocusedPanel } = useUIStore();
     const {
@@ -213,6 +215,12 @@ export const BrowseEditorTabs = forwardRef<BrowseEditorTabsHandle>(
         if (view) {
           view.focus();
           openSearchPanel(view);
+        }
+      },
+      saveActiveFile() {
+        const activePath = useFileStore.getState().browseActiveFilePath;
+        if (activePath) {
+          saveFile(activePath);
         }
       },
     }));

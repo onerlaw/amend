@@ -232,7 +232,8 @@ export function useTerminal(containerId: string | null) {
       }
 
       // Load web links addon for Cmd+Click URL opening
-      const webLinksAddon = new WebLinksAddon((_event, uri) => {
+      const webLinksAddon = new WebLinksAddon((event, uri) => {
+        if (!event.metaKey) return;
         openUrl(uri).catch(console.error);
       });
       terminal.loadAddon(webLinksAddon);

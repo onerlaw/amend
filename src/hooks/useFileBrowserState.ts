@@ -217,6 +217,33 @@ export function useFileBrowserState() {
     [updateBrowseFileContent, markBrowseFileSaved, setSaveStatus]
   );
 
+  const saveFile = useCallback(
+    async (path: string) => {
+      // Clear any pending auto-save timer
+      const timer = autoSaveTimers.current.get(path);
+      if (timer) {
+        clearTimeout(timer);
+        autoSaveTimers.current.delete(path);
+      }
+
+      const file = useFileStore.getState().browseOpenFiles.find((f) => f.path === path);
+      if (!file || !file.isDirty) return;
+
+      setSaveStatus(path, 'saving');
+      try {
+        recentSelfWrites.current.set(path, Date.now());
+        await writeFile(path, file.content);
+        markBrowseFileSaved(path);
+        setSaveStatus(path, 'idle');
+      } catch (err) {
+        recentSelfWrites.current.delete(path);
+        console.error('Failed to save file:', err);
+        setSaveStatus(path, 'error');
+      }
+    },
+    [markBrowseFileSaved, setSaveStatus]
+  );
+
   // Get currently active file
   const activeFile = browseOpenFiles.find((f) => f.path === browseActiveFilePath) || null;
 
@@ -236,5 +263,6 @@ export function useFileBrowserState() {
     }, [invalidateFileTree, loadDirectory]),
     setBrowseActiveFile,
     getSaveStatus,
+    saveFile,
   };
 }

@@ -118,7 +118,7 @@ export function TerminalPane({ id, isActive }: TerminalPaneProps) {
   return (
     <div
       ref={containerRef}
-      className={`h-full w-full bg-terminal-bg p-2 ${isActive ? 'block' : 'hidden'}`}
+      className={`h-full w-full bg-terminal-bg px-2 pt-2 ${isActive ? 'block' : 'hidden'}`}
     >
       {status !== 'ready' && (
         <div className="absolute inset-0 flex items-center justify-center text-gray-500 text-sm z-10 pointer-events-none">

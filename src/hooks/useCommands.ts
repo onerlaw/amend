@@ -130,6 +130,13 @@ export function useCommands({ terminalTabsRef, browseEditorTabsRef }: CommandRef
           return;
         }
 
+        // Cmd/Ctrl + S: Save active file immediately
+        case 's': {
+          e.preventDefault();
+          browseEditorTabsRef.current?.saveActiveFile();
+          return;
+        }
+
         // Cmd/Ctrl + F (without Shift): Find in file (browse mode) or terminal search
         case 'f': {
           if (e.shiftKey) return;

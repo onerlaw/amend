@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type MouseEvent } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
 import mermaid from 'mermaid';
 import type { Components } from 'react-markdown';
+import { openUrl } from '@tauri-apps/plugin-opener';
 
 mermaid.initialize({ theme: 'dark', startOnLoad: false });
 
@@ -65,7 +66,16 @@ const markdownComponents: Components = {
   ),
   p: ({ children }) => <p className="mb-4 leading-relaxed">{children}</p>,
   a: ({ href, children }) => (
-    <a href={href} className="text-accent underline hover:opacity-80">
+    <a
+      href={href}
+      className="text-accent underline hover:opacity-80"
+      onClick={(e: MouseEvent<HTMLAnchorElement>) => {
+        e.preventDefault();
+        if (e.metaKey && href) {
+          openUrl(href).catch(console.error);
+        }
+      }}
+    >
       {children}
     </a>
   ),

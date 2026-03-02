@@ -131,7 +131,8 @@ export class FileLinkProvider implements ILinkProvider {
       links.push({
         range,
         text: fullMatch,
-        activate: () => {
+        activate: (event: MouseEvent) => {
+          if (!event.metaKey) return;
           this.openFile(filePath, lineNum);
         },
       });
