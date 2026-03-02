@@ -412,6 +412,86 @@ const darkTheme = EditorView.theme(
       overflow: 'auto',
       maxHeight: '200px',
     },
+    // Autocomplete dropdown
+    '.cm-tooltip-autocomplete': {
+      backgroundColor: 'var(--surface-2)',
+      border: '1px solid var(--border)',
+      borderRadius: '6px',
+      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
+      overflow: 'hidden',
+    },
+    '.cm-tooltip-autocomplete ul': {
+      fontFamily: 'Menlo, Monaco, "Courier New", monospace',
+      fontSize: '12px',
+      maxHeight: '200px',
+    },
+    '.cm-tooltip-autocomplete ul li': {
+      padding: '2px 8px',
+      color: 'var(--text-primary)',
+    },
+    '.cm-tooltip-autocomplete ul li[aria-selected]': {
+      backgroundColor: 'var(--accent)',
+      color: 'var(--surface-0)',
+    },
+    '.cm-completionIcon': {
+      opacity: '0.7',
+      paddingRight: '4px',
+    },
+    '.cm-completionLabel': {
+      color: 'inherit',
+    },
+    '.cm-completionMatchedText': {
+      textDecoration: 'none',
+      color: '#3b82f6',
+      fontWeight: '600',
+    },
+    '.cm-tooltip-autocomplete ul li[aria-selected] .cm-completionMatchedText': {
+      color: 'inherit',
+    },
+    '.cm-completionDetail': {
+      marginLeft: '8px',
+      fontStyle: 'italic',
+      color: 'var(--text-tertiary)',
+    },
+    '.cm-tooltip-autocomplete ul li[aria-selected] .cm-completionDetail': {
+      color: 'inherit',
+      opacity: '0.8',
+    },
+    '.cm-completionInfo': {
+      backgroundColor: 'var(--surface-2)',
+      border: '1px solid var(--border)',
+      borderRadius: '6px',
+      padding: '8px 12px',
+      fontSize: '12px',
+      lineHeight: '1.4',
+      maxWidth: '400px',
+      maxHeight: '200px',
+      overflow: 'auto',
+      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
+    },
+    '.cm-completionInfo code': {
+      fontFamily: 'Menlo, Monaco, "Courier New", monospace',
+      fontSize: '11px',
+      backgroundColor: 'var(--surface-1)',
+      padding: '1px 4px',
+      borderRadius: '3px',
+    },
+    // Signature help tooltip
+    '.cm-signature': {
+      backgroundColor: 'var(--surface-2)',
+      border: '1px solid var(--border)',
+      borderRadius: '6px',
+      padding: '6px 10px',
+      fontSize: '12px',
+      lineHeight: '1.4',
+      maxWidth: '500px',
+      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
+      fontFamily: 'Menlo, Monaco, "Courier New", monospace',
+    },
+    '.cm-signature .cm-signature-activeParameter': {
+      fontWeight: '700',
+      color: '#3b82f6',
+    },
     // Go-to-line dialog (reuses search panel container)
     '.cm-gotoLine': {
       padding: '4px 8px',

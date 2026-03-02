@@ -1,4 +1,4 @@
-import { LSPClient, serverDiagnostics, hoverTooltips } from '@codemirror/lsp-client';
+import { LSPClient, serverDiagnostics, hoverTooltips, serverCompletion, signatureHelp } from '@codemirror/lsp-client';
 import { TauriTransport } from './TauriTransport';
 import {
   getServerConfigForExtension,
@@ -111,7 +111,7 @@ async function startServer(
   const client = new LSPClient({
     rootUri: `file://${rootPath}`,
     timeout: 10000,
-    extensions: [serverDiagnostics(), hoverTooltips()],
+    extensions: [serverDiagnostics(), hoverTooltips(), serverCompletion(), signatureHelp()],
   });
 
   client.connect(transport);
