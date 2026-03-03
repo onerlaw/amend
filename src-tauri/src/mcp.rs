@@ -475,9 +475,7 @@ fn write_claude_code_config(port: u16) {
         None => return,
     };
 
-    let servers = obj
-        .entry("mcpServers")
-        .or_insert_with(|| json!({}));
+    let servers = obj.entry("mcpServers").or_insert_with(|| json!({}));
 
     if let Some(servers_obj) = servers.as_object_mut() {
         servers_obj.insert(

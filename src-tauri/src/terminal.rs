@@ -178,10 +178,9 @@ impl TerminalManager {
         // Spawn reader thread
         let id_clone = id.clone();
         let app_handle_clone = app_handle.clone();
+        let rt = tokio::runtime::Handle::current();
 
         thread::spawn(move || {
-            // Create a tokio runtime handle for async buffer operations
-            let rt = tokio::runtime::Handle::current();
             let output_buffer = rt.block_on(buffer_registry.get_or_create(&id_for_buffer));
 
             let mut buffer = [0u8; 4096];
@@ -272,7 +271,7 @@ impl TerminalManager {
 
 // Tauri commands
 #[tauri::command]
-pub fn create_terminal(
+pub async fn create_terminal(
     app_handle: AppHandle,
     state: tauri::State<'_, Arc<TerminalManager>>,
     cwd: Option<String>,

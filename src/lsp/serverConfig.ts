@@ -21,7 +21,7 @@ export const serverConfigs: LspServerConfig[] = [
     languageIds: ['typescript', 'javascript', 'typescriptreact', 'javascriptreact'],
     fileExtensions: ['ts', 'tsx', 'js', 'jsx', 'mjs', 'cjs'],
     useBundledNode: true,
-    serverScript: 'lsp-servers/typescript/node_modules/.bin/typescript-language-server',
+    serverScript: 'lsp-servers/typescript/node_modules/typescript-language-server/lib/cli.mjs',
     args: ['--stdio'],
   },
 ];

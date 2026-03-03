@@ -1,4 +1,10 @@
-import { LSPClient, serverDiagnostics, hoverTooltips, serverCompletion, signatureHelp } from '@codemirror/lsp-client';
+import {
+  LSPClient,
+  serverDiagnostics,
+  hoverTooltips,
+  serverCompletion,
+  signatureHelp,
+} from '@codemirror/lsp-client';
 import { TauriTransport } from './TauriTransport';
 import {
   getServerConfigForExtension,
