@@ -35,6 +35,27 @@ function serverKey(configName: string, rootPath: string): string {
 
 const servers = new Map<string, ManagedServer>();
 
+export interface LspServerStatus {
+  configName: string;
+  serverId: string;
+  refCount: number;
+  rootPath: string;
+}
+
+export function getRunningServers(): LspServerStatus[] {
+  const result: LspServerStatus[] = [];
+  for (const [key, managed] of servers) {
+    const rootPath = key.split('::')[1] ?? '';
+    result.push({
+      configName: managed.config.name,
+      serverId: managed.serverId,
+      refCount: managed.refCount,
+      rootPath,
+    });
+  }
+  return result;
+}
+
 /**
  * Get or start an LSP client for the given file extension and project root.
  * Returns { client, languageId } or null if no server config matches.

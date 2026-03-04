@@ -4,24 +4,18 @@ import { useUIStore } from '@/stores/uiStore';
 import { useTerminalStore } from '@/stores/terminalStore';
 import { useFileStore } from '@/stores/fileStore';
 import { useGitPolling } from '@/hooks/useGit';
-import { useTheme } from '@/hooks/useTheme';
 import { useCommands } from '@/hooks/useCommands';
 import type { TerminalTabsHandle } from '@/components/Terminal/TerminalTabs';
 import { DiffViewerProvider } from '@/components/DiffViewer/DiffViewerContext';
 import type { BrowseEditorTabsHandle } from '@/components/FileBrowser/BrowseEditorTabs';
 import { GlobalSearch } from '@/components/GlobalSearch/GlobalSearch';
-import { ModalOverlay } from '@/components/ModalOverlay';
 import { indexProject, getGitRoot, onFsChanged, startWatchingDirectory } from '@/lib/tauri';
 import { startTerminalMetadataSync, stopTerminalMetadataSync } from '@/lib/terminalMetadataSync';
 import { formatShortcut, openFileInBrowseMode } from '@/lib/fileUtils';
 import { useSessionStore } from '@/stores/sessionStore';
 import {
   PlusIcon,
-  CloseIcon,
   SettingsIcon,
-  SunIcon,
-  MoonIcon,
-  MonitorIcon,
   SidebarIcon,
   NotesIcon,
   BranchIcon,
@@ -59,84 +53,11 @@ const BrowseFileListPanel = lazy(() =>
 const NotesPanel = lazy(() =>
   import('@/components/NotesPanel').then((m) => ({ default: m.NotesPanel }))
 );
-
-function SettingsPanel({ onClose }: { onClose: () => void }) {
-  const { themeMode, setThemeMode } = useTheme();
-
-  const themes = [
-    { mode: 'light' as const, label: 'Light', icon: <SunIcon className="h-3.5 w-3.5" /> },
-    { mode: 'dark' as const, label: 'Dark', icon: <MoonIcon className="h-3.5 w-3.5" /> },
-    { mode: 'system' as const, label: 'System', icon: <MonitorIcon className="h-3.5 w-3.5" /> },
-  ];
-
-  return (
-    <ModalOverlay onClose={onClose}>
-      <div className="w-80 rounded-xl bg-surface-2 p-4 shadow-xl">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-primary">Settings</h2>
-          <button onClick={onClose} className="rounded-md p-1 text-secondary hover:bg-surface-3">
-            <CloseIcon className="h-4 w-4" />
-          </button>
-        </div>
-
-        {/* Appearance */}
-        <div className="mb-3">
-          <h3 className="mb-2 text-xs font-medium text-secondary">Appearance</h3>
-          <div className="flex gap-2">
-            {themes.map(({ mode, label, icon }) => (
-              <button
-                key={mode}
-                onClick={() => setThemeMode(mode)}
-                className={`flex flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-xs ${
-                  themeMode === mode
-                    ? 'bg-accent text-white'
-                    : 'bg-surface-3 text-secondary hover:text-primary'
-                }`}
-              >
-                {icon}
-                {label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="border-t border-surface-3" />
-
-        {/* Keyboard Shortcuts */}
-        <div className="mt-3">
-          <h3 className="mb-2 text-xs font-medium text-secondary">Keyboard Shortcuts</h3>
-          <div className="space-y-2 text-xs">
-            {[
-              ['New Terminal', formatShortcut('Mod+T')],
-              ['Open Folder', formatShortcut('Mod+O')],
-              ['Cycle Panes', formatShortcut('Mod+`')],
-              ['Split Right', formatShortcut('Mod+D')],
-              ['Split Down', formatShortcut('Mod+Shift+D')],
-              ['Close Tab', formatShortcut('Mod+W')],
-              ['Search', `${formatShortcut('Mod+P')} / ${formatShortcut('Mod+Shift+F')}`],
-              ['Find in File', formatShortcut('Mod+F')],
-              ['Go to Line', formatShortcut('Mod+G')],
-              ['Fold Code', formatShortcut('Mod+Shift+[')],
-              ['Unfold Code', formatShortcut('Mod+Shift+]')],
-              ['Paste Files', formatShortcut('Mod+V')],
-              ['Toggle Notes', formatShortcut('Mod+Shift+N')],
-              ['Increase Font Size', formatShortcut('Mod+=')],
-              ['Decrease Font Size', formatShortcut('Mod+-')],
-              ['Reset Font Size', formatShortcut('Mod+0')],
-            ].map(([label, keys]) => (
-              <div key={label} className="flex items-center justify-between py-1">
-                <span className="text-primary">{label}</span>
-                <kbd className="rounded-md bg-surface-1 px-2 py-0.5 font-mono text-secondary">
-                  {keys}
-                </kbd>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    </ModalOverlay>
-  );
-}
+const SettingsPanel = lazy(() =>
+  import('@/components/Settings/SettingsPanel').then((m) => ({
+    default: m.SettingsPanel,
+  }))
+);
 
 export function MainLayout() {
   const {
@@ -470,7 +391,11 @@ export function MainLayout() {
       </div>
 
       {/* Settings Panel */}
-      {showSettings && <SettingsPanel onClose={() => setShowSettings(false)} />}
+      {showSettings && (
+        <Suspense fallback={null}>
+          <SettingsPanel onClose={() => setShowSettings(false)} />
+        </Suspense>
+      )}
 
       {/* Worktree Manager Modal */}
       {showWorktrees && contextPath && (
