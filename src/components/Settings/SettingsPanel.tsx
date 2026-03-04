@@ -17,7 +17,7 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
 
   return (
     <ModalOverlay onClose={onClose}>
-      <div className="w-96 rounded-xl bg-surface-2 p-4 shadow-xl">
+      <div className="w-[560px] rounded-xl bg-surface-2 p-4 shadow-xl">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-sm font-semibold text-primary">Settings</h2>
           <button onClick={onClose} className="rounded-md p-1 text-secondary hover:bg-surface-3">

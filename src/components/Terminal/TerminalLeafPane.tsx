@@ -1,4 +1,4 @@
-import { useCallback, useRef, useEffect, useState, useMemo } from 'react';
+import { Fragment, useCallback, useRef, useEffect, useState, useMemo } from 'react';
 import { TerminalPane } from './TerminalPane';
 import { DropZoneOverlay } from './DropZoneOverlay';
 import {
@@ -135,58 +135,49 @@ export function TerminalLeafPane({ leafId, terminalIds, activeTerminalId }: Term
       onMouseDown={handleMouseDown}
     >
       {showTabBar && (
-        <div className="flex items-center bg-surface-1 px-1 gap-0.5 shrink-0 overflow-x-auto items-end">
-          {paneGroups.map((group, groupIdx) => (
-            <div
-              key={group.projectName + (group.mainRepoRoot ?? '~')}
-              className="flex items-end shrink-0"
-            >
-              {groupIdx > 0 && <div className="w-px h-5 bg-surface-3 shrink-0 mb-0.5" />}
-              <div className="flex flex-col">
-                {paneGroups.length > 1 && <ProjectLabel name={group.projectName} />}
-                <div className="flex gap-0.5 items-end">
-                  {group.subGroups.map((subGroup, subIdx) => (
-                    <div key={subGroup.gitRoot ?? '~'} className="flex items-end">
-                      {subIdx > 0 && group.hasMultipleWorktrees && (
-                        <div className="w-px h-4 bg-surface-3/50 shrink-0 mb-0.5" />
+        <div className="flex items-center bg-surface-1 px-1 gap-0.5 shrink-0 overflow-x-auto">
+          {paneGroups.map((group, groupIdx) => {
+            const multipleGroups = paneGroups.length > 1;
+            return (
+              <Fragment key={group.projectName + (group.mainRepoRoot ?? '~')}>
+                {groupIdx > 0 && <div className="w-px h-5 bg-surface-3 shrink-0" />}
+                <div className={`flex items-center gap-0.5 shrink-0 ${multipleGroups ? 'bg-surface-2/50 rounded-md px-1 py-0.5' : ''}`}>
+                  {multipleGroups && <ProjectLabel name={group.projectName} />}
+                  {group.subGroups.map((subGroup) => (
+                    <Fragment key={subGroup.gitRoot ?? '~'}>
+                      {group.hasMultipleWorktrees && (
+                        <WorktreeSubLabel name={subGroup.worktreeLabel} />
                       )}
-                      <div className="flex flex-col">
-                        {group.hasMultipleWorktrees && (
-                          <WorktreeSubLabel name={subGroup.worktreeLabel} />
-                        )}
-                        <div className="flex gap-0.5">
-                          {subGroup.tabs.map((tab) => {
-                            const isActive = tab.id === activeTerminalId;
-                            return (
-                              <button
-                                key={tab.id}
-                                onMouseDown={(e) => handleTabMouseDown(e, tab.id)}
-                                onClick={() => handleTabClick(tab.id)}
-                                className={`group flex items-center gap-1 px-1.5 py-0.5 text-[11px] shrink-0 ${
-                                  isActive
-                                    ? 'bg-terminal-bg text-primary'
-                                    : 'text-secondary hover:bg-surface-2 opacity-50 hover:opacity-75'
-                                } ${draggingTabId === tab.id ? 'opacity-50' : ''}`}
-                              >
-                                <TerminalTabLabel tab={tab} />
-                                <span
-                                  onMouseDown={(e) => e.stopPropagation()}
-                                  onClick={(e) => handleCloseTab(e, tab.id)}
-                                  className="ml-0.5 rounded-full p-0.5 opacity-0 hover:bg-surface-3 group-hover:opacity-100"
-                                >
-                                  <CloseIcon className="h-2.5 w-2.5" />
-                                </span>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    </div>
+                      {subGroup.tabs.map((tab) => {
+                        const isActive = tab.id === activeTerminalId;
+                        return (
+                          <button
+                            key={tab.id}
+                            onMouseDown={(e) => handleTabMouseDown(e, tab.id)}
+                            onClick={() => handleTabClick(tab.id)}
+                            className={`group flex items-center gap-1 px-1.5 py-0.5 text-[11px] shrink-0 ${
+                              isActive
+                                ? 'bg-terminal-bg text-primary'
+                                : 'text-secondary hover:bg-surface-2 opacity-50 hover:opacity-75'
+                            } ${draggingTabId === tab.id ? 'opacity-50' : ''}`}
+                          >
+                            <TerminalTabLabel tab={tab} />
+                            <span
+                              onMouseDown={(e) => e.stopPropagation()}
+                              onClick={(e) => handleCloseTab(e, tab.id)}
+                              className="ml-0.5 rounded-full p-0.5 opacity-0 hover:bg-surface-3 group-hover:opacity-100"
+                            >
+                              <CloseIcon className="h-2.5 w-2.5" />
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </Fragment>
                   ))}
                 </div>
-              </div>
-            </div>
-          ))}
+              </Fragment>
+            );
+          })}
         </div>
       )}
       {closingTabId && (
