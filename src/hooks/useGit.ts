@@ -5,6 +5,9 @@ import { gitPollData, gitQuickCheck, GitStatus, DiffStats } from '@/lib/tauri';
 const MIN_INTERVAL = 2_000;
 const MAX_INTERVAL = 30_000;
 const BACKOFF_MULTIPLIER = 1.5;
+/** Force a full poll at least this often to catch working-tree changes
+ *  (new files, edits) that don't modify .git/index or HEAD. */
+const FORCED_FULL_POLL_INTERVAL = 5_000;
 
 /** Combined polling hook for git status and diff stats.
  *  Uses adaptive polling: short interval after changes, backs off when idle.
@@ -22,6 +25,7 @@ export function useGitPolling(repoPath: string | null) {
   const fingerprintRef = useRef<string>('');
   const intervalRef = useRef(MIN_INTERVAL);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastFullPollTimeRef = useRef(0);
 
   /** Do a full poll: fetch status + diff stats from the backend. */
   const fullPoll = useCallback(
@@ -45,8 +49,9 @@ export function useGitPolling(repoPath: string | null) {
       try {
         const data = await gitPollData(repoPath);
 
-        // Update cached fingerprint
+        // Update cached fingerprint and last full poll time
         fingerprintRef.current = data.fingerprint;
+        lastFullPollTimeRef.current = Date.now();
 
         // Only update status if actually changed (avoid unnecessary re-renders)
         const statusKey =
@@ -94,24 +99,24 @@ export function useGitPolling(repoPath: string | null) {
     if (pollingRef.current) return;
 
     try {
-      // If we have a cached fingerprint, do a cheap check first
-      if (fingerprintRef.current) {
+      const timeSinceFullPoll = Date.now() - lastFullPollTimeRef.current;
+      const needsForcedFullPoll = timeSinceFullPoll >= FORCED_FULL_POLL_INTERVAL;
+
+      // If we have a cached fingerprint and don't need a forced poll, do a cheap check first
+      if (fingerprintRef.current && !needsForcedFullPoll) {
         const changed = await gitQuickCheck(repoPath, fingerprintRef.current);
         if (!changed) {
           // Nothing changed — back off
           intervalRef.current = Math.min(intervalRef.current * BACKOFF_MULTIPLIER, MAX_INTERVAL);
-          // At max interval, force a full poll to catch working-tree changes
-          // that don't modify the git index (e.g. uncommitted file edits).
-          if (intervalRef.current >= MAX_INTERVAL) {
-            await fullPoll(true);
-          }
           return;
         }
       }
 
-      // Something changed (or first poll) — do full poll and reset interval
+      // Something changed, first poll, or time for a forced full poll
       await fullPoll(true);
-      intervalRef.current = MIN_INTERVAL;
+      intervalRef.current = needsForcedFullPoll
+        ? Math.min(intervalRef.current, FORCED_FULL_POLL_INTERVAL)
+        : MIN_INTERVAL;
     } catch {
       // On error, back off
       intervalRef.current = Math.min(intervalRef.current * BACKOFF_MULTIPLIER, MAX_INTERVAL);

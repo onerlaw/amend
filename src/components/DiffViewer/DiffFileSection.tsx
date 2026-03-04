@@ -737,7 +737,7 @@ export const DiffFileSection = memo(function DiffFileSection({
 
   const fileName = getFileName(filePath);
   const dirPath = filePath.includes('/') ? dirname(filePath) + '/' : '';
-  const hasContent = !isLoading && !error && (oldContent || newContent);
+  const hasContent = !isLoading && !error && (oldContent || newContent || isBinary);
 
   return (
     <div className="m-2" data-file-path={filePath}>
@@ -807,8 +807,14 @@ export const DiffFileSection = memo(function DiffFileSection({
             </div>
           )}
 
-          {hasContent && isBinary && (
+          {hasContent && isBinary && (oldContent || newContent) && (
             <ImageDiffContent filePath={filePath} oldContent={oldContent} newContent={newContent} />
+          )}
+
+          {hasContent && isBinary && !oldContent && !newContent && (
+            <div className="flex items-center justify-center py-4 text-tertiary text-sm">
+              Binary file changed
+            </div>
           )}
 
           {hasContent && !isBinary && category === 'conflicted' && repoPath && onRefresh && (

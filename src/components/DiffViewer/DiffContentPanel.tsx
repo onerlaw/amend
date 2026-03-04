@@ -217,12 +217,13 @@ function DiffFileList({
   scrollContainerRef: React.RefObject<HTMLDivElement | null>;
 }) {
   // Filter out files whose loaded diff shows identical content (no actual diff).
-  // Files still loading, with errors, or not yet fetched remain visible.
+  // Files still loading, with errors, binary, or not yet fetched remain visible.
   const filteredFiles = useMemo(() => {
     return allFiles.filter((file) => {
       const diff = diffs.get(file.path);
       if (!diff) return true; // not fetched yet
       if (diff.isLoading || diff.error) return true;
+      if (diff.isBinary) return true; // always show binary files
       return diff.oldContent !== diff.newContent;
     });
   }, [allFiles, diffs]);

@@ -369,12 +369,26 @@ fn get_file_diff_sync(repo_path: &str, file_path: &str) -> Result<GitDiff, GitEr
         });
     }
 
-    // Get current file content
-    let new_content = if full_path.exists() {
-        std::fs::read_to_string(&full_path).unwrap_or_default()
+    // Get current file content — detect binary files by UTF-8 validity
+    let (new_content, is_binary) = if full_path.exists() {
+        match std::fs::read_to_string(&full_path) {
+            Ok(content) => (content, false),
+            Err(_) => (String::new(), true),
+        }
     } else {
-        String::new()
+        (String::new(), false)
     };
+
+    if is_binary {
+        // Non-image binary file — return early with binary flag
+        return Ok(GitDiff {
+            old_path: file_path.to_string(),
+            new_path: file_path.to_string(),
+            old_content: String::new(),
+            new_content: String::new(),
+            is_binary: true,
+        });
+    }
 
     // Get HEAD content
     let old_content = match repo.head() {
@@ -1054,12 +1068,25 @@ fn get_branch_file_diff_sync(
         });
     }
 
-    // Read current working tree file
-    let new_content = if full_path.exists() {
-        std::fs::read_to_string(&full_path).unwrap_or_default()
+    // Read current working tree file — detect binary files by UTF-8 validity
+    let (new_content, is_binary) = if full_path.exists() {
+        match std::fs::read_to_string(&full_path) {
+            Ok(content) => (content, false),
+            Err(_) => (String::new(), true),
+        }
     } else {
-        String::new()
+        (String::new(), false)
     };
+
+    if is_binary {
+        return Ok(GitDiff {
+            old_path: file_path.to_string(),
+            new_path: file_path.to_string(),
+            old_content: String::new(),
+            new_content: String::new(),
+            is_binary: true,
+        });
+    }
 
     // Read old content from base ref via git2
     let old_content = match repo.revparse_single(base_ref) {
