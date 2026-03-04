@@ -41,7 +41,10 @@ export function useServerStatus() {
         const parsed = JSON.parse(content);
         const servers = parsed?.mcpServers ?? {};
         registered = Object.values(servers as Record<string, { url?: string }>).some(
-          (s) => typeof s?.url === 'string' && s.url.includes('localhost') && s.url.includes(String(port))
+          (s) =>
+            typeof s?.url === 'string' &&
+            (s.url.includes('localhost') || s.url.includes('127.0.0.1')) &&
+            s.url.includes(String(port))
         );
       } catch {
         // File doesn't exist or can't be parsed

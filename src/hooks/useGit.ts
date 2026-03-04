@@ -17,6 +17,7 @@ const FORCED_FULL_POLL_INTERVAL = 5_000;
 export function useGitPolling(repoPath: string | null) {
   const [status, setStatus] = useState<GitStatus | null>(null);
   const [diffStats, setDiffStats] = useState<DiffStats | null>(null);
+  const [currentBranch, setCurrentBranch] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const lastStatusRef = useRef<string>('');
@@ -72,6 +73,9 @@ export function useGitPolling(repoPath: string | null) {
           lastStatsRef.current = statsKey;
           setDiffStats(data.diffStats);
         }
+
+        setCurrentBranch(data.currentBranch);
+
       } catch (err) {
         // Repository::discover error means not a git repo
         const msg = err instanceof Error ? err.message : String(err);
@@ -152,6 +156,7 @@ export function useGitPolling(repoPath: string | null) {
     if (!repoPath) {
       setStatus(null);
       setDiffStats(null);
+      setCurrentBranch(null);
       lastStatusRef.current = '';
       lastStatsRef.current = '';
       fingerprintRef.current = '';
@@ -188,7 +193,7 @@ export function useGitPolling(repoPath: string | null) {
     return fullPoll(false);
   }, [fullPoll, scheduleNext]);
 
-  return { status, diffStats, isLoading, error, refresh: manualRefresh, resetInterval, forceCheck };
+  return { status, diffStats, currentBranch, isLoading, error, refresh: manualRefresh, resetInterval, forceCheck };
 }
 
 export type GitPollingResult = ReturnType<typeof useGitPolling>;

@@ -67,6 +67,10 @@ export async function getMcpServerPort(): Promise<number | null> {
   return invoke('get_mcp_server_port');
 }
 
+export async function registerMcpServer(): Promise<void> {
+  return invoke('register_mcp_server');
+}
+
 export async function onWindowCloseRequested(callback: () => void): Promise<UnlistenFn> {
   return listen('window-close-requested', () => {
     callback();
@@ -316,6 +320,7 @@ export interface GitPollData {
   status: GitStatus;
   diffStats: DiffStats;
   fingerprint: string;
+  currentBranch: string | null;
 }
 
 export async function gitPollData(repoPath: string): Promise<GitPollData> {

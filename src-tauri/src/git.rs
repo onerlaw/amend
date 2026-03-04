@@ -772,6 +772,7 @@ pub struct GitPollData {
     /// Opaque fingerprint of .git/index mtime + HEAD ref. Callers can cache
     /// this and pass it to `git_quick_check` to detect changes cheaply.
     pub fingerprint: String,
+    pub current_branch: Option<String>,
 }
 
 /// Lightweight change-detection: checks .git/index mtime and HEAD ref
@@ -910,10 +911,26 @@ fn git_poll_data_sync(repo_path: &str) -> Result<GitPollData, GitError> {
         files_changed: total_files,
     };
 
+    let current_branch = repo
+        .head()
+        .ok()
+        .and_then(|h| {
+            if h.is_branch() {
+                h.shorthand().map(|s| s.to_string())
+            } else {
+                // Detached HEAD — use short commit hash
+                h.target().map(|oid| {
+                    let hex = oid.to_string();
+                    hex[..7.min(hex.len())].to_string()
+                })
+            }
+        });
+
     Ok(GitPollData {
         status,
         diff_stats,
         fingerprint,
+        current_branch,
     })
 }
 

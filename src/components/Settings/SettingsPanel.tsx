@@ -3,6 +3,7 @@ import { useServerStatus } from '@/hooks/useServerStatus';
 import { ModalOverlay } from '@/components/ModalOverlay';
 import { CloseIcon, SunIcon, MoonIcon, MonitorIcon } from '@/components/Icons';
 import { formatShortcut } from '@/lib/fileUtils';
+import { registerMcpServer } from '@/lib/tauri';
 
 export function SettingsPanel({ onClose }: { onClose: () => void }) {
   const { themeMode, setThemeMode } = useTheme();
@@ -96,9 +97,19 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
               </div>
               <div className="flex items-center justify-between text-[10px]">
                 <span className="text-tertiary">Claude Code</span>
-                <span className={mcpStatus.registered ? 'text-green-500' : 'text-secondary'}>
-                  {mcpStatus.registered ? 'Registered' : 'Not registered'}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className={mcpStatus.registered ? 'text-green-500' : 'text-secondary'}>
+                    {mcpStatus.registered ? 'Registered' : 'Not registered'}
+                  </span>
+                  {mcpStatus.port && !mcpStatus.registered && (
+                    <button
+                      onClick={() => registerMcpServer()}
+                      className="rounded bg-accent px-1.5 py-0.5 text-[10px] text-white hover:bg-accent/80"
+                    >
+                      Install
+                    </button>
+                  )}
+                </div>
               </div>
               <div>
                 <div className="mb-1 text-[10px] text-tertiary">Tools</div>

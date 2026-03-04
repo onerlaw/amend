@@ -317,7 +317,16 @@ export function MainLayout() {
             </button>
           </div>
         </div>
-        <div className="flex w-10 items-center justify-end">
+        <div className="flex min-w-[40px] items-center justify-end gap-2">
+          {gitPolling.currentBranch && (
+            <div className="flex items-center gap-1 text-xs text-secondary" title={gitPolling.currentBranch + (activeTab?.worktreeName ? ` (${activeTab.worktreeName})` : '')}>
+              <BranchIcon className="h-3 w-3 shrink-0" />
+              <span className="max-w-[120px] truncate">{gitPolling.currentBranch}</span>
+              {activeTab?.worktreeName && (
+                <span className="max-w-[80px] truncate text-tertiary">({activeTab.worktreeName})</span>
+              )}
+            </div>
+          )}
           {(panelMode === 'browse' || panelMode === 'diff') && (
             <button
               onClick={panelMode === 'browse' ? toggleBrowseFileList : toggleDiffFileList}
