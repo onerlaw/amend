@@ -82,6 +82,7 @@ pub fn run() {
             // MCP commands
             mcp::get_mcp_server_port,
             mcp::register_mcp_server,
+            mcp::check_mcp_registrations,
             // Terminal metadata commands
             terminal_metadata::sync_terminal_metadata,
             terminal_metadata::remove_terminal_metadata,

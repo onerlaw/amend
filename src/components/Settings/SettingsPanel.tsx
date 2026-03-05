@@ -54,7 +54,10 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
             <h3 className="mb-2 text-xs font-medium text-secondary">Language Servers</h3>
             <div className="space-y-2">
               {lspStatuses.map(({ config, running }) => (
-                <div key={config.name} className="flex items-center justify-between rounded-md bg-surface-3 px-3 py-2">
+                <div
+                  key={config.name}
+                  className="flex items-center justify-between rounded-md bg-surface-3 px-3 py-2"
+                >
                   <div>
                     <div className="text-xs font-medium text-primary">{config.name}</div>
                     <div className="text-[10px] text-tertiary">
@@ -62,9 +65,13 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
                     </div>
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <span className={`inline-block h-1.5 w-1.5 rounded-full ${running ? 'bg-green-500' : 'bg-gray-400'}`} />
+                    <span
+                      className={`inline-block h-1.5 w-1.5 rounded-full ${running ? 'bg-green-500' : 'bg-gray-400'}`}
+                    />
                     <span className="text-[10px] text-secondary">
-                      {running ? `Running (${running.refCount} ${running.refCount === 1 ? 'file' : 'files'})` : 'Stopped'}
+                      {running
+                        ? `Running (${running.refCount} ${running.refCount === 1 ? 'file' : 'files'})`
+                        : 'Stopped'}
                     </span>
                   </div>
                 </div>
@@ -80,7 +87,9 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
             <div className="space-y-2 rounded-md bg-surface-3 px-3 py-2">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5">
-                  <span className={`inline-block h-1.5 w-1.5 rounded-full ${mcpStatus.port ? 'bg-green-500' : 'bg-gray-400'}`} />
+                  <span
+                    className={`inline-block h-1.5 w-1.5 rounded-full ${mcpStatus.port ? 'bg-green-500' : 'bg-gray-400'}`}
+                  />
                   <span className="text-xs font-medium text-primary">{mcpServerName}</span>
                 </div>
                 {mcpStatus.port && (
@@ -95,27 +104,44 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
                 <span className="text-tertiary">Protocol</span>
                 <span className="text-secondary">{mcpProtocolVersion}</span>
               </div>
-              <div className="flex items-center justify-between text-[10px]">
-                <span className="text-tertiary">Claude Code</span>
-                <div className="flex items-center gap-2">
-                  <span className={mcpStatus.registered ? 'text-green-500' : 'text-secondary'}>
-                    {mcpStatus.registered ? 'Registered' : 'Not registered'}
-                  </span>
-                  {mcpStatus.port && !mcpStatus.registered && (
-                    <button
-                      onClick={() => registerMcpServer()}
-                      className="rounded bg-accent px-1.5 py-0.5 text-[10px] text-white hover:bg-accent/80"
-                    >
-                      Install
-                    </button>
-                  )}
+              {mcpStatus.registrations.length > 0 && (
+                <div>
+                  <div className="mb-1 flex items-center justify-between">
+                    <span className="text-[10px] text-tertiary">Registrations</span>
+                    {mcpStatus.port && mcpStatus.registrations.some((r) => !r.registered) && (
+                      <button
+                        onClick={() => registerMcpServer()}
+                        className="rounded bg-accent px-1.5 py-0.5 text-[10px] text-white hover:bg-accent/80"
+                      >
+                        Install All
+                      </button>
+                    )}
+                  </div>
+                  <div className="space-y-1">
+                    {mcpStatus.registrations.map((reg) => (
+                      <div key={reg.name} className="flex items-center justify-between text-[10px]">
+                        <span className="text-tertiary">{reg.name}</span>
+                        <div className="flex items-center gap-1.5">
+                          <span
+                            className={`inline-block h-1.5 w-1.5 rounded-full ${reg.registered ? 'bg-green-500' : 'bg-gray-400'}`}
+                          />
+                          <span className={reg.registered ? 'text-green-500' : 'text-secondary'}>
+                            {reg.registered ? 'Registered' : 'Not registered'}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
               <div>
                 <div className="mb-1 text-[10px] text-tertiary">Tools</div>
                 <div className="flex flex-wrap gap-1">
                   {mcpTools.map((tool) => (
-                    <span key={tool} className="rounded bg-surface-1 px-1.5 py-0.5 text-[10px] text-secondary">
+                    <span
+                      key={tool}
+                      className="rounded bg-surface-1 px-1.5 py-0.5 text-[10px] text-secondary"
+                    >
                       {tool}
                     </span>
                   ))}
