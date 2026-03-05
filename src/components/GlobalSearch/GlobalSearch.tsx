@@ -6,6 +6,9 @@ import { useUIStore } from '@/stores/uiStore';
 import { getFileIconColor, openFileInBrowseMode } from '@/lib/fileUtils';
 import { modifierKey, formatShortcut } from '@/lib/fileUtils';
 import { SearchIcon, FileIcon, SpinnerIcon } from '@/components/Icons';
+import { SemanticSearchPanel } from '@/components/SemanticSearch/SemanticSearchPanel';
+
+type SearchMode = 'files' | 'semantic';
 
 export function GlobalSearch() {
   const [isOpen, setIsOpen] = useState(false);
@@ -14,6 +17,7 @@ export function GlobalSearch() {
   const [contentResults, setContentResults] = useState<SearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [searchMode, setSearchMode] = useState<SearchMode>('files');
   const inputRef = useRef<HTMLInputElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
 
@@ -80,9 +84,9 @@ export function GlobalSearch() {
   const filenameGenRef = useRef(0);
   const contentGenRef = useRef(0);
 
-  // Phase 1: fast filename search
+  // Phase 1: fast filename search (only when in files mode)
   useEffect(() => {
-    if (!isOpen || !query.trim() || !searchRoot) {
+    if (!isOpen || !query.trim() || !searchRoot || searchMode !== 'files') {
       setFilenameResults([]);
       return;
     }
@@ -108,11 +112,11 @@ export function GlobalSearch() {
     }, 50);
 
     return () => clearTimeout(timeoutId);
-  }, [query, isOpen, searchRoot]);
+  }, [query, isOpen, searchRoot, searchMode]);
 
-  // Phase 2: slower content search
+  // Phase 2: slower content search (only when in files mode)
   useEffect(() => {
-    if (!isOpen || !query.trim() || !searchRoot) {
+    if (!isOpen || !query.trim() || !searchRoot || searchMode !== 'files') {
       setContentResults([]);
       setIsSearching(false);
       return;
@@ -146,7 +150,7 @@ export function GlobalSearch() {
     }, 400);
 
     return () => clearTimeout(timeoutId);
-  }, [query, isOpen, searchRoot]);
+  }, [query, isOpen, searchRoot, searchMode]);
 
   // Scroll selected item into view
   useEffect(() => {
@@ -163,15 +167,21 @@ export function GlobalSearch() {
     if (e.key === 'Escape') {
       e.preventDefault();
       closeSearch();
-    } else if (e.key === 'ArrowDown') {
+    } else if (e.key === 'Tab') {
+      // Tab to switch between search modes
       e.preventDefault();
-      setSelectedIndex((i) => Math.min(i + 1, results.length - 1));
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      setSelectedIndex((i) => Math.max(i - 1, 0));
-    } else if (e.key === 'Enter' && results.length > 0) {
-      e.preventDefault();
-      handleSelectResult(results[selectedIndex]);
+      setSearchMode((mode) => (mode === 'files' ? 'semantic' : 'files'));
+    } else if (searchMode === 'files') {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setSelectedIndex((i) => Math.min(i + 1, results.length - 1));
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setSelectedIndex((i) => Math.max(i - 1, 0));
+      } else if (e.key === 'Enter' && results.length > 0) {
+        e.preventDefault();
+        handleSelectResult(results[selectedIndex]);
+      }
     }
   };
 
@@ -203,9 +213,36 @@ export function GlobalSearch() {
             onClick={closeSearch}
           >
             <div
-              className="w-[500px] max-w-[90vw] rounded-xl bg-surface-2 shadow-xl"
+              className="w-[560px] max-w-[90vw] rounded-xl bg-surface-2 shadow-xl"
               onClick={(e) => e.stopPropagation()}
             >
+              {/* Mode Tabs */}
+              <div className="flex items-center border-b border-border">
+                <button
+                  onClick={() => setSearchMode('files')}
+                  className={`px-4 py-2 text-xs font-medium transition-colors ${
+                    searchMode === 'files'
+                      ? 'text-accent border-b-2 border-accent'
+                      : 'text-tertiary hover:text-secondary'
+                  }`}
+                >
+                  Files
+                </button>
+                <button
+                  onClick={() => setSearchMode('semantic')}
+                  className={`px-4 py-2 text-xs font-medium transition-colors ${
+                    searchMode === 'semantic'
+                      ? 'text-accent border-b-2 border-accent'
+                      : 'text-tertiary hover:text-secondary'
+                  }`}
+                >
+                  Semantic
+                </button>
+                <span className="ml-auto mr-3 text-[10px] text-tertiary">
+                  <kbd className="rounded-md bg-surface-1 px-1 py-0.5">Tab</kbd> switch
+                </span>
+              </div>
+
               {/* Input */}
               <div className="flex items-center gap-2 px-3 py-3">
                 <SearchIcon className="h-4 w-4 text-tertiary" />
@@ -215,61 +252,74 @@ export function GlobalSearch() {
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   onKeyDown={handleInputKeyDown}
-                  placeholder="Search files..."
+                  placeholder={
+                    searchMode === 'files' ? 'Search files...' : 'Search symbols...'
+                  }
                   className="flex-1 bg-transparent text-sm text-primary outline-none placeholder:text-tertiary"
                 />
-                {isSearching && <SpinnerIcon className="h-4 w-4 animate-spin text-tertiary" />}
+                {isSearching && searchMode === 'files' && (
+                  <SpinnerIcon className="h-4 w-4 animate-spin text-tertiary" />
+                )}
               </div>
 
-              {/* Results */}
-              <div ref={resultsRef} className="max-h-[50vh] overflow-y-auto">
-                {!searchRoot && (
-                  <div className="px-3 py-8 text-center text-sm text-tertiary">
-                    Open a repository first to search files
-                  </div>
-                )}
-                {searchRoot && query && results.length === 0 && !isSearching && (
-                  <div className="px-3 py-8 text-center text-sm text-tertiary">
-                    No results found
-                  </div>
-                )}
-                {results.map((result, index) => (
-                  <button
-                    key={`${result.path}-${result.lineNumber ?? 0}`}
-                    onClick={() => handleSelectResult(result)}
-                    className={`flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-surface-3/50 ${
-                      index === selectedIndex ? 'bg-surface-3' : ''
-                    }`}
-                  >
-                    <FileIcon
-                      className={`h-4 w-4 flex-shrink-0 ${getFileIconColor(result.name)}`}
-                    />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="truncate text-sm text-primary">{result.name}</span>
-                        {result.matchType === 'content' && result.lineNumber && (
-                          <span className="flex-shrink-0 text-xs text-tertiary">
-                            :{result.lineNumber}
-                          </span>
-                        )}
+              {/* File Search Results */}
+              {searchMode === 'files' && (
+                <>
+                  <div ref={resultsRef} className="max-h-[50vh] overflow-y-auto">
+                    {!searchRoot && (
+                      <div className="px-3 py-8 text-center text-sm text-tertiary">
+                        Open a repository first to search files
                       </div>
-                      <div className="truncate text-xs text-tertiary">
-                        {result.matchType === 'content' && result.lineContent ? (
-                          <span className="font-mono">{result.lineContent}</span>
-                        ) : (
-                          getRelativePath(result.path)
-                        )}
+                    )}
+                    {searchRoot && query && results.length === 0 && !isSearching && (
+                      <div className="px-3 py-8 text-center text-sm text-tertiary">
+                        No results found
                       </div>
-                    </div>
-                    <span className="flex-shrink-0 rounded-md bg-surface-1 px-1.5 py-0.5 text-[10px] text-tertiary">
-                      {result.matchType === 'filename' ? 'name' : 'content'}
-                    </span>
-                  </button>
-                ))}
-              </div>
+                    )}
+                    {results.map((result, index) => (
+                      <button
+                        key={`${result.path}-${result.lineNumber ?? 0}`}
+                        onClick={() => handleSelectResult(result)}
+                        className={`flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-surface-3/50 ${
+                          index === selectedIndex ? 'bg-surface-3' : ''
+                        }`}
+                      >
+                        <FileIcon
+                          className={`h-4 w-4 flex-shrink-0 ${getFileIconColor(result.name)}`}
+                        />
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="truncate text-sm text-primary">{result.name}</span>
+                            {result.matchType === 'content' && result.lineNumber && (
+                              <span className="flex-shrink-0 text-xs text-tertiary">
+                                :{result.lineNumber}
+                              </span>
+                            )}
+                          </div>
+                          <div className="truncate text-xs text-tertiary">
+                            {result.matchType === 'content' && result.lineContent ? (
+                              <span className="font-mono">{result.lineContent}</span>
+                            ) : (
+                              getRelativePath(result.path)
+                            )}
+                          </div>
+                        </div>
+                        <span className="flex-shrink-0 rounded-md bg-surface-1 px-1.5 py-0.5 text-[10px] text-tertiary">
+                          {result.matchType === 'filename' ? 'name' : 'content'}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+
+              {/* Semantic Search Results */}
+              {searchMode === 'semantic' && (
+                <SemanticSearchPanel query={query} isOpen={isOpen} onClose={closeSearch} />
+              )}
 
               {/* Footer */}
-              <div className="flex items-center justify-between px-3 py-2 text-[10px] text-tertiary">
+              <div className="flex items-center justify-between px-3 py-2 text-[10px] text-tertiary border-t border-border">
                 <div className="flex items-center gap-3">
                   <span>
                     <kbd className="rounded-md bg-surface-1 px-1 py-0.5">↑↓</kbd> navigate
@@ -281,7 +331,9 @@ export function GlobalSearch() {
                     <kbd className="rounded-md bg-surface-1 px-1 py-0.5">esc</kbd> close
                   </span>
                 </div>
-                <div>{results.length > 0 && `${results.length} results`}</div>
+                <div>
+                  {searchMode === 'files' && results.length > 0 && `${results.length} results`}
+                </div>
               </div>
             </div>
           </div>,
