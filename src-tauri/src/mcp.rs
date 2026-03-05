@@ -996,19 +996,25 @@ fn write_claude_hooks(port: u16) {
 
     // PreToolUse hook: fires when Claude is about to use an amend-terminal tool
     let pre_tool_hook = json!({
-        "matcher": "mcp__amend-terminal",
-        "command": format!(
-            "curl -sf -X POST {url} -H 'Content-Type: application/json' -d '{{\"agent\":\"claude\",\"action\":\"tool_use\"}}' > /dev/null 2>&1 || true"
-        ),
+        "matcher": { "tools": ["mcp__amend-terminal*"] },
+        "hooks": [{
+            "type": "command",
+            "command": format!(
+                "curl -sf -X POST {url} -H 'Content-Type: application/json' -d '{{\"agent\":\"claude\",\"action\":\"tool_use\"}}' > /dev/null 2>&1 || true"
+            )
+        }],
         "_id": CLAUDE_HOOKS_MARKER
     });
 
     // Stop hook: fires when Claude finishes responding
     let stop_hook = json!({
-        "matcher": "",
-        "command": format!(
-            "curl -sf -X POST {url} -H 'Content-Type: application/json' -d '{{\"agent\":\"claude\",\"action\":\"session_end\"}}' > /dev/null 2>&1 || true"
-        ),
+        "matcher": {},
+        "hooks": [{
+            "type": "command",
+            "command": format!(
+                "curl -sf -X POST {url} -H 'Content-Type: application/json' -d '{{\"agent\":\"claude\",\"action\":\"session_end\"}}' > /dev/null 2>&1 || true"
+            )
+        }],
         "_id": CLAUDE_HOOKS_MARKER
     });
 
@@ -1074,8 +1080,12 @@ fn remove_claude_hooks(port: u16) {
                 arr.retain(|h| {
                     let is_ours =
                         h.get("_id").and_then(|v| v.as_str()) == Some(CLAUDE_HOOKS_MARKER);
+                    // In the new format, command is nested inside hooks[].command
                     let matches_port = h
-                        .get("command")
+                        .get("hooks")
+                        .and_then(|v| v.as_array())
+                        .and_then(|arr| arr.first())
+                        .and_then(|entry| entry.get("command"))
                         .and_then(|v| v.as_str())
                         .map(|cmd| cmd.contains(&expected_url))
                         .unwrap_or(false);
