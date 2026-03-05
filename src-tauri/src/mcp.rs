@@ -579,9 +579,7 @@ pub async fn get_mcp_server_port(
 }
 
 #[tauri::command]
-pub async fn register_mcp_server(
-    state: tauri::State<'_, McpServerHandle>,
-) -> Result<(), String> {
+pub async fn register_mcp_server(state: tauri::State<'_, McpServerHandle>) -> Result<(), String> {
     let port = state.get_port().await.ok_or("MCP server not running")?;
     write_claude_code_config(port);
     Ok(())
