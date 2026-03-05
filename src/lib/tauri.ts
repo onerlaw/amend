@@ -412,3 +412,59 @@ export async function findDefinition(symbol: string): Promise<SymbolDefinition[]
 export async function findReferences(symbol: string, rootPath: string): Promise<SymbolReference[]> {
   return invoke('find_references', { symbol, rootPath });
 }
+
+// Semantic search types
+export interface CallRelation {
+  caller: string;
+  callerFile: string;
+  callerLine: number;
+  callee: string;
+}
+
+export interface ImportInfo {
+  filePath: string;
+  importedName: string;
+  source: string;
+  line: number;
+}
+
+export interface CallGraphNode {
+  name: string;
+  filePath: string;
+  line: number;
+  calls: CallGraphNode[];
+}
+
+export interface SemanticSearchResult {
+  symbol: SymbolDefinition;
+  callerCount: number;
+  calleeCount: number;
+  importerCount: number;
+}
+
+// Semantic search commands
+export async function findCallers(symbol: string): Promise<CallRelation[]> {
+  return invoke('find_callers', { symbol });
+}
+
+export async function findCallees(symbol: string): Promise<CallRelation[]> {
+  return invoke('find_callees', { symbol });
+}
+
+export async function findImporters(symbol: string): Promise<ImportInfo[]> {
+  return invoke('find_importers', { symbol });
+}
+
+export async function getCallGraph(
+  symbol: string,
+  maxDepth?: number
+): Promise<CallGraphNode | null> {
+  return invoke('get_call_graph', { symbol, maxDepth });
+}
+
+export async function semanticSearch(
+  query: string,
+  limit?: number
+): Promise<SemanticSearchResult[]> {
+  return invoke('semantic_search', { query, limit });
+}

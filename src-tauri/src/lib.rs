@@ -13,7 +13,10 @@ use filesystem::{FileSystemManager, SearchGeneration};
 use lsp::LspManager;
 use mcp::{McpServer, McpServerHandle};
 use std::sync::Arc;
-use symbols::{SymbolDefinition, SymbolIndex, SymbolReference};
+use symbols::{
+    CallGraphNode, CallRelation, ImportInfo, SemanticSearchResult, SymbolDefinition, SymbolIndex,
+    SymbolReference,
+};
 use tauri::{Emitter, Manager, State};
 use terminal::TerminalManager;
 use terminal_buffer::OutputBufferRegistry;
@@ -134,6 +137,12 @@ pub fn run() {
             remove_file_from_index,
             find_definition,
             find_references,
+            // Semantic search commands
+            find_callers,
+            find_callees,
+            find_importers,
+            get_call_graph,
+            semantic_search,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -185,6 +194,72 @@ async fn find_references(
 ) -> Result<Vec<SymbolReference>, String> {
     let idx = index.inner().clone();
     let result = spawn_blocking(move || idx.find_references(&symbol, &root_path))
+        .await
+        .map_err(|e| format!("Task failed: {}", e))?;
+    Ok(result)
+}
+
+// Semantic search commands
+
+#[tauri::command]
+async fn find_callers(
+    symbol: String,
+    index: State<'_, SymbolIndex>,
+) -> Result<Vec<CallRelation>, String> {
+    let idx = index.inner().clone();
+    let result = spawn_blocking(move || idx.find_callers(&symbol))
+        .await
+        .map_err(|e| format!("Task failed: {}", e))?;
+    Ok(result)
+}
+
+#[tauri::command]
+async fn find_callees(
+    symbol: String,
+    index: State<'_, SymbolIndex>,
+) -> Result<Vec<CallRelation>, String> {
+    let idx = index.inner().clone();
+    let result = spawn_blocking(move || idx.find_callees(&symbol))
+        .await
+        .map_err(|e| format!("Task failed: {}", e))?;
+    Ok(result)
+}
+
+#[tauri::command]
+async fn find_importers(
+    symbol: String,
+    index: State<'_, SymbolIndex>,
+) -> Result<Vec<ImportInfo>, String> {
+    let idx = index.inner().clone();
+    let result = spawn_blocking(move || idx.find_importers(&symbol))
+        .await
+        .map_err(|e| format!("Task failed: {}", e))?;
+    Ok(result)
+}
+
+#[tauri::command]
+async fn get_call_graph(
+    symbol: String,
+    max_depth: Option<usize>,
+    index: State<'_, SymbolIndex>,
+) -> Result<Option<CallGraphNode>, String> {
+    let idx = index.inner().clone();
+    let depth = max_depth.unwrap_or(3);
+    let result = spawn_blocking(move || idx.get_call_graph(&symbol, depth))
+        .await
+        .map_err(|e| format!("Task failed: {}", e))?;
+    Ok(result)
+}
+
+#[tauri::command]
+async fn semantic_search(
+    query: String,
+    limit: Option<usize>,
+    index: State<'_, SymbolIndex>,
+) -> Result<Vec<SemanticSearchResult>, String> {
+    let idx = index.inner().clone();
+    let max = limit.unwrap_or(50);
+    let result = spawn_blocking(move || idx.semantic_search(&query, max))
         .await
         .map_err(|e| format!("Task failed: {}", e))?;
     Ok(result)
