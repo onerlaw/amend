@@ -4,6 +4,7 @@ mod git;
 mod lsp;
 mod mcp;
 mod session;
+mod snapshot;
 mod symbols;
 mod terminal;
 mod terminal_buffer;
@@ -149,6 +150,13 @@ pub fn run() {
             session::get_session,
             session::delete_session,
             session::record_session_event,
+            // Snapshot commands
+            snapshot::create_snapshot,
+            snapshot::list_snapshots,
+            snapshot::restore_snapshot,
+            snapshot::delete_snapshot,
+            snapshot::diff_snapshot,
+            snapshot::get_snapshot_file_diff,
             // Watcher commands
             watcher::start_watching_directory,
             watcher::stop_watching_directory,

@@ -342,6 +342,59 @@ export async function gitQuickCheck(repoPath: string, cachedFingerprint: string)
   return invoke('git_quick_check', { repoPath, cachedFingerprint });
 }
 
+// Snapshot types
+export interface Snapshot {
+  id: string;
+  label: string;
+  timestamp: number;
+  commitSha: string;
+  repoPath: string;
+  changedFiles: string[];
+}
+
+export interface SnapshotFileDiff {
+  path: string;
+  status: string;
+}
+
+export interface SnapshotDiff {
+  oldContent: string;
+  newContent: string;
+  isBinary: boolean;
+}
+
+// Snapshot commands
+export async function createSnapshot(repoPath: string, label: string): Promise<Snapshot> {
+  return invoke('create_snapshot', { repoPath, label });
+}
+
+export async function listSnapshots(repoPath: string): Promise<Snapshot[]> {
+  return invoke('list_snapshots', { repoPath });
+}
+
+export async function restoreSnapshot(repoPath: string, snapshotId: string): Promise<void> {
+  return invoke('restore_snapshot', { repoPath, snapshotId });
+}
+
+export async function deleteSnapshot(repoPath: string, snapshotId: string): Promise<void> {
+  return invoke('delete_snapshot', { repoPath, snapshotId });
+}
+
+export async function diffSnapshot(
+  repoPath: string,
+  snapshotId: string
+): Promise<SnapshotFileDiff[]> {
+  return invoke('diff_snapshot', { repoPath, snapshotId });
+}
+
+export async function getSnapshotFileDiff(
+  repoPath: string,
+  snapshotId: string,
+  filePath: string
+): Promise<SnapshotDiff> {
+  return invoke('get_snapshot_file_diff', { repoPath, snapshotId, filePath });
+}
+
 // LSP commands
 export interface LspStartParams {
   serverId: string;
