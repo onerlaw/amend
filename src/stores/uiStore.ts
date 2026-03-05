@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { toggleSetItem } from '@/lib/fileUtils';
 
-export type PanelMode = 'diff' | 'browse' | null;
+export type PanelMode = 'diff' | 'browse' | 'timeline' | null;
 export type ThemeMode = 'light' | 'dark' | 'system';
 export type FocusedPanel = 'terminal' | 'editor' | 'file-list';
 export type DiffMode = 'working' | 'branch';

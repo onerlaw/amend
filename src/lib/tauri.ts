@@ -468,3 +468,53 @@ export async function semanticSearch(
 ): Promise<SemanticSearchResult[]> {
   return invoke('semantic_search', { query, limit });
 }
+
+// Session timeline types
+export interface SessionSummary {
+  id: string;
+  terminalId: string;
+  startedAt: number;
+  stoppedAt: number | null;
+  label: string;
+  eventCount: number;
+}
+
+export interface SessionData {
+  id: string;
+  terminalId: string;
+  startedAt: number;
+  stoppedAt: number | null;
+  events: Record<string, unknown>[];
+  label: string;
+}
+
+export interface SessionEvent {
+  type: string;
+  timestamp: number;
+  [key: string]: unknown;
+}
+
+// Session timeline commands
+export async function startSessionRecording(terminalId: string): Promise<string> {
+  return invoke('start_session_recording', { terminalId });
+}
+
+export async function stopSessionRecording(sessionId: string): Promise<void> {
+  return invoke('stop_session_recording', { sessionId });
+}
+
+export async function listSessions(): Promise<SessionSummary[]> {
+  return invoke('list_sessions');
+}
+
+export async function getSession(sessionId: string): Promise<SessionData> {
+  return invoke('get_session', { sessionId });
+}
+
+export async function deleteSession(sessionId: string): Promise<void> {
+  return invoke('delete_session', { sessionId });
+}
+
+export async function recordSessionEvent(sessionId: string, event: SessionEvent): Promise<void> {
+  return invoke('record_session_event', { sessionId, event });
+}
