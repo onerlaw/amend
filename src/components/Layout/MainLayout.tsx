@@ -58,6 +58,11 @@ const SettingsPanel = lazy(() =>
     default: m.SettingsPanel,
   }))
 );
+const SessionTimeline = lazy(() =>
+  import('@/components/Timeline/SessionTimeline').then((m) => ({
+    default: m.SessionTimeline,
+  }))
+);
 
 export function MainLayout() {
   const {
@@ -315,6 +320,16 @@ export function MainLayout() {
             >
               Browse
             </button>
+            <button
+              onClick={() => setPanelMode(panelMode === 'timeline' ? null : 'timeline')}
+              className={`rounded-md px-2 py-1 text-xs ${
+                panelMode === 'timeline'
+                  ? 'bg-accent text-white'
+                  : 'text-secondary hover:bg-surface-3'
+              }`}
+            >
+              Timeline
+            </button>
           </div>
         </div>
         <div className="flex min-w-[40px] items-center justify-end gap-2">
@@ -392,6 +407,16 @@ export function MainLayout() {
               <Panel id="browse-file-list" order={3} defaultSize={20} minSize={10} maxSize={40}>
                 <Suspense fallback={null}>
                   <BrowseFileListPanel />
+                </Suspense>
+              </Panel>
+            )}
+
+            {/* Timeline mode */}
+            {panelMode === 'timeline' && <PanelResizeHandle />}
+            {panelMode === 'timeline' && (
+              <Panel id="timeline" order={2} defaultSize={40} minSize={20}>
+                <Suspense fallback={null}>
+                  <SessionTimeline />
                 </Suspense>
               </Panel>
             )}

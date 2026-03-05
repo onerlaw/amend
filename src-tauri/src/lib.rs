@@ -3,6 +3,7 @@ mod filesystem;
 mod git;
 mod lsp;
 mod mcp;
+mod session;
 mod symbols;
 mod terminal;
 mod terminal_buffer;
@@ -12,6 +13,7 @@ mod watcher;
 use filesystem::{FileSystemManager, SearchGeneration};
 use lsp::LspManager;
 use mcp::{McpServer, McpServerHandle};
+use session::SessionCapture;
 use std::sync::Arc;
 use symbols::{
     CallGraphNode, CallRelation, ImportInfo, SemanticSearchResult, SymbolDefinition, SymbolIndex,
@@ -30,6 +32,7 @@ pub fn run() {
     let output_buffers = Arc::new(OutputBufferRegistry::new());
     let metadata_store = Arc::new(TerminalMetadataStore::new());
     let mcp_handle = McpServerHandle::new();
+    let session_capture = SessionCapture::new();
 
     // Clone Arcs for the setup hook
     let tm_for_mcp = Arc::clone(&terminal_manager);
@@ -45,12 +48,22 @@ pub fn run() {
         .manage(output_buffers)
         .manage(metadata_store)
         .manage(mcp_handle)
+        .manage(session_capture)
         .manage(LspManager::new())
         .manage(FileSystemManager::new())
         .manage(SearchGeneration::new())
         .manage(SymbolIndex::new())
         .manage(FileWatcher::new())
         .setup(move |app| {
+            // Initialize session capture data directory and load persisted sessions
+            let session_state: tauri::State<'_, SessionCapture> = app.state();
+            if let Ok(app_data_dir) = app.path().app_data_dir() {
+                session_state.set_data_dir(app_data_dir);
+                if let Err(e) = session_state.load_sessions() {
+                    eprintln!("[session] Failed to load sessions: {}", e);
+                }
+            }
+
             let mcp_handle: tauri::State<'_, McpServerHandle> = app.state();
             let mcp_handle_inner = mcp_handle.inner().clone();
 
@@ -129,6 +142,13 @@ pub fn run() {
             git::unstage_file,
             git::stage_file,
             git::get_diff_stats,
+            // Session timeline commands
+            session::start_session_recording,
+            session::stop_session_recording,
+            session::list_sessions,
+            session::get_session,
+            session::delete_session,
+            session::record_session_event,
             // Watcher commands
             watcher::start_watching_directory,
             watcher::stop_watching_directory,
