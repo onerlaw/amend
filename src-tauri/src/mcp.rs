@@ -314,6 +314,7 @@ async fn tool_list_terminals(id: Value, state: &McpServerState) -> JsonRpcRespon
             "repoName": meta.repo_name,
             "mainRepoRoot": meta.main_repo_root,
             "worktreeName": meta.worktree_name,
+            "branchName": meta.branch_name,
             "isBusy": is_busy,
             "lastLine": last_line,
         }));

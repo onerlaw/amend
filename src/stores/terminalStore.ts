@@ -10,6 +10,7 @@ export interface TerminalTab {
   repoName?: string | null;
   mainRepoRoot?: string | null;
   worktreeName?: string | null;
+  branchName?: string | null;
 }
 
 interface TerminalState {
@@ -27,6 +28,7 @@ interface TerminalState {
       repoName?: string | null;
       mainRepoRoot?: string | null;
       worktreeName?: string | null;
+      branchName?: string | null;
     }
   ) => void;
   reorderTabs: (fromIndex: number, toIndex: number) => void;
@@ -101,6 +103,7 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
               repoName: undefined,
               mainRepoRoot: undefined,
               worktreeName: undefined,
+              branchName: undefined,
             }
           : t
       ),
@@ -117,6 +120,7 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
               repoName: info.repoName ?? null,
               mainRepoRoot: info.mainRepoRoot ?? null,
               worktreeName: info.worktreeName ?? null,
+              branchName: info.branchName ?? null,
             }
           : t
       ),

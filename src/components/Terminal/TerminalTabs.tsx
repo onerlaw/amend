@@ -26,34 +26,30 @@ import { isTerminalBusy } from '@/lib/tauri';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { collectTerminalIds, findLeafByTerminalId, deserializeLayout } from '@/lib/layoutTree';
 
-export function TerminalTabLabel({ tab }: { tab: TerminalTab }) {
-  const dirName = getFileName(tab.cwd);
-  if (tab.worktreeName) {
-    const subtitle = tab.title || dirName;
-    return (
-      <span className="flex flex-col leading-tight max-w-[160px]">
-        <span className="truncate">{tab.worktreeName}</span>
-        {subtitle !== tab.worktreeName && (
-          <span className="truncate text-[10px] opacity-60">{subtitle}</span>
-        )}
-      </span>
-    );
-  }
-  return <span className="truncate max-w-[200px]">{tab.title || dirName}</span>;
+function TabBranchBadge({ tab }: { tab: TerminalTab }) {
+  const label = tab.branchName ?? tab.worktreeName ?? '~';
+  return (
+    <span className="inline-flex items-center text-[9px] text-tertiary/70 bg-surface-2 rounded px-1 font-mono select-none shrink-0">
+      {label}
+    </span>
+  );
 }
 
-interface WorktreeSubGroup {
-  worktreeLabel: string;
-  gitRoot: string | null;
-  tabs: TerminalTab[];
-  globalIndices: number[];
+export function TerminalTabLabel({ tab }: { tab: TerminalTab }) {
+  const dirName = getFileName(tab.cwd);
+  return (
+    <span className="flex items-center gap-1 max-w-[200px]">
+      <span className="truncate">{tab.title || dirName}</span>
+      <TabBranchBadge tab={tab} />
+    </span>
+  );
 }
 
 interface TabGroup {
   projectName: string;
-  mainRepoRoot: string | null;
-  subGroups: WorktreeSubGroup[];
-  hasMultipleWorktrees: boolean;
+  projectKey: string;
+  tabs: TerminalTab[];
+  globalIndices: number[];
 }
 
 export function groupTabsByProject(tabs: TerminalTab[]): TabGroup[] {
@@ -63,7 +59,6 @@ export function groupTabsByProject(tabs: TerminalTab[]): TabGroup[] {
   for (let i = 0; i < tabs.length; i++) {
     const tab = tabs[i];
     const root = tab.gitRoot ?? null;
-    // Level 1: group by mainRepoRoot so all worktrees of the same repo are together
     const mainRoot = tab.mainRepoRoot ?? root;
     const projectKey = mainRoot ?? '~';
 
@@ -71,33 +66,16 @@ export function groupTabsByProject(tabs: TerminalTab[]): TabGroup[] {
     if (!group) {
       group = {
         projectName: tab.repoName ?? (root ? getFileName(root) : '~'),
-        mainRepoRoot: mainRoot,
-        subGroups: [],
-        hasMultipleWorktrees: false,
+        projectKey,
+        tabs: [],
+        globalIndices: [],
       };
       groupMap.set(projectKey, group);
       groups.push(group);
     }
 
-    // Level 2: sub-group by gitRoot within each project
-    const subKey = root ?? '~';
-    let subGroup = group.subGroups.find((sg) => (sg.gitRoot ?? '~') === subKey);
-    if (!subGroup) {
-      subGroup = {
-        worktreeLabel: tab.worktreeName ?? (root ? getFileName(root) : '~'),
-        gitRoot: root,
-        tabs: [],
-        globalIndices: [],
-      };
-      group.subGroups.push(subGroup);
-    }
-    subGroup.tabs.push(tab);
-    subGroup.globalIndices.push(i);
-  }
-
-  // Set hasMultipleWorktrees flag
-  for (const group of groups) {
-    group.hasMultipleWorktrees = group.subGroups.length > 1;
+    group.tabs.push(tab);
+    group.globalIndices.push(i);
   }
 
   return groups;
@@ -106,14 +84,6 @@ export function groupTabsByProject(tabs: TerminalTab[]): TabGroup[] {
 export function ProjectLabel({ name }: { name: string }) {
   return (
     <span className="inline-flex items-center px-1.5 py-0.5 text-[10px] text-tertiary bg-surface-3 rounded font-medium select-none shrink-0">
-      {name}
-    </span>
-  );
-}
-
-export function WorktreeSubLabel({ name }: { name: string }) {
-  return (
-    <span className="inline-flex items-center px-1 text-[10px] text-tertiary/60 font-medium select-none shrink-0">
       {name}
     </span>
   );
@@ -311,54 +281,44 @@ export const TerminalTabs = forwardRef<TerminalTabsHandle>(function TerminalTabs
       {backgroundedTabs.length > 0 && (
         <div className="flex items-center bg-surface-2 px-1 pt-1 gap-0.5">
           <div ref={containerRef} className="flex flex-1 overflow-x-auto gap-0.5 items-center">
-            {backgroundedGroups.map((group, groupIdx) => {
-              const multipleGroups = backgroundedGroups.length > 1;
-              return (
-                <Fragment key={group.projectName + (group.mainRepoRoot ?? '~')}>
-                  {groupIdx > 0 && <div className="w-px h-5 bg-surface-3 shrink-0" />}
-                  <div className={`flex items-center gap-0.5 shrink-0 ${multipleGroups ? 'bg-surface-1/50 rounded-md px-1 py-0.5' : ''}`}>
-                    {multipleGroups && <ProjectLabel name={group.projectName} />}
-                    {group.subGroups.map((subGroup) => (
-                      <Fragment key={subGroup.gitRoot ?? '~'}>
-                        {group.hasMultipleWorktrees && (
-                          <WorktreeSubLabel name={subGroup.worktreeLabel} />
+            {backgroundedGroups.map((group, groupIdx) => (
+              <Fragment key={group.projectKey}>
+                {groupIdx > 0 && <div className="w-0.5 h-6 bg-accent/30 rounded-full mx-1 shrink-0" />}
+                <div className="flex items-center gap-0.5 shrink-0 bg-surface-1/50 rounded-md px-1 py-0.5">
+                  <ProjectLabel name={group.projectName} />
+                  {group.tabs.map((tab, tabIdx) => {
+                    const globalIndex = group.globalIndices[tabIdx];
+                    const isActive = activeTabId === tab.id;
+                    return (
+                      <div key={tab.id} className="relative flex">
+                        {dropIndicatorIndex === globalIndex && (
+                          <div className="absolute left-0 top-1 bottom-1 w-0.5 bg-accent rounded-full z-10 pointer-events-none" />
                         )}
-                        {subGroup.tabs.map((tab, tabIdx) => {
-                          const globalIndex = subGroup.globalIndices[tabIdx];
-                          const isActive = activeTabId === tab.id;
-                          return (
-                            <div key={tab.id} className="relative flex">
-                              {dropIndicatorIndex === globalIndex && (
-                                <div className="absolute left-0 top-1 bottom-1 w-0.5 bg-accent rounded-full z-10 pointer-events-none" />
-                              )}
-                              <button
-                                {...getTabDragProps(globalIndex)}
-                                onClick={() => handleTabClick(tab.id)}
-                                className={`group flex items-center gap-1.5 px-2 py-1 text-xs ${
-                                  isActive
-                                    ? 'bg-terminal-bg text-primary'
-                                    : 'text-secondary hover:bg-surface-1 opacity-50 hover:opacity-75'
-                                } ${dragFromIndex === globalIndex ? 'opacity-50' : ''}`}
-                                title={tab.cwd}
-                              >
-                                <TerminalTabLabel tab={tab} />
-                                <span
-                                  onMouseDown={(e) => e.stopPropagation()}
-                                  onClick={(e) => handleCloseTerminal(e, tab.id)}
-                                  className="ml-1 rounded-full p-0.5 opacity-0 hover:bg-surface-3 group-hover:opacity-100"
-                                >
-                                  <CloseIcon />
-                                </span>
-                              </button>
-                            </div>
-                          );
-                        })}
-                      </Fragment>
-                    ))}
-                  </div>
-                </Fragment>
-              );
-            })}
+                        <button
+                          {...getTabDragProps(globalIndex)}
+                          onClick={() => handleTabClick(tab.id)}
+                          className={`group flex items-center gap-1.5 px-2 py-1 text-xs ${
+                            isActive
+                              ? 'bg-terminal-bg text-primary'
+                              : 'text-secondary hover:bg-surface-1 opacity-50 hover:opacity-75'
+                          } ${dragFromIndex === globalIndex ? 'opacity-50' : ''}`}
+                          title={tab.cwd}
+                        >
+                          <TerminalTabLabel tab={tab} />
+                          <span
+                            onMouseDown={(e) => e.stopPropagation()}
+                            onClick={(e) => handleCloseTerminal(e, tab.id)}
+                            className="ml-1 rounded-full p-0.5 opacity-0 hover:bg-surface-3 group-hover:opacity-100"
+                          >
+                            <CloseIcon />
+                          </span>
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </Fragment>
+            ))}
             {dropIndicatorIndex === backgroundedTabs.length && (
               <div className="relative flex">
                 <div className="absolute left-0 top-1 bottom-1 w-0.5 bg-accent rounded-full z-10 pointer-events-none" />

@@ -12,6 +12,7 @@ pub struct TerminalMetadata {
     pub repo_name: Option<String>,
     pub main_repo_root: Option<String>,
     pub worktree_name: Option<String>,
+    pub branch_name: Option<String>,
 }
 
 pub struct TerminalMetadataStore {

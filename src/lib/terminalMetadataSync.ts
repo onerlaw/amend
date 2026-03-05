@@ -15,6 +15,7 @@ function buildMetadata(tab: TerminalTab): TerminalMetadataPayload {
     repoName: tab.repoName ?? null,
     mainRepoRoot: tab.mainRepoRoot ?? null,
     worktreeName: tab.worktreeName ?? null,
+    branchName: tab.branchName ?? null,
   };
 }
 

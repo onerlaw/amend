@@ -49,6 +49,7 @@ export interface TerminalMetadataPayload {
   repoName: string | null;
   mainRepoRoot: string | null;
   worktreeName: string | null;
+  branchName: string | null;
 }
 
 export async function syncTerminalMetadata(
@@ -212,6 +213,7 @@ export interface GitRepoInfo {
   repoName: string;
   mainRepoRoot: string;
   worktreeName: string | null;
+  currentBranch: string | null;
 }
 
 export async function getGitRepoInfo(path: string): Promise<GitRepoInfo | null> {

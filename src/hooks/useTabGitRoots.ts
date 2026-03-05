@@ -28,6 +28,7 @@ export function useTabGitRoots() {
             repoName: info?.repoName ?? null,
             mainRepoRoot: info?.mainRepoRoot ?? null,
             worktreeName: info?.worktreeName ?? null,
+            branchName: info?.currentBranch ?? null,
           });
         }
       });
@@ -52,6 +53,7 @@ export function useTabGitRoots() {
               repoName: info.repoName,
               mainRepoRoot: info.mainRepoRoot ?? null,
               worktreeName: info.worktreeName ?? null,
+              branchName: info.currentBranch ?? null,
             });
           }
         });

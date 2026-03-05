@@ -200,6 +200,7 @@ pub struct GitRepoInfo {
     pub repo_name: String,
     pub main_repo_root: String,
     pub worktree_name: Option<String>,
+    pub current_branch: Option<String>,
 }
 
 #[tauri::command]
@@ -245,11 +246,21 @@ pub async fn get_git_repo_info(path: String) -> Result<Option<GitRepoInfo>, GitE
             None
         };
 
+        let current_branch = repo.head().ok().and_then(|head| {
+            if head.is_branch() {
+                head.shorthand().map(|s| s.to_string())
+            } else {
+                // Detached HEAD — use short SHA
+                head.target().map(|oid| oid.to_string()[..7].to_string())
+            }
+        });
+
         Ok(Some(GitRepoInfo {
             git_root,
             repo_name,
             main_repo_root,
             worktree_name,
+            current_branch,
         }))
     })
     .await
