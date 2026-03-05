@@ -63,6 +63,11 @@ const SessionTimeline = lazy(() =>
     default: m.SessionTimeline,
   }))
 );
+const SnapshotPanel = lazy(() =>
+  import('@/components/Snapshots/SnapshotPanel').then((m) => ({
+    default: m.SnapshotPanel,
+  }))
+);
 
 export function MainLayout() {
   const {
@@ -330,15 +335,33 @@ export function MainLayout() {
             >
               Timeline
             </button>
+            <button
+              onClick={() => setPanelMode(panelMode === 'snapshots' ? null : 'snapshots')}
+              className={`rounded-md px-2 py-1 text-xs ${
+                panelMode === 'snapshots'
+                  ? 'bg-accent text-white'
+                  : 'text-secondary hover:bg-surface-3'
+              }`}
+            >
+              Snapshots
+            </button>
           </div>
         </div>
         <div className="flex min-w-[40px] items-center justify-end gap-2">
           {gitPolling.currentBranch && (
-            <div className="flex items-center gap-1 text-xs text-secondary" title={gitPolling.currentBranch + (activeTab?.worktreeName ? ` (${activeTab.worktreeName})` : '')}>
+            <div
+              className="flex items-center gap-1 text-xs text-secondary"
+              title={
+                gitPolling.currentBranch +
+                (activeTab?.worktreeName ? ` (${activeTab.worktreeName})` : '')
+              }
+            >
               <BranchIcon className="h-3 w-3 shrink-0" />
               <span className="max-w-[120px] truncate">{gitPolling.currentBranch}</span>
               {activeTab?.worktreeName && (
-                <span className="max-w-[80px] truncate text-tertiary">({activeTab.worktreeName})</span>
+                <span className="max-w-[80px] truncate text-tertiary">
+                  ({activeTab.worktreeName})
+                </span>
               )}
             </div>
           )}
@@ -417,6 +440,16 @@ export function MainLayout() {
               <Panel id="timeline" order={2} defaultSize={40} minSize={20}>
                 <Suspense fallback={null}>
                   <SessionTimeline />
+                </Suspense>
+              </Panel>
+            )}
+
+            {/* Snapshots mode */}
+            {panelMode === 'snapshots' && <PanelResizeHandle />}
+            {panelMode === 'snapshots' && (
+              <Panel id="snapshots" order={2} defaultSize={40} minSize={20}>
+                <Suspense fallback={null}>
+                  <SnapshotPanel />
                 </Suspense>
               </Panel>
             )}
