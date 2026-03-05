@@ -995,8 +995,9 @@ fn write_claude_hooks(port: u16) {
     let url = hooks_url(port);
 
     // PreToolUse hook: fires when Claude is about to use an amend-terminal tool
+    // matcher is a regex string that filters on tool_name
     let pre_tool_hook = json!({
-        "matcher": { "tools": ["mcp__amend-terminal*"] },
+        "matcher": "mcp__amend-terminal.*",
         "hooks": [{
             "type": "command",
             "command": format!(
@@ -1007,8 +1008,8 @@ fn write_claude_hooks(port: u16) {
     });
 
     // Stop hook: fires when Claude finishes responding
+    // Stop does not support matchers, so omit it
     let stop_hook = json!({
-        "matcher": {},
         "hooks": [{
             "type": "command",
             "command": format!(
