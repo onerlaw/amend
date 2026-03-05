@@ -20,11 +20,17 @@ import {
   NotesIcon,
   BranchIcon,
   FolderIcon,
+  EyeIcon,
 } from '@/components/Icons';
 import { useNotesStore } from '@/stores/notesStore';
 import { WorktreeManager } from '@/components/WorktreeManager';
 import { useCreateTerminal } from '@/hooks/useTerminalLifecycle';
 
+const ReviewPanel = lazy(() =>
+  import('@/components/AgentWorkspace/ReviewPanel').then((m) => ({
+    default: m.ReviewPanel,
+  }))
+);
 const TerminalTabs = lazy(() =>
   import('@/components/Terminal/TerminalTabs').then((m) => ({
     default: m.TerminalTabs,
@@ -84,6 +90,7 @@ export function MainLayout() {
   const { tabs, activeTabId } = useTerminalStore();
   const [showSettings, setShowSettings] = useState(false);
   const [showWorktrees, setShowWorktrees] = useState(false);
+  const [showAgentWorkspaces, setShowAgentWorkspaces] = useState(false);
   const createTerminal = useCreateTerminal();
   const terminalTabsRef = useRef<TerminalTabsHandle>(null);
   const browseEditorTabsRef = useRef<BrowseEditorTabsHandle>(null);
@@ -262,6 +269,20 @@ export function MainLayout() {
             title="Worktrees"
           >
             <BranchIcon />
+          </button>
+          <button
+            onClick={() => contextPath && setShowAgentWorkspaces(true)}
+            disabled={!contextPath}
+            className={`rounded-md p-1.5 ${
+              showAgentWorkspaces
+                ? 'bg-accent text-white'
+                : contextPath
+                  ? 'text-secondary hover:bg-surface-3'
+                  : 'cursor-not-allowed text-tertiary opacity-50'
+            }`}
+            title="Agent Workspaces"
+          >
+            <EyeIcon />
           </button>
           <button
             onClick={() => terminalTabsRef.current?.openFolder()}
@@ -471,6 +492,17 @@ export function MainLayout() {
           onClose={() => setShowWorktrees(false)}
           createTerminal={createTerminal}
         />
+      )}
+
+      {/* Agent Workspaces Review Panel */}
+      {showAgentWorkspaces && contextPath && (
+        <Suspense fallback={null}>
+          <ReviewPanel
+            repoPath={contextPath}
+            onClose={() => setShowAgentWorkspaces(false)}
+            createTerminal={createTerminal}
+          />
+        </Suspense>
       )}
 
       {/* Floating Notes Panel */}

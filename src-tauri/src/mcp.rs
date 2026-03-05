@@ -526,9 +526,7 @@ async fn tool_get_workspace_status(id: Value, args: &Value) -> JsonRpcResponse {
                 }]
             }),
         ),
-        Err(e) => {
-            JsonRpcResponse::error(id, -32603, format!("Failed to list workspaces: {}", e))
-        }
+        Err(e) => JsonRpcResponse::error(id, -32603, format!("Failed to list workspaces: {}", e)),
     }
 }
 

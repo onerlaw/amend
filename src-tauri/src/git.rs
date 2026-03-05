@@ -1229,10 +1229,7 @@ fn current_branch_name(repo_path: &str) -> Result<String, GitError> {
     }
 }
 
-fn create_agent_worktree_sync(
-    repo_path: &str,
-    agent_id: &str,
-) -> Result<AgentWorktree, GitError> {
+fn create_agent_worktree_sync(repo_path: &str, agent_id: &str) -> Result<AgentWorktree, GitError> {
     validate_no_flag(agent_id, "agent_id")?;
     if agent_id.trim().is_empty() {
         return Err(GitError::InvalidArgument(
@@ -1242,9 +1239,7 @@ fn create_agent_worktree_sync(
 
     let branch_name = format!("{}{}", AGENT_BRANCH_PREFIX, agent_id);
     let dir_name = format!("{}{}", AGENT_WORKTREE_PREFIX, agent_id);
-    let worktree_path = Path::new(repo_path)
-        .join(".worktrees")
-        .join(&dir_name);
+    let worktree_path = Path::new(repo_path).join(".worktrees").join(&dir_name);
 
     let worktree_path_str = worktree_path.to_string_lossy().to_string();
 
@@ -1326,7 +1321,12 @@ fn merge_agent_worktree_sync(
             // Find commits unique to the agent branch and cherry-pick them
             let log_output = run_git_command(
                 repo_path,
-                &["log", "--format=%H", "--reverse", &format!("HEAD..{}", branch_name)],
+                &[
+                    "log",
+                    "--format=%H",
+                    "--reverse",
+                    &format!("HEAD..{}", branch_name),
+                ],
             )?;
             for sha in log_output.lines() {
                 let sha = sha.trim();
@@ -1344,9 +1344,7 @@ fn discard_agent_worktree_sync(repo_path: &str, agent_id: &str) -> Result<(), Gi
     validate_no_flag(agent_id, "agent_id")?;
     let branch_name = format!("{}{}", AGENT_BRANCH_PREFIX, agent_id);
     let dir_name = format!("{}{}", AGENT_WORKTREE_PREFIX, agent_id);
-    let worktree_path = Path::new(repo_path)
-        .join(".worktrees")
-        .join(&dir_name);
+    let worktree_path = Path::new(repo_path).join(".worktrees").join(&dir_name);
     let worktree_path_str = worktree_path.to_string_lossy().to_string();
 
     // Remove the worktree (force in case of uncommitted changes)
@@ -1401,8 +1399,7 @@ fn get_agent_worktree_diff_sync(
     }
 
     // Find the merge-base between HEAD and the agent branch
-    let merge_base_output =
-        run_git_command(repo_path, &["merge-base", "HEAD", &branch_name])?;
+    let merge_base_output = run_git_command(repo_path, &["merge-base", "HEAD", &branch_name])?;
     let merge_base = merge_base_output.trim();
 
     // Get changed files between merge-base and agent branch tip
@@ -1463,19 +1460,14 @@ pub async fn merge_agent_worktree(
 }
 
 #[tauri::command]
-pub async fn discard_agent_worktree(
-    repo_path: String,
-    agent_id: String,
-) -> Result<(), GitError> {
+pub async fn discard_agent_worktree(repo_path: String, agent_id: String) -> Result<(), GitError> {
     spawn_blocking(move || discard_agent_worktree_sync(&repo_path, &agent_id))
         .await
         .map_err(|e| GitError::TaskJoin(e.to_string()))?
 }
 
 #[tauri::command]
-pub async fn list_agent_worktrees(
-    repo_path: String,
-) -> Result<Vec<AgentWorktree>, GitError> {
+pub async fn list_agent_worktrees(repo_path: String) -> Result<Vec<AgentWorktree>, GitError> {
     spawn_blocking(move || list_agent_worktrees_sync(&repo_path))
         .await
         .map_err(|e| GitError::TaskJoin(e.to_string()))?
