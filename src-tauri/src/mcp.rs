@@ -431,40 +431,71 @@ fn discovery_file_path() -> Option<std::path::PathBuf> {
     dirs::home_dir().map(|h| h.join(".amend").join("mcp.json"))
 }
 
-fn claude_code_config_path() -> Option<std::path::PathBuf> {
-    dirs::home_dir().map(|h| h.join(".claude.json"))
+// --- Multi-tool MCP registration ---
+
+struct JsonMcpTool {
+    name: &'static str,
+    config_path: fn() -> Option<std::path::PathBuf>,
+    url_field: &'static str,
+    extra_fields: Option<Value>,
 }
 
-fn write_discovery_file(port: u16) {
-    if let Some(path) = discovery_file_path() {
-        if let Some(parent) = path.parent() {
-            let _ = std::fs::create_dir_all(parent);
-        }
-        let content = json!({
-            "url": format!("http://127.0.0.1:{}/sse", port)
-        });
-        if let Err(e) = std::fs::write(&path, serde_json::to_string_pretty(&content).unwrap()) {
-            eprintln!("[MCP] Failed to write discovery file: {}", e);
-        }
-    }
+const MCP_SERVER_KEY: &str = "amend-terminal";
 
-    write_claude_code_config(port);
+fn json_mcp_tools() -> Vec<JsonMcpTool> {
+    vec![
+        JsonMcpTool {
+            name: "Claude Code",
+            config_path: || dirs::home_dir().map(|h| h.join(".claude.json")),
+            url_field: "url",
+            extra_fields: Some(json!({"type": "sse"})),
+        },
+        JsonMcpTool {
+            name: "Cursor",
+            config_path: || dirs::home_dir().map(|h| h.join(".cursor").join("mcp.json")),
+            url_field: "url",
+            extra_fields: None,
+        },
+        JsonMcpTool {
+            name: "Windsurf",
+            config_path: || {
+                dirs::home_dir()
+                    .map(|h| h.join(".codeium").join("windsurf").join("mcp_config.json"))
+            },
+            url_field: "serverUrl",
+            extra_fields: None,
+        },
+        JsonMcpTool {
+            name: "Cline",
+            config_path: || {
+                dirs::home_dir().map(|h| {
+                    h.join("Library/Application Support/Code/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json")
+                })
+            },
+            url_field: "url",
+            extra_fields: None,
+        },
+        JsonMcpTool {
+            name: "Gemini CLI",
+            config_path: || dirs::home_dir().map(|h| h.join(".gemini").join("settings.json")),
+            url_field: "url",
+            extra_fields: None,
+        },
+    ]
 }
 
-pub fn remove_discovery_file(port: Option<u16>) {
-    if let Some(path) = discovery_file_path() {
-        let _ = std::fs::remove_file(path);
-    }
-
-    if let Some(port) = port {
-        remove_claude_code_config(port);
-    }
+fn sse_url(port: u16) -> String {
+    format!("http://127.0.0.1:{}/sse", port)
 }
 
-fn write_claude_code_config(port: u16) {
-    let Some(path) = claude_code_config_path() else {
+fn write_json_tool_config(tool: &JsonMcpTool, port: u16) {
+    let Some(path) = (tool.config_path)() else {
         return;
     };
+
+    if let Some(parent) = path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
 
     let mut config: Value = std::fs::read_to_string(&path)
         .ok()
@@ -479,27 +510,30 @@ fn write_claude_code_config(port: u16) {
     let servers = obj.entry("mcpServers").or_insert_with(|| json!({}));
 
     if let Some(servers_obj) = servers.as_object_mut() {
-        servers_obj.insert(
-            "amend-terminal".to_string(),
-            json!({
-                "type": "sse",
-                "url": format!("http://127.0.0.1:{}/sse", port)
-            }),
-        );
+        let mut entry = json!({});
+        entry[tool.url_field] = json!(sse_url(port));
+        if let Some(extra) = &tool.extra_fields {
+            if let (Some(entry_obj), Some(extra_obj)) = (entry.as_object_mut(), extra.as_object()) {
+                for (k, v) in extra_obj {
+                    entry_obj.insert(k.clone(), v.clone());
+                }
+            }
+        }
+        servers_obj.insert(MCP_SERVER_KEY.to_string(), entry);
     }
 
     match serde_json::to_string_pretty(&config) {
         Ok(json_str) => {
             if let Err(e) = std::fs::write(&path, json_str) {
-                eprintln!("[MCP] Failed to write Claude Code config: {}", e);
+                eprintln!("[MCP] Failed to write {} config: {}", tool.name, e);
             }
         }
-        Err(e) => eprintln!("[MCP] Failed to serialize Claude Code config: {}", e),
+        Err(e) => eprintln!("[MCP] Failed to serialize {} config: {}", tool.name, e),
     }
 }
 
-fn remove_claude_code_config(port: u16) {
-    let Some(path) = claude_code_config_path() else {
+fn remove_json_tool_config(tool: &JsonMcpTool, port: u16) {
+    let Some(path) = (tool.config_path)() else {
         return;
     };
 
@@ -524,11 +558,10 @@ fn remove_claude_code_config(port: u16) {
             None => return,
         };
 
-        // Only remove if the URL matches our port
-        let expected_url = format!("http://127.0.0.1:{}/sse", port);
-        if let Some(entry) = servers.get("amend-terminal") {
-            if entry.get("url").and_then(|u| u.as_str()) == Some(&expected_url) {
-                servers.remove("amend-terminal");
+        let expected_url = sse_url(port);
+        if let Some(entry) = servers.get(MCP_SERVER_KEY) {
+            if entry.get(tool.url_field).and_then(|u| u.as_str()) == Some(&expected_url) {
+                servers.remove(MCP_SERVER_KEY);
             }
         }
 
@@ -542,10 +575,208 @@ fn remove_claude_code_config(port: u16) {
     match serde_json::to_string_pretty(&config) {
         Ok(json_str) => {
             if let Err(e) = std::fs::write(&path, json_str) {
-                eprintln!("[MCP] Failed to write Claude Code config: {}", e);
+                eprintln!("[MCP] Failed to write {} config: {}", tool.name, e);
             }
         }
-        Err(e) => eprintln!("[MCP] Failed to serialize Claude Code config: {}", e),
+        Err(e) => eprintln!("[MCP] Failed to serialize {} config: {}", tool.name, e),
+    }
+}
+
+fn check_json_tool_registered(tool: &JsonMcpTool, port: u16) -> bool {
+    let Some(path) = (tool.config_path)() else {
+        return false;
+    };
+
+    let content = match std::fs::read_to_string(&path) {
+        Ok(s) => s,
+        Err(_) => return false,
+    };
+
+    let config: Value = match serde_json::from_str(&content) {
+        Ok(v) => v,
+        Err(_) => return false,
+    };
+
+    let expected_url = sse_url(port);
+    config
+        .get("mcpServers")
+        .and_then(|s| s.get(MCP_SERVER_KEY))
+        .and_then(|e| e.get(tool.url_field))
+        .and_then(|u| u.as_str())
+        == Some(&expected_url)
+}
+
+// --- Codex CLI (TOML) ---
+
+fn codex_config_path() -> Option<std::path::PathBuf> {
+    dirs::home_dir().map(|h| h.join(".codex").join("config.toml"))
+}
+
+fn write_codex_config(port: u16) {
+    let Some(path) = codex_config_path() else {
+        return;
+    };
+
+    if let Some(parent) = path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+
+    let mut config: toml::Table = std::fs::read_to_string(&path)
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or_default();
+
+    let servers = config
+        .entry("mcp_servers")
+        .or_insert_with(|| toml::Value::Table(toml::Table::new()));
+
+    if let toml::Value::Table(servers_tbl) = servers {
+        let mut entry = toml::Table::new();
+        entry.insert("url".to_string(), toml::Value::String(sse_url(port)));
+        servers_tbl.insert(MCP_SERVER_KEY.to_string(), toml::Value::Table(entry));
+    }
+
+    match toml::to_string_pretty(&config) {
+        Ok(toml_str) => {
+            if let Err(e) = std::fs::write(&path, toml_str) {
+                eprintln!("[MCP] Failed to write Codex CLI config: {}", e);
+            }
+        }
+        Err(e) => eprintln!("[MCP] Failed to serialize Codex CLI config: {}", e),
+    }
+}
+
+fn remove_codex_config(port: u16) {
+    let Some(path) = codex_config_path() else {
+        return;
+    };
+
+    let content = match std::fs::read_to_string(&path) {
+        Ok(s) => s,
+        Err(_) => return,
+    };
+
+    let mut config: toml::Table = match content.parse() {
+        Ok(t) => t,
+        Err(_) => return,
+    };
+
+    let should_remove_servers = {
+        let servers = match config.get_mut("mcp_servers") {
+            Some(toml::Value::Table(t)) => t,
+            _ => return,
+        };
+
+        let expected_url = sse_url(port);
+        if let Some(toml::Value::Table(entry)) = servers.get(MCP_SERVER_KEY) {
+            if entry.get("url").and_then(|u| u.as_str()) == Some(expected_url.as_str()) {
+                servers.remove(MCP_SERVER_KEY);
+            }
+        }
+
+        servers.is_empty()
+    };
+
+    if should_remove_servers {
+        config.remove("mcp_servers");
+    }
+
+    match toml::to_string_pretty(&config) {
+        Ok(toml_str) => {
+            if let Err(e) = std::fs::write(&path, toml_str) {
+                eprintln!("[MCP] Failed to write Codex CLI config: {}", e);
+            }
+        }
+        Err(e) => eprintln!("[MCP] Failed to serialize Codex CLI config: {}", e),
+    }
+}
+
+fn check_codex_registered(port: u16) -> bool {
+    let Some(path) = codex_config_path() else {
+        return false;
+    };
+
+    let content = match std::fs::read_to_string(&path) {
+        Ok(s) => s,
+        Err(_) => return false,
+    };
+
+    let config: toml::Table = match content.parse() {
+        Ok(t) => t,
+        Err(_) => return false,
+    };
+
+    let expected_url = sse_url(port);
+    config
+        .get("mcp_servers")
+        .and_then(|s| s.get(MCP_SERVER_KEY))
+        .and_then(|e| e.get("url"))
+        .and_then(|u| u.as_str())
+        == Some(expected_url.as_str())
+}
+
+// --- Aggregate write/remove/check ---
+
+fn write_all_tool_configs(port: u16) {
+    for tool in &json_mcp_tools() {
+        write_json_tool_config(tool, port);
+    }
+    write_codex_config(port);
+}
+
+fn remove_all_tool_configs(port: u16) {
+    for tool in &json_mcp_tools() {
+        remove_json_tool_config(tool, port);
+    }
+    remove_codex_config(port);
+}
+
+#[derive(Debug, Serialize, Clone)]
+pub struct McpToolRegistration {
+    pub name: String,
+    pub registered: bool,
+}
+
+fn check_all_tool_registrations(port: u16) -> Vec<McpToolRegistration> {
+    let mut results: Vec<McpToolRegistration> = json_mcp_tools()
+        .iter()
+        .map(|tool| McpToolRegistration {
+            name: tool.name.to_string(),
+            registered: check_json_tool_registered(tool, port),
+        })
+        .collect();
+
+    results.push(McpToolRegistration {
+        name: "Codex CLI".to_string(),
+        registered: check_codex_registered(port),
+    });
+
+    results
+}
+
+fn write_discovery_file(port: u16) {
+    if let Some(path) = discovery_file_path() {
+        if let Some(parent) = path.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        let content = json!({
+            "url": sse_url(port)
+        });
+        if let Err(e) = std::fs::write(&path, serde_json::to_string_pretty(&content).unwrap()) {
+            eprintln!("[MCP] Failed to write discovery file: {}", e);
+        }
+    }
+
+    write_all_tool_configs(port);
+}
+
+pub fn remove_discovery_file(port: Option<u16>) {
+    if let Some(path) = discovery_file_path() {
+        let _ = std::fs::remove_file(path);
+    }
+
+    if let Some(port) = port {
+        remove_all_tool_configs(port);
     }
 }
 
@@ -582,6 +813,14 @@ pub async fn get_mcp_server_port(
 #[tauri::command]
 pub async fn register_mcp_server(state: tauri::State<'_, McpServerHandle>) -> Result<(), String> {
     let port = state.get_port().await.ok_or("MCP server not running")?;
-    write_claude_code_config(port);
+    write_all_tool_configs(port);
     Ok(())
+}
+
+#[tauri::command]
+pub async fn check_mcp_registrations(
+    state: tauri::State<'_, McpServerHandle>,
+) -> Result<Vec<McpToolRegistration>, String> {
+    let port = state.get_port().await.ok_or("MCP server not running")?;
+    Ok(check_all_tool_registrations(port))
 }

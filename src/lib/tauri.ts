@@ -72,6 +72,15 @@ export async function registerMcpServer(): Promise<void> {
   return invoke('register_mcp_server');
 }
 
+export interface McpToolRegistration {
+  name: string;
+  registered: boolean;
+}
+
+export async function checkMcpRegistrations(): Promise<McpToolRegistration[]> {
+  return invoke('check_mcp_registrations');
+}
+
 export async function onWindowCloseRequested(callback: () => void): Promise<UnlistenFn> {
   return listen('window-close-requested', () => {
     callback();
