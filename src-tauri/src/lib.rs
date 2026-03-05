@@ -157,6 +157,12 @@ pub fn run() {
             snapshot::delete_snapshot,
             snapshot::diff_snapshot,
             snapshot::get_snapshot_file_diff,
+            // Agent workspace commands
+            git::create_agent_worktree,
+            git::merge_agent_worktree,
+            git::discard_agent_worktree,
+            git::list_agent_worktrees,
+            git::get_agent_worktree_diff,
             // Watcher commands
             watcher::start_watching_directory,
             watcher::stop_watching_directory,
