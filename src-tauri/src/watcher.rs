@@ -1,4 +1,5 @@
 use notify::{Config, Event, RecommendedWatcher, RecursiveMode, Watcher};
+use std::collections::HashSet;
 use std::sync::mpsc;
 use std::sync::Mutex;
 use std::thread;
@@ -62,8 +63,15 @@ impl FileWatcher {
             loop {
                 // Wait for an event or shutdown
                 match event_rx.recv_timeout(Duration::from_millis(100)) {
-                    Ok(_event) => {
+                    Ok(first_event) => {
                         // Got an event, start debounce: drain events for 500ms
+                        let mut changed_paths = HashSet::new();
+                        for p in &first_event.paths {
+                            if let Some(s) = p.to_str() {
+                                changed_paths.insert(s.to_string());
+                            }
+                        }
+
                         let deadline = std::time::Instant::now() + Duration::from_millis(500);
                         loop {
                             let remaining =
@@ -72,12 +80,19 @@ impl FileWatcher {
                                 break;
                             }
                             match event_rx.recv_timeout(remaining) {
-                                Ok(_) => continue,
+                                Ok(ev) => {
+                                    for p in &ev.paths {
+                                        if let Some(s) = p.to_str() {
+                                            changed_paths.insert(s.to_string());
+                                        }
+                                    }
+                                }
                                 Err(mpsc::RecvTimeoutError::Timeout) => break,
                                 Err(mpsc::RecvTimeoutError::Disconnected) => return,
                             }
                         }
-                        let _ = app.emit("fs-changed", ());
+                        let paths: Vec<String> = changed_paths.into_iter().collect();
+                        let _ = app.emit("fs-changed", &paths);
                     }
                     Err(mpsc::RecvTimeoutError::Timeout) => {
                         // Check for shutdown

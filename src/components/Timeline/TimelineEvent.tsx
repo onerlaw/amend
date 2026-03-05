@@ -2,8 +2,6 @@ import type { TimelineEvent as TimelineEventType } from '@/stores/timelineStore'
 
 interface TimelineEventProps {
   event: TimelineEventType;
-  isHighlighted: boolean;
-  onClick: () => void;
 }
 
 function formatTime(timestamp: number): string {
@@ -44,6 +42,12 @@ function EventIcon({ type }: { type: string }) {
           <path d="M0 3a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V3zm9.5 5.5h-3a.5.5 0 0 0 0 1h3a.5.5 0 0 0 0-1zm-6.354-.354a.5.5 0 1 0 .708.708l2-2a.5.5 0 0 0 0-.708l-2-2a.5.5 0 1 0-.708.708L4.793 6.5 3.146 8.146z" />
         </svg>
       );
+    case 'agentActivity':
+      return (
+        <svg className="h-3.5 w-3.5 shrink-0" viewBox="0 0 16 16" fill="currentColor">
+          <path d="M6 12.5a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 0 1h-3a.5.5 0 0 1-.5-.5ZM3 8.062C3 6.76 4.235 5.765 5.53 5.886a26.58 26.58 0 0 0 4.94 0C11.765 5.765 13 6.76 13 8.062v1.157a.933.933 0 0 1-.765.935c-.845.147-2.34.346-4.235.346-1.895 0-3.39-.2-4.235-.346A.933.933 0 0 1 3 9.22V8.062Zm4.542-.827a.25.25 0 0 0-.217.068l-.92.9a.25.25 0 1 0 .35.356l.754-.738.545 1.09a.25.25 0 0 0 .452-.012l.61-1.433.04.09a.25.25 0 0 0 .458-.201l-.452-1.028a.25.25 0 0 0-.464.01L8.09 7.79l-.524-1.047a.25.25 0 0 0-.024-.05ZM4.5 1a3 3 0 0 0-3 3v1a.5.5 0 0 0 1 0V4a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v1a.5.5 0 0 0 1 0V4a3 3 0 0 0-3-3h-7Z" />
+        </svg>
+      );
     default:
       return (
         <svg className="h-3.5 w-3.5 shrink-0" viewBox="0 0 16 16" fill="currentColor">
@@ -65,6 +69,8 @@ function eventColor(type: string): string {
       return 'text-warning';
     case 'terminalOutput':
       return 'text-secondary';
+    case 'agentActivity':
+      return 'text-purple-400';
     default:
       return 'text-tertiary';
   }
@@ -111,6 +117,20 @@ function EventDetail({ event }: { event: TimelineEventType }) {
           </span>
         </div>
       );
+    case 'agentActivity': {
+      const action = event.action as string;
+      const agent = event.agent as string;
+      const toolName = event.toolName as string | undefined;
+      const label = action === 'session_end' ? 'Session ended' : toolName ? `Used ${toolName}` : 'Active';
+      return (
+        <div className="flex items-center gap-1.5">
+          <span className="rounded bg-purple-500/15 px-1.5 py-0.5 text-[10px] font-medium text-purple-400">
+            {agent}
+          </span>
+          <span className="text-xs text-secondary">{label}</span>
+        </div>
+      );
+    }
     default:
       return <div className="text-xs text-tertiary">Unknown event</div>;
   }
@@ -130,14 +150,9 @@ function shortenPath(path: string): string {
   return `.../${parts.slice(-2).join('/')}`;
 }
 
-export function TimelineEvent({ event, isHighlighted, onClick }: TimelineEventProps) {
+export function TimelineEvent({ event }: TimelineEventProps) {
   return (
-    <button
-      className={`flex w-full items-start gap-2 rounded-md px-2 py-1.5 text-left transition-colors ${
-        isHighlighted ? 'bg-accent/10' : 'hover:bg-surface-3'
-      }`}
-      onClick={onClick}
-    >
+    <div className="flex w-full items-start gap-2 rounded-md px-2 py-1.5 text-left">
       <div className={`mt-0.5 ${eventColor(event.type)}`}>
         <EventIcon type={event.type} />
       </div>
@@ -145,6 +160,6 @@ export function TimelineEvent({ event, isHighlighted, onClick }: TimelineEventPr
         <EventDetail event={event} />
       </div>
       <span className="shrink-0 text-[10px] text-tertiary">{formatTime(event.timestamp)}</span>
-    </button>
+    </div>
   );
 }

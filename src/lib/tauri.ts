@@ -81,6 +81,14 @@ export async function checkMcpRegistrations(): Promise<McpToolRegistration[]> {
   return invoke('check_mcp_registrations');
 }
 
+export async function onMcpTerminalCreated(
+  callback: (payload: { id: string; cwd: string }) => void
+): Promise<UnlistenFn> {
+  return listen<{ id: string; cwd: string }>('mcp-terminal-created', (event) => {
+    callback(event.payload);
+  });
+}
+
 export async function onWindowCloseRequested(callback: () => void): Promise<UnlistenFn> {
   return listen('window-close-requested', () => {
     callback();
@@ -179,9 +187,9 @@ export async function stopWatchingDirectory(): Promise<void> {
   return invoke('stop_watching_directory');
 }
 
-export async function onFsChanged(callback: () => void): Promise<UnlistenFn> {
-  return listen('fs-changed', () => {
-    callback();
+export async function onFsChanged(callback: (paths: string[]) => void): Promise<UnlistenFn> {
+  return listen<string[]>('fs-changed', (event) => {
+    callback(event.payload);
   });
 }
 
@@ -568,7 +576,7 @@ export async function semanticSearch(
 // Session timeline types
 export interface SessionSummary {
   id: string;
-  terminalId: string;
+  terminalId: string | null;
   startedAt: number;
   stoppedAt: number | null;
   label: string;
@@ -577,7 +585,7 @@ export interface SessionSummary {
 
 export interface SessionData {
   id: string;
-  terminalId: string;
+  terminalId: string | null;
   startedAt: number;
   stoppedAt: number | null;
   events: Record<string, unknown>[];
@@ -591,16 +599,30 @@ export interface SessionEvent {
 }
 
 // Session timeline commands
-export async function startSessionRecording(terminalId: string): Promise<string> {
-  return invoke('start_session_recording', { terminalId });
+export async function recordEvent(event: SessionEvent, terminalId?: string): Promise<string> {
+  return invoke('record_event', { event, terminalId: terminalId ?? null });
 }
 
-export async function stopSessionRecording(sessionId: string): Promise<void> {
-  return invoke('stop_session_recording', { sessionId });
+export async function getActiveSessionId(): Promise<string | null> {
+  return invoke('get_active_session_id');
+}
+
+export async function getActiveSessionIdForTerminal(terminalId: string): Promise<string | null> {
+  return invoke('get_active_session_id_for_terminal', { terminalId });
+}
+
+export async function closeTerminalSession(terminalId: string): Promise<void> {
+  return invoke('close_terminal_session', { terminalId });
 }
 
 export async function listSessions(): Promise<SessionSummary[]> {
   return invoke('list_sessions');
+}
+
+export async function listSessionsForTerminal(
+  terminalId?: string
+): Promise<SessionSummary[]> {
+  return invoke('list_sessions_for_terminal', { terminalId: terminalId ?? null });
 }
 
 export async function getSession(sessionId: string): Promise<SessionData> {
@@ -611,6 +633,15 @@ export async function deleteSession(sessionId: string): Promise<void> {
   return invoke('delete_session', { sessionId });
 }
 
-export async function recordSessionEvent(sessionId: string, event: SessionEvent): Promise<void> {
-  return invoke('record_session_event', { sessionId, event });
+export interface SessionEventPayload {
+  sessionId: string;
+  terminalId: string | null;
+}
+
+export async function onSessionEventRecorded(
+  callback: (payload: SessionEventPayload) => void
+): Promise<UnlistenFn> {
+  return listen<SessionEventPayload>('session-event-recorded', (event) => {
+    callback(event.payload);
+  });
 }

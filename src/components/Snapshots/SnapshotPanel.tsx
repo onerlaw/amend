@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback, memo, lazy, Suspense } from 'react';
 import { useSnapshotStore } from '@/stores/snapshotStore';
 import { useFileStore } from '@/stores/fileStore';
-import { PlusIcon, TrashIcon, RefreshIcon, DocumentIcon } from '@/components/Icons';
+import { PlusIcon, TrashIcon, RefreshIcon, DocumentIcon, CloseIcon } from '@/components/Icons';
+import { ModalOverlay } from '@/components/ModalOverlay';
 
 const DiffFileSection = lazy(() =>
   import('@/components/DiffViewer/DiffFileSection').then((m) => ({
@@ -240,7 +241,7 @@ function SnapshotDiffPanel({ repoPath, snapshotId }: { repoPath: string; snapsho
   );
 }
 
-export function SnapshotPanel() {
+export function SnapshotPanel({ onClose }: { onClose: () => void }) {
   const contextPath = useFileStore((s) => s.contextPath);
   const {
     snapshots,
@@ -315,20 +316,51 @@ export function SnapshotPanel() {
     if (contextPath) loadSnapshots(contextPath);
   }, [contextPath, loadSnapshots]);
 
+  const handleClose = useCallback(() => {
+    clearSelection();
+    onClose();
+  }, [clearSelection, onClose]);
+
   if (!contextPath) {
     return (
-      <div className="flex h-full flex-col items-center justify-center bg-surface-0 px-6 text-center">
-        <DocumentIcon className="h-16 w-16 text-tertiary mb-4" />
-        <h3 className="text-lg font-medium text-primary mb-2">No Repository Open</h3>
-        <p className="text-sm text-tertiary max-w-sm">
-          Open a folder to create and manage snapshots.
-        </p>
-      </div>
+      <ModalOverlay onClose={handleClose}>
+        <div
+          className="w-[720px] max-h-[80vh] rounded-xl bg-surface-2 shadow-xl flex flex-col overflow-hidden"
+          onKeyDown={(e) => e.key === 'Escape' && handleClose()}
+          tabIndex={-1}
+        >
+          <div className="flex items-center gap-2 px-3 py-1.5">
+            <span className="text-xs font-semibold uppercase tracking-wide text-primary">
+              Snapshots
+            </span>
+            <div className="flex-1" />
+            <button
+              onClick={handleClose}
+              className="rounded-md p-1 text-secondary hover:bg-surface-3"
+              title="Close"
+            >
+              <CloseIcon className="h-3.5 w-3.5" />
+            </button>
+          </div>
+          <div className="flex py-12 flex-col items-center justify-center bg-surface-0 px-6 text-center">
+            <DocumentIcon className="h-16 w-16 text-tertiary mb-4" />
+            <h3 className="text-lg font-medium text-primary mb-2">No Repository Open</h3>
+            <p className="text-sm text-tertiary max-w-sm">
+              Open a folder to create and manage snapshots.
+            </p>
+          </div>
+        </div>
+      </ModalOverlay>
     );
   }
 
   return (
-    <div className="h-full overflow-hidden bg-surface-0 flex flex-col">
+    <ModalOverlay onClose={handleClose}>
+    <div
+      className="w-[720px] max-h-[80vh] rounded-xl bg-surface-2 shadow-xl flex flex-col overflow-hidden"
+      onKeyDown={(e) => e.key === 'Escape' && handleClose()}
+      tabIndex={-1}
+    >
       {/* Toolbar */}
       <div className="flex items-center gap-2 bg-surface-2 px-3 py-1.5">
         <span className="text-xs font-semibold uppercase tracking-wide text-primary">
@@ -346,6 +378,13 @@ export function SnapshotPanel() {
           title="Refresh"
         >
           <RefreshIcon className="h-3.5 w-3.5" />
+        </button>
+        <button
+          onClick={handleClose}
+          className="rounded-md p-1 text-secondary hover:bg-surface-3"
+          title="Close"
+        >
+          <CloseIcon className="h-3.5 w-3.5" />
         </button>
       </div>
 
@@ -401,5 +440,6 @@ export function SnapshotPanel() {
         )}
       </div>
     </div>
+    </ModalOverlay>
   );
 }

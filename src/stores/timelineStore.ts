@@ -1,15 +1,15 @@
 import { create } from 'zustand';
 import {
-  startSessionRecording,
-  stopSessionRecording,
-  listSessions as listSessionsCmd,
+  listSessionsForTerminal,
   getSession as getSessionCmd,
   deleteSession as deleteSessionCmd,
+  getActiveSessionIdForTerminal,
 } from '@/lib/tauri';
+import { useTerminalStore } from '@/stores/terminalStore';
 
 export interface TimelineSession {
   id: string;
-  terminalId: string;
+  terminalId: string | null;
   startedAt: number;
   stoppedAt: number | null;
   label: string;
@@ -17,7 +17,7 @@ export interface TimelineSession {
 }
 
 export interface TimelineEvent {
-  type: 'commandStart' | 'commandEnd' | 'fileChanged' | 'gitStatusChanged' | 'terminalOutput';
+  type: 'commandStart' | 'commandEnd' | 'fileChanged' | 'gitStatusChanged' | 'terminalOutput' | 'agentActivity';
   timestamp: number;
   [key: string]: unknown;
 }
@@ -26,42 +26,37 @@ interface TimelineState {
   sessions: TimelineSession[];
   activeSessionId: string | null;
   events: TimelineEvent[];
-  isRecording: boolean;
-  playbackPosition: number | null;
+  liveSessionId: string | null;
+  currentTerminalId: string | null;
 
-  startRecording: (terminalId: string) => Promise<void>;
-  stopRecording: () => Promise<void>;
-  loadSessions: () => Promise<void>;
+  setCurrentTerminalId: (id: string | null) => void;
+  loadSessions: (terminalId?: string) => Promise<void>;
   selectSession: (id: string) => Promise<void>;
   deleteSession: (id: string) => Promise<void>;
-  setPlaybackPosition: (timestamp: number | null) => void;
+  setLiveSessionId: (id: string | null) => void;
+  refreshActiveSession: () => Promise<void>;
+  initLiveSessionForTerminal: (terminalId: string) => Promise<void>;
 }
 
 export const useTimelineStore = create<TimelineState>()((set, get) => ({
   sessions: [],
   activeSessionId: null,
   events: [],
-  isRecording: false,
-  playbackPosition: null,
+  liveSessionId: null,
+  currentTerminalId: null,
 
-  startRecording: async (terminalId: string) => {
-    const sessionId = await startSessionRecording(terminalId);
-    set({ activeSessionId: sessionId, isRecording: true, events: [] });
-    // Refresh session list
-    await get().loadSessions();
+  setCurrentTerminalId: (id: string | null) => {
+    set({ currentTerminalId: id });
+    if (id) {
+      get().loadSessions(id);
+      get().initLiveSessionForTerminal(id);
+    } else {
+      get().loadSessions();
+    }
   },
 
-  stopRecording: async () => {
-    const { activeSessionId } = get();
-    if (!activeSessionId) return;
-    await stopSessionRecording(activeSessionId);
-    set({ isRecording: false });
-    // Refresh session list
-    await get().loadSessions();
-  },
-
-  loadSessions: async () => {
-    const sessions = await listSessionsCmd();
+  loadSessions: async (terminalId?: string) => {
+    const sessions = await listSessionsForTerminal(terminalId);
     set({ sessions });
   },
 
@@ -70,20 +65,49 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
     set({
       activeSessionId: id,
       events: session.events as TimelineEvent[],
-      playbackPosition: null,
     });
   },
 
   deleteSession: async (id: string) => {
     await deleteSessionCmd(id);
-    const { activeSessionId } = get();
+    const { activeSessionId, liveSessionId, currentTerminalId } = get();
     if (activeSessionId === id) {
-      set({ activeSessionId: null, events: [], playbackPosition: null });
+      set({ activeSessionId: null, events: [] });
     }
-    await get().loadSessions();
+    if (liveSessionId === id) {
+      set({ liveSessionId: null });
+    }
+    await get().loadSessions(currentTerminalId ?? undefined);
   },
 
-  setPlaybackPosition: (timestamp: number | null) => {
-    set({ playbackPosition: timestamp });
+  setLiveSessionId: (id: string | null) => {
+    set({ liveSessionId: id, activeSessionId: id, events: [] });
+    if (id) {
+      get().selectSession(id);
+    }
+  },
+
+  refreshActiveSession: async () => {
+    const { activeSessionId } = get();
+    if (!activeSessionId) return;
+    const session = await getSessionCmd(activeSessionId);
+    set({ events: session.events as TimelineEvent[] });
+  },
+
+  initLiveSessionForTerminal: async (terminalId: string) => {
+    const id = await getActiveSessionIdForTerminal(terminalId);
+    if (id) {
+      get().setLiveSessionId(id);
+    } else {
+      set({ liveSessionId: null, activeSessionId: null, events: [] });
+    }
   },
 }));
+
+// Helper to initialize the live session from the active terminal
+export async function initLiveSession() {
+  const terminalId = useTerminalStore.getState().activeTabId;
+  if (terminalId) {
+    await useTimelineStore.getState().initLiveSessionForTerminal(terminalId);
+  }
+}

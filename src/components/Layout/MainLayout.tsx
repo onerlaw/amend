@@ -9,7 +9,13 @@ import type { TerminalTabsHandle } from '@/components/Terminal/TerminalTabs';
 import { DiffViewerProvider } from '@/components/DiffViewer/DiffViewerContext';
 import type { BrowseEditorTabsHandle } from '@/components/FileBrowser/BrowseEditorTabs';
 import { GlobalSearch } from '@/components/GlobalSearch/GlobalSearch';
-import { indexProject, getGitRoot, onFsChanged, startWatchingDirectory } from '@/lib/tauri';
+import {
+  indexProject,
+  getGitRoot,
+  onFsChanged,
+  startWatchingDirectory,
+  recordEvent,
+} from '@/lib/tauri';
 import { startTerminalMetadataSync, stopTerminalMetadataSync } from '@/lib/terminalMetadataSync';
 import { formatShortcut, openFileInBrowseMode } from '@/lib/fileUtils';
 import { useSessionStore } from '@/stores/sessionStore';
@@ -91,6 +97,7 @@ export function MainLayout() {
   const [showSettings, setShowSettings] = useState(false);
   const [showWorktrees, setShowWorktrees] = useState(false);
   const [showAgentWorkspaces, setShowAgentWorkspaces] = useState(false);
+  const [showSnapshots, setShowSnapshots] = useState(false);
   const createTerminal = useCreateTerminal();
   const terminalTabsRef = useRef<TerminalTabsHandle>(null);
   const browseEditorTabsRef = useRef<BrowseEditorTabsHandle>(null);
@@ -206,7 +213,17 @@ export function MainLayout() {
       console.error('[MainLayout] Failed to start file watcher:', err);
     });
 
-    onFsChanged(() => {
+    onFsChanged((paths) => {
+      // Record file change event
+      if (contextPath) {
+        recordEvent({
+          type: 'fileChanged',
+          timestamp: Date.now(),
+          path: paths.length > 0 ? paths[0] : contextPath,
+          changeType: paths.length > 1 ? `${paths.length} files` : 'modified',
+        }, useTerminalStore.getState().activeTabId ?? undefined).catch(console.error);
+      }
+
       // Debounced re-index (5s)
       if (indexTimer) clearTimeout(indexTimer);
       indexTimer = setTimeout(() => {
@@ -232,6 +249,30 @@ export function MainLayout() {
       if (gitTimer) clearTimeout(gitTimer);
     };
   }, [contextPath, gitPolling.forceCheck]);
+
+  // Record git status changes
+  const prevGitStatusRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!contextPath || !gitPolling.status) return;
+    const s = gitPolling.status;
+    const key = `${s.staged.length}:${s.unstaged.length}:${s.untracked.length}`;
+    if (prevGitStatusRef.current === null) {
+      // First load — just store without recording
+      prevGitStatusRef.current = key;
+      return;
+    }
+    if (key !== prevGitStatusRef.current) {
+      prevGitStatusRef.current = key;
+      recordEvent({
+        type: 'gitStatusChanged',
+        timestamp: Date.now(),
+        repoPath: contextPath,
+        stagedCount: s.staged.length,
+        unstagedCount: s.unstaged.length,
+        untrackedCount: s.untracked.length,
+      }, useTerminalStore.getState().activeTabId ?? undefined).catch(console.error);
+    }
+  }, [contextPath, gitPolling.status]);
 
   return (
     <div className="flex h-screen flex-col bg-surface-0">
@@ -357,9 +398,9 @@ export function MainLayout() {
               Timeline
             </button>
             <button
-              onClick={() => setPanelMode(panelMode === 'snapshots' ? null : 'snapshots')}
+              onClick={() => setShowSnapshots(!showSnapshots)}
               className={`rounded-md px-2 py-1 text-xs ${
-                panelMode === 'snapshots'
+                showSnapshots
                   ? 'bg-accent text-white'
                   : 'text-secondary hover:bg-surface-3'
               }`}
@@ -465,15 +506,6 @@ export function MainLayout() {
               </Panel>
             )}
 
-            {/* Snapshots mode */}
-            {panelMode === 'snapshots' && <PanelResizeHandle />}
-            {panelMode === 'snapshots' && (
-              <Panel id="snapshots" order={2} defaultSize={40} minSize={20}>
-                <Suspense fallback={null}>
-                  <SnapshotPanel />
-                </Suspense>
-              </Panel>
-            )}
           </PanelGroup>
         </DiffViewerProvider>
       </div>
@@ -502,6 +534,13 @@ export function MainLayout() {
             onClose={() => setShowAgentWorkspaces(false)}
             createTerminal={createTerminal}
           />
+        </Suspense>
+      )}
+
+      {/* Snapshots Modal */}
+      {showSnapshots && (
+        <Suspense fallback={null}>
+          <SnapshotPanel onClose={() => setShowSnapshots(false)} />
         </Suspense>
       )}
 

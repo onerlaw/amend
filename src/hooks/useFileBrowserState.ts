@@ -70,7 +70,7 @@ export function useFileBrowserState() {
     if (!contextPath) return;
 
     let unlisten: (() => void) | undefined;
-    onFsChanged(() => {
+    onFsChanged((_paths) => {
       // Debounce the UI refresh on the frontend side to coalesce rapid events
       // (e.g. npm install generating hundreds of fs-changed events)
       if (fsDebounceTimer.current) {

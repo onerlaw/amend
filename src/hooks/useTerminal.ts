@@ -11,6 +11,8 @@ import {
   closeTerminal,
   onTerminalOutput,
   onTerminalExit,
+  recordEvent,
+  closeTerminalSession,
 } from '@/lib/tauri';
 import { useTerminalStore } from '@/stores/terminalStore';
 import { useFileStore } from '@/stores/fileStore';
@@ -286,9 +288,15 @@ export function useTerminal(containerId: string | null) {
       // Set up exit listener - close the tab when the process exits
       const unlistenExit = await onTerminalExit(containerId, () => {
         if (!terminalRegistry.has(containerId)) return;
+        closeTerminalSession(containerId).catch(console.error);
         closeTerminal(containerId).catch(console.error);
         useTerminalStore.getState().removeTab(containerId);
       });
+
+      // Track pending command for session timeline recording.
+      // Shells typically: preexec → set title to command → run command → precmd → OSC 7 (cwd).
+      // We capture the title as the command name and record it when OSC 7 fires.
+      let pendingCommand: { title: string; startedAt: number } | null = null;
 
       // Set up OSC 7 handler for cwd detection (shells emit this after each command)
       const oscDisposable = terminal.parser.registerOscHandler(7, (data) => {
@@ -300,6 +308,27 @@ export function useTerminal(containerId: string | null) {
           if (cwd) {
             useTerminalStore.getState().updateTabCwd(containerId, cwd);
           }
+
+          // Record command event for session timeline
+          if (pendingCommand) {
+            const now = Date.now();
+            const cmd = pendingCommand;
+            pendingCommand = null;
+            recordEvent({
+              type: 'commandStart',
+              timestamp: cmd.startedAt,
+              terminalId: containerId,
+              command: cmd.title,
+              cwd: cwd || '',
+            }, containerId).catch(console.error);
+            recordEvent({
+              type: 'commandEnd',
+              timestamp: now,
+              terminalId: containerId,
+              exitCode: null,
+              durationMs: now - cmd.startedAt,
+            }, containerId).catch(console.error);
+          }
         } catch (e) {
           console.warn('[CWD] OSC 7 parse failed:', { raw: data, error: e });
         }
@@ -309,6 +338,11 @@ export function useTerminal(containerId: string | null) {
       // Set up title change listener
       const titleDisposable = terminal.onTitleChange((title) => {
         useTerminalStore.getState().setTabTitle(containerId, title);
+        // Shells set the title to the running command via preexec.
+        // Store it so we can record a command event when OSC 7 fires.
+        if (title) {
+          pendingCommand = { title, startedAt: Date.now() };
+        }
       });
 
       // Store in registry BEFORE the first fit so listeners can reference it

@@ -1,3 +1,4 @@
+use crate::session::{SessionCapture, SessionEvent};
 use crate::terminal::TerminalManager;
 use crate::terminal_buffer::OutputBufferRegistry;
 use crate::terminal_metadata::TerminalMetadataStore;
@@ -12,6 +13,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::convert::Infallible;
 use std::sync::Arc;
+use tauri::{AppHandle, Emitter, Manager};
 use tokio::sync::{broadcast, RwLock};
 use tower_http::cors::CorsLayer;
 
@@ -72,6 +74,7 @@ pub struct McpServerState {
     pub output_buffers: Arc<OutputBufferRegistry>,
     pub metadata_store: Arc<TerminalMetadataStore>,
     pub terminal_manager: Arc<TerminalManager>,
+    pub app_handle: AppHandle,
     pub response_tx: broadcast::Sender<String>,
 }
 
@@ -84,6 +87,7 @@ impl McpServer {
         output_buffers: Arc<OutputBufferRegistry>,
         metadata_store: Arc<TerminalMetadataStore>,
         terminal_manager: Arc<TerminalManager>,
+        app_handle: AppHandle,
     ) -> Result<u16, Box<dyn std::error::Error + Send + Sync>> {
         let (response_tx, _) = broadcast::channel::<String>(256);
 
@@ -91,12 +95,14 @@ impl McpServer {
             output_buffers,
             metadata_store,
             terminal_manager,
+            app_handle,
             response_tx,
         };
 
         let app = axum::Router::new()
             .route("/sse", get(sse_handler))
             .route("/message", post(message_handler))
+            .route("/hooks/event", post(hooks_event_handler))
             .layer(CorsLayer::permissive())
             .with_state(state);
 
@@ -178,6 +184,43 @@ async fn message_handler(
     let _ = state.response_tx.send(json_str);
 
     StatusCode::ACCEPTED.into_response()
+}
+
+// --- Hooks Handler ---
+
+#[derive(Debug, Deserialize)]
+struct HookEventRequest {
+    agent: String,
+    action: String,
+    #[serde(default)]
+    tool_name: Option<String>,
+}
+
+async fn hooks_event_handler(
+    AxumState(state): AxumState<McpServerState>,
+    Json(req): Json<HookEventRequest>,
+) -> impl IntoResponse {
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis() as u64;
+
+    let event = SessionEvent::AgentActivity {
+        timestamp: now,
+        agent: req.agent,
+        action: req.action,
+        tool_name: req.tool_name,
+    };
+
+    let capture: tauri::State<'_, SessionCapture> = state.app_handle.state();
+    let session_id = capture.record_auto_event(event, None);
+    let _ = capture.save_session(&session_id);
+    let _ = state.app_handle.emit(
+        "session-event-recorded",
+        json!({ "sessionId": session_id, "terminalId": null }),
+    );
+
+    (StatusCode::OK, Json(json!({ "sessionId": session_id })))
 }
 
 // --- MCP Protocol Handlers ---
@@ -264,6 +307,20 @@ fn handle_tools_list(id: Value) -> JsonRpcResponse {
                     }
                 },
                 {
+                    "name": "create_terminal",
+                    "description": "Create a new terminal. Returns the terminal ID. The terminal will appear in the Amend UI.",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {
+                            "cwd": {
+                                "type": "string",
+                                "description": "Working directory for the new terminal. Defaults to home directory if not provided."
+                            }
+                        },
+                        "required": []
+                    }
+                },
+                {
                     "name": "create_isolated_workspace",
                     "description": "Create an isolated git worktree for agent work. Returns the workspace path and branch name.",
                     "inputSchema": {
@@ -339,6 +396,7 @@ async fn handle_tools_call(
         "read_terminal_output" => tool_read_terminal_output(id, &arguments, state).await,
         "is_terminal_busy" => tool_is_terminal_busy(id, &arguments, state).await,
         "write_to_terminal" => tool_write_to_terminal(id, &arguments, state).await,
+        "create_terminal" => tool_create_terminal(id, &arguments, state).await,
         "create_isolated_workspace" => tool_create_isolated_workspace(id, &arguments).await,
         "get_workspace_status" => tool_get_workspace_status(id, &arguments).await,
         "complete_workspace" => tool_complete_workspace(id, &arguments).await,
@@ -475,6 +533,43 @@ async fn tool_write_to_terminal(
             }),
         ),
         Err(e) => JsonRpcResponse::error(id, -32603, format!("Write failed: {}", e)),
+    }
+}
+
+async fn tool_create_terminal(
+    id: Value,
+    args: &Value,
+    state: &McpServerState,
+) -> JsonRpcResponse {
+    let cwd = args.get("cwd").and_then(|v| v.as_str()).map(|s| s.to_string());
+
+    match state
+        .terminal_manager
+        .create_terminal(&state.app_handle, cwd.clone())
+    {
+        Ok(terminal_id) => {
+            let effective_cwd = cwd.unwrap_or_else(|| {
+                dirs::home_dir()
+                    .map(|h| h.to_string_lossy().to_string())
+                    .unwrap_or_default()
+            });
+
+            let _ = state.app_handle.emit(
+                "mcp-terminal-created",
+                json!({ "id": terminal_id, "cwd": effective_cwd }),
+            );
+
+            JsonRpcResponse::success(
+                id,
+                json!({
+                    "content": [{
+                        "type": "text",
+                        "text": terminal_id
+                    }]
+                }),
+            )
+        }
+        Err(e) => JsonRpcResponse::error(id, -32603, format!("Failed to create terminal: {}", e)),
     }
 }
 
@@ -864,6 +959,150 @@ fn check_codex_registered(port: u16) -> bool {
         == Some(expected_url.as_str())
 }
 
+// --- Claude Code Hooks ---
+
+const CLAUDE_HOOKS_MARKER: &str = "amend-session-hook";
+
+fn claude_settings_path() -> Option<std::path::PathBuf> {
+    dirs::home_dir().map(|h| h.join(".claude").join("settings.json"))
+}
+
+fn hooks_url(port: u16) -> String {
+    format!("http://127.0.0.1:{}/hooks/event", port)
+}
+
+fn write_claude_hooks(port: u16) {
+    let Some(path) = claude_settings_path() else {
+        return;
+    };
+
+    if let Some(parent) = path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+
+    let mut config: Value = std::fs::read_to_string(&path)
+        .ok()
+        .and_then(|s| serde_json::from_str(&s).ok())
+        .unwrap_or_else(|| json!({}));
+
+    let obj = match config.as_object_mut() {
+        Some(o) => o,
+        None => return,
+    };
+
+    let hooks = obj.entry("hooks").or_insert_with(|| json!({}));
+
+    let url = hooks_url(port);
+
+    // PreToolUse hook: fires when Claude is about to use an amend-terminal tool
+    let pre_tool_hook = json!({
+        "matcher": "mcp__amend-terminal",
+        "command": format!(
+            "curl -sf -X POST {url} -H 'Content-Type: application/json' -d '{{\"agent\":\"claude\",\"action\":\"tool_use\"}}' > /dev/null 2>&1 || true"
+        ),
+        "_id": CLAUDE_HOOKS_MARKER
+    });
+
+    // Stop hook: fires when Claude finishes responding
+    let stop_hook = json!({
+        "matcher": "",
+        "command": format!(
+            "curl -sf -X POST {url} -H 'Content-Type: application/json' -d '{{\"agent\":\"claude\",\"action\":\"session_end\"}}' > /dev/null 2>&1 || true"
+        ),
+        "_id": CLAUDE_HOOKS_MARKER
+    });
+
+    if let Some(hooks_obj) = hooks.as_object_mut() {
+        // Add PreToolUse hook
+        let pre_tool_arr = hooks_obj
+            .entry("PreToolUse")
+            .or_insert_with(|| json!([]));
+        if let Some(arr) = pre_tool_arr.as_array_mut() {
+            arr.retain(|h| h.get("_id").and_then(|v| v.as_str()) != Some(CLAUDE_HOOKS_MARKER));
+            arr.push(pre_tool_hook);
+        }
+
+        // Add Stop hook
+        let stop_arr = hooks_obj.entry("Stop").or_insert_with(|| json!([]));
+        if let Some(arr) = stop_arr.as_array_mut() {
+            arr.retain(|h| h.get("_id").and_then(|v| v.as_str()) != Some(CLAUDE_HOOKS_MARKER));
+            arr.push(stop_hook);
+        }
+    }
+
+    match serde_json::to_string_pretty(&config) {
+        Ok(json_str) => {
+            if let Err(e) = std::fs::write(&path, json_str) {
+                eprintln!("[MCP] Failed to write Claude hooks config: {}", e);
+            }
+        }
+        Err(e) => eprintln!("[MCP] Failed to serialize Claude hooks config: {}", e),
+    }
+}
+
+fn remove_claude_hooks(port: u16) {
+    let Some(path) = claude_settings_path() else {
+        return;
+    };
+
+    let content = match std::fs::read_to_string(&path) {
+        Ok(s) => s,
+        Err(_) => return,
+    };
+
+    let mut config: Value = match serde_json::from_str(&content) {
+        Ok(v) => v,
+        Err(_) => return,
+    };
+
+    let obj = match config.as_object_mut() {
+        Some(o) => o,
+        None => return,
+    };
+
+    let expected_url = hooks_url(port);
+
+    let should_remove_hooks = {
+        let hooks = match obj.get_mut("hooks").and_then(|v| v.as_object_mut()) {
+            Some(h) => h,
+            None => return,
+        };
+
+        // Remove our hooks from each event array
+        for (_event_name, arr_val) in hooks.iter_mut() {
+            if let Some(arr) = arr_val.as_array_mut() {
+                arr.retain(|h| {
+                    let is_ours =
+                        h.get("_id").and_then(|v| v.as_str()) == Some(CLAUDE_HOOKS_MARKER);
+                    let matches_port = h
+                        .get("command")
+                        .and_then(|v| v.as_str())
+                        .map(|cmd| cmd.contains(&expected_url))
+                        .unwrap_or(false);
+                    !(is_ours && matches_port)
+                });
+            }
+        }
+
+        // Remove empty arrays
+        hooks.retain(|_, v| !v.as_array().map(|a| a.is_empty()).unwrap_or(false));
+        hooks.is_empty()
+    };
+
+    if should_remove_hooks {
+        obj.remove("hooks");
+    }
+
+    match serde_json::to_string_pretty(&config) {
+        Ok(json_str) => {
+            if let Err(e) = std::fs::write(&path, json_str) {
+                eprintln!("[MCP] Failed to write Claude hooks config: {}", e);
+            }
+        }
+        Err(e) => eprintln!("[MCP] Failed to serialize Claude hooks config: {}", e),
+    }
+}
+
 // --- Aggregate write/remove/check ---
 
 fn write_all_tool_configs(port: u16) {
@@ -871,6 +1110,7 @@ fn write_all_tool_configs(port: u16) {
         write_json_tool_config(tool, port);
     }
     write_codex_config(port);
+    write_claude_hooks(port);
 }
 
 fn remove_all_tool_configs(port: u16) {
@@ -878,6 +1118,7 @@ fn remove_all_tool_configs(port: u16) {
         remove_json_tool_config(tool, port);
     }
     remove_codex_config(port);
+    remove_claude_hooks(port);
 }
 
 #[derive(Debug, Serialize, Clone)]

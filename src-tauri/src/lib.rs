@@ -63,14 +63,16 @@ pub fn run() {
                 if let Err(e) = session_state.load_sessions() {
                     eprintln!("[session] Failed to load sessions: {}", e);
                 }
+                session_state.restore_active_session();
             }
 
             let mcp_handle: tauri::State<'_, McpServerHandle> = app.state();
             let mcp_handle_inner = mcp_handle.inner().clone();
 
             // Spawn MCP server on the async runtime
+            let app_handle_for_mcp = app.handle().clone();
             tauri::async_runtime::spawn(async move {
-                match McpServer::start(ob_for_mcp, ms_for_mcp, tm_for_mcp).await {
+                match McpServer::start(ob_for_mcp, ms_for_mcp, tm_for_mcp, app_handle_for_mcp).await {
                     Ok(port) => {
                         mcp_handle_inner.set_port(port).await;
                     }
@@ -144,12 +146,14 @@ pub fn run() {
             git::stage_file,
             git::get_diff_stats,
             // Session timeline commands
-            session::start_session_recording,
-            session::stop_session_recording,
+            session::record_event,
+            session::get_active_session_id,
+            session::get_active_session_id_for_terminal,
+            session::close_terminal_session,
             session::list_sessions,
+            session::list_sessions_for_terminal,
             session::get_session,
             session::delete_session,
-            session::record_session_event,
             // Snapshot commands
             snapshot::create_snapshot,
             snapshot::list_snapshots,

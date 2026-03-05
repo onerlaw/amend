@@ -22,7 +22,7 @@ import { RootDropZone } from './RootDropZone';
 import { CloseIcon, FolderIcon } from '@/components/Icons';
 import { getFileName, formatShortcut } from '@/lib/fileUtils';
 import { useDraggableTabs } from '@/hooks/useDraggableTabs';
-import { isTerminalBusy } from '@/lib/tauri';
+import { isTerminalBusy, onMcpTerminalCreated } from '@/lib/tauri';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { collectTerminalIds, findLeafByTerminalId, deserializeLayout } from '@/lib/layoutTree';
 
@@ -192,6 +192,19 @@ export const TerminalTabs = forwardRef<TerminalTabsHandle>(function TerminalTabs
       initLayout(tabs[0].id);
     }
   }, [tabs.length, layout, initLayout, tabs]);
+
+  // Listen for MCP-created terminals and add them to the UI
+  const addTab = useTerminalStore((s) => s.addTab);
+  const ensureTerminalInLayout = useTerminalLayoutStore((s) => s.ensureTerminalInLayout);
+  useEffect(() => {
+    const unlisten = onMcpTerminalCreated(({ id, cwd }) => {
+      addTab(id, cwd);
+      ensureTerminalInLayout(id);
+    });
+    return () => {
+      unlisten.then((fn) => fn());
+    };
+  }, [addTab, ensureTerminalInLayout]);
 
   // Save terminal state to session whenever tabs, active tab, or layout changes
   useEffect(() => {

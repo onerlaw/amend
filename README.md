@@ -3,6 +3,7 @@
 A desktop IDE built for developers who live in the terminal and work alongside AI agents. Amend pairs a fully integrated terminal with a real-time diff viewer, code editor, and deep git integration — everything you need to supervise, review, and steer agentic coding workflows without switching windows.
 
 Built with Rust and React. Fast, native, cross-platform.
+<!-- timeline test -->
 
 ## Why Amend?
 

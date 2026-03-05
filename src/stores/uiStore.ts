@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { toggleSetItem } from '@/lib/fileUtils';
 
-export type PanelMode = 'diff' | 'browse' | 'timeline' | 'snapshots' | null;
+export type PanelMode = 'diff' | 'browse' | 'timeline' | null;
 export type ThemeMode = 'light' | 'dark' | 'system';
 export type FocusedPanel = 'terminal' | 'editor' | 'file-list';
 export type DiffMode = 'working' | 'branch';
@@ -88,6 +88,16 @@ export const useUIStore = create<UIState>()(
     }),
     {
       name: 'amend-ui',
+      version: 1,
+      migrate: (persisted: unknown, version: number) => {
+        if (version === 0) {
+          const state = persisted as Record<string, unknown>;
+          if (state.panelMode === 'snapshots') {
+            state.panelMode = null;
+          }
+        }
+        return persisted as UIState;
+      },
       partialize: (state) => ({
         panelMode: state.panelMode,
         themeMode: state.themeMode,

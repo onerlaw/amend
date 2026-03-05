@@ -50,7 +50,7 @@ impl TerminalMetadataStore {
 pub async fn sync_terminal_metadata(
     id: String,
     metadata: TerminalMetadata,
-    state: tauri::State<'_, TerminalMetadataStore>,
+    state: tauri::State<'_, Arc<TerminalMetadataStore>>,
 ) -> Result<(), String> {
     state.update(&id, metadata).await;
     Ok(())
@@ -59,7 +59,7 @@ pub async fn sync_terminal_metadata(
 #[tauri::command]
 pub async fn remove_terminal_metadata(
     id: String,
-    state: tauri::State<'_, TerminalMetadataStore>,
+    state: tauri::State<'_, Arc<TerminalMetadataStore>>,
 ) -> Result<(), String> {
     state.remove(&id).await;
     Ok(())

@@ -1,8 +1,9 @@
-import { useEffect, useMemo } from 'react';
-import { useTimelineStore } from '@/stores/timelineStore';
+import { useEffect, useMemo, useRef } from 'react';
+import { useTimelineStore, initLiveSession } from '@/stores/timelineStore';
 import { useTerminalStore } from '@/stores/terminalStore';
 import { TimelineEvent } from './TimelineEvent';
 import type { TimelineEvent as TimelineEventType } from '@/stores/timelineStore';
+import { onSessionEventRecorded } from '@/lib/tauri';
 import { TrashIcon } from '@/components/Icons';
 
 interface EventGroup {
@@ -49,36 +50,74 @@ function formatDuration(startMs: number, endMs: number | null): string {
   return `${mins}m ${secs}s`;
 }
 
-function RecordingIndicator() {
-  return (
-    <span className="flex items-center gap-1 text-xs text-diff-remove-text">
-      <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-diff-remove-text" />
-      Recording
-    </span>
-  );
-}
-
 export function SessionTimeline() {
   const {
     sessions,
     activeSessionId,
     events,
-    isRecording,
-    playbackPosition,
-    startRecording,
-    stopRecording,
+    liveSessionId,
     loadSessions,
     selectSession,
     deleteSession,
-    setPlaybackPosition,
+    setLiveSessionId,
+    setCurrentTerminalId,
+    refreshActiveSession,
   } = useTimelineStore();
 
-  const { activeTabId } = useTerminalStore();
+  const activeTabId = useTerminalStore((s) => s.activeTabId);
+  const activeTab = useTerminalStore((s) => s.tabs.find((t) => t.id === s.activeTabId));
 
-  // Load sessions on mount
+  const eventListRef = useRef<HTMLDivElement>(null);
+
+  // Sync timeline to active terminal
   useEffect(() => {
-    loadSessions();
+    setCurrentTerminalId(activeTabId);
+  }, [activeTabId, setCurrentTerminalId]);
+
+  // Load sessions and auto-select live session on mount
+  useEffect(() => {
+    if (!activeTabId) {
+      loadSessions();
+    }
+    initLiveSession();
   }, [loadSessions]);
+
+  // Subscribe to session-event-recorded from backend
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    onSessionEventRecorded((payload) => {
+      const { currentTerminalId: currentTid } = useTimelineStore.getState();
+
+      // Only process events for the currently viewed terminal
+      if (currentTid && payload.terminalId !== currentTid) return;
+
+      const { activeSessionId: currentActive, liveSessionId: currentLive } =
+        useTimelineStore.getState();
+
+      // Update live session ID if a new session was created
+      if (currentLive !== payload.sessionId) {
+        setLiveSessionId(payload.sessionId);
+      }
+
+      // Refresh events if viewing the active session
+      if (currentActive === payload.sessionId) {
+        refreshActiveSession();
+      }
+
+      // Refresh the session list
+      loadSessions(currentTid ?? undefined);
+    }).then((fn) => {
+      unlisten = fn;
+    });
+    return () => unlisten?.();
+  }, [loadSessions, setLiveSessionId, refreshActiveSession]);
+
+  // Auto-scroll to bottom when new events arrive for the live session
+  useEffect(() => {
+    if (activeSessionId === liveSessionId && eventListRef.current) {
+      eventListRef.current.scrollTop = eventListRef.current.scrollHeight;
+    }
+  }, [events, activeSessionId, liveSessionId]);
 
   const eventGroups = useMemo(() => groupEvents(events), [events]);
 
@@ -88,28 +127,12 @@ export function SessionTimeline() {
     <div className="flex h-full flex-col bg-surface-1 text-primary">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-surface-3 px-3 py-2">
-        <div className="flex items-center gap-2">
-          <h2 className="text-xs font-medium uppercase tracking-wider text-secondary">Timeline</h2>
-          {isRecording && <RecordingIndicator />}
-        </div>
-        <div className="flex items-center gap-1">
-          {isRecording ? (
-            <button
-              onClick={() => stopRecording()}
-              className="rounded-md bg-diff-remove-text px-2 py-1 text-xs text-white hover:opacity-90"
-            >
-              Stop
-            </button>
-          ) : (
-            <button
-              onClick={() => activeTabId && startRecording(activeTabId)}
-              disabled={!activeTabId}
-              className="rounded-md bg-accent px-2 py-1 text-xs text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              Record
-            </button>
+        <h2 className="text-xs font-medium uppercase tracking-wider text-secondary">
+          Timeline
+          {activeTab?.title && (
+            <span className="ml-1.5 normal-case text-tertiary">— {activeTab.title}</span>
           )}
-        </div>
+        </h2>
       </div>
 
       <div className="flex min-h-0 flex-1">
@@ -121,7 +144,7 @@ export function SessionTimeline() {
           <div className="flex-1 overflow-y-auto">
             {sessions.length === 0 ? (
               <div className="px-3 py-4 text-xs text-tertiary">
-                No sessions yet. Click Record to start capturing events.
+                Sessions appear automatically as you work.
               </div>
             ) : (
               sessions.map((session) => (
@@ -135,7 +158,12 @@ export function SessionTimeline() {
                   onClick={() => selectSession(session.id)}
                 >
                   <div className="min-w-0 flex-1">
-                    <div className="truncate text-xs">{session.label}</div>
+                    <div className="flex items-center gap-1.5 truncate text-xs">
+                      {session.label}
+                      {liveSessionId === session.id && (
+                        <span className="inline-block h-1.5 w-1.5 rounded-full bg-diff-add-text" />
+                      )}
+                    </div>
                     <div className="flex items-center gap-1.5 text-[10px] text-tertiary">
                       <span>{formatSessionDate(session.startedAt)}</span>
                       <span>|</span>
@@ -170,12 +198,10 @@ export function SessionTimeline() {
                   {activeSession.label} - {events.length} event{events.length !== 1 ? 's' : ''}
                 </div>
               </div>
-              <div className="flex-1 overflow-y-auto px-1 py-1">
+              <div ref={eventListRef} className="flex-1 overflow-y-auto px-1 py-1">
                 {eventGroups.length === 0 ? (
                   <div className="px-3 py-4 text-xs text-tertiary">
-                    {isRecording
-                      ? 'Waiting for events...'
-                      : 'No events recorded in this session.'}
+                    No events recorded in this session.
                   </div>
                 ) : (
                   eventGroups.map((group, gi) => (
@@ -186,12 +212,7 @@ export function SessionTimeline() {
                         </div>
                       )}
                       {group.events.map((event, ei) => (
-                        <TimelineEvent
-                          key={`${gi}-${ei}`}
-                          event={event}
-                          isHighlighted={playbackPosition === event.timestamp}
-                          onClick={() => setPlaybackPosition(event.timestamp)}
-                        />
+                        <TimelineEvent key={`${gi}-${ei}`} event={event} />
                       ))}
                     </div>
                   ))
@@ -202,7 +223,7 @@ export function SessionTimeline() {
             <div className="flex flex-1 items-center justify-center text-xs text-tertiary">
               {sessions.length > 0
                 ? 'Select a session to view its timeline'
-                : 'Start recording to capture agent session events'}
+                : 'Sessions appear automatically as you work'}
             </div>
           )}
         </div>
