@@ -306,6 +306,49 @@ export async function getDiffStats(repoPath: string): Promise<DiffStats> {
   return invoke('get_diff_stats', { repoPath });
 }
 
+// Agent workspace types
+export interface AgentWorkspace {
+  id: string;
+  path: string;
+  branch: string;
+  parentBranch: string;
+  createdAt: number;
+  status: 'active' | 'completed' | 'merging';
+}
+
+export type MergeStrategy = 'fastForward' | 'squash' | 'cherryPick';
+
+// Agent workspace commands
+export async function createAgentWorktree(
+  repoPath: string,
+  agentId: string
+): Promise<AgentWorkspace> {
+  return invoke('create_agent_worktree', { repoPath, agentId });
+}
+
+export async function mergeAgentWorktree(
+  repoPath: string,
+  agentId: string,
+  strategy: MergeStrategy
+): Promise<void> {
+  return invoke('merge_agent_worktree', { repoPath, agentId, strategy });
+}
+
+export async function discardAgentWorktree(repoPath: string, agentId: string): Promise<void> {
+  return invoke('discard_agent_worktree', { repoPath, agentId });
+}
+
+export async function listAgentWorktrees(repoPath: string): Promise<AgentWorkspace[]> {
+  return invoke('list_agent_worktrees', { repoPath });
+}
+
+export async function getAgentWorktreeDiff(
+  repoPath: string,
+  agentId: string
+): Promise<GitFileStatus[]> {
+  return invoke('get_agent_worktree_diff', { repoPath, agentId });
+}
+
 export interface BranchDiffSummary {
   files: GitFileStatus[];
   diffStats: DiffStats;

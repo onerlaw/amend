@@ -4,6 +4,7 @@ use git2::{DiffOptions, Repository, StatusOptions};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::time::{SystemTime, UNIX_EPOCH};
 use thiserror::Error;
 use tokio::task::spawn_blocking;
 
@@ -36,6 +37,25 @@ pub struct GitWorktree {
     pub path: String,
     pub branch: String,
     pub is_main: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AgentWorktree {
+    pub id: String,
+    pub path: String,
+    pub branch: String,
+    pub parent_branch: String,
+    pub created_at: u64,
+    pub status: String, // "active" | "completed" | "merging"
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum MergeStrategy {
+    FastForward,
+    Squash,
+    CherryPick,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -1177,6 +1197,290 @@ pub async fn list_branches(repo_path: String) -> Result<Vec<GitBranch>, GitError
     })
     .await
     .map_err(|e| GitError::TaskJoin(e.to_string()))?
+}
+
+// --- Agent Worktree Lifecycle ---
+
+const AGENT_WORKTREE_PREFIX: &str = "amend-agent-";
+const AGENT_BRANCH_PREFIX: &str = "amend/agent/";
+
+fn current_timestamp() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs()
+}
+
+/// Extract agent_id from a branch name like "amend/agent/{id}".
+fn agent_id_from_branch(branch: &str) -> Option<&str> {
+    branch.strip_prefix(AGENT_BRANCH_PREFIX)
+}
+
+/// Determine the current branch of the repo at `repo_path`.
+fn current_branch_name(repo_path: &str) -> Result<String, GitError> {
+    let output = run_git_command(repo_path, &["rev-parse", "--abbrev-ref", "HEAD"])?;
+    let branch = output.trim().to_string();
+    if branch == "HEAD" {
+        // Detached HEAD — use short hash instead
+        let hash_output = run_git_command(repo_path, &["rev-parse", "--short", "HEAD"])?;
+        Ok(hash_output.trim().to_string())
+    } else {
+        Ok(branch)
+    }
+}
+
+fn create_agent_worktree_sync(repo_path: &str, agent_id: &str) -> Result<AgentWorktree, GitError> {
+    validate_no_flag(agent_id, "agent_id")?;
+    if agent_id.trim().is_empty() {
+        return Err(GitError::InvalidArgument(
+            "agent_id must not be empty".to_string(),
+        ));
+    }
+
+    let branch_name = format!("{}{}", AGENT_BRANCH_PREFIX, agent_id);
+    let dir_name = format!("{}{}", AGENT_WORKTREE_PREFIX, agent_id);
+    let worktree_path = Path::new(repo_path).join(".worktrees").join(&dir_name);
+
+    let worktree_path_str = worktree_path.to_string_lossy().to_string();
+
+    // Determine the parent branch before creating the worktree
+    let parent_branch = current_branch_name(repo_path)?;
+
+    // Ensure .worktrees directory exists
+    let worktrees_dir = Path::new(repo_path).join(".worktrees");
+    std::fs::create_dir_all(&worktrees_dir)
+        .map_err(|e| GitError::CommandFailed(format!("Failed to create .worktrees dir: {}", e)))?;
+
+    // Check if the branch/worktree already exists
+    let existing = list_worktrees_sync(repo_path)?;
+    if let Some(wt) = existing.iter().find(|w| w.branch == branch_name) {
+        // Worktree already exists — return it as AgentWorktree
+        return Ok(AgentWorktree {
+            id: agent_id.to_string(),
+            path: wt.path.clone(),
+            branch: branch_name,
+            parent_branch,
+            created_at: current_timestamp(),
+            status: "active".to_string(),
+        });
+    }
+
+    // Create new branch + worktree from current HEAD
+    run_git_command(
+        repo_path,
+        &[
+            "worktree",
+            "add",
+            "-b",
+            &branch_name,
+            "--",
+            &worktree_path_str,
+            "HEAD",
+        ],
+    )?;
+
+    Ok(AgentWorktree {
+        id: agent_id.to_string(),
+        path: worktree_path_str,
+        branch: branch_name,
+        parent_branch,
+        created_at: current_timestamp(),
+        status: "active".to_string(),
+    })
+}
+
+fn merge_agent_worktree_sync(
+    repo_path: &str,
+    agent_id: &str,
+    strategy: &MergeStrategy,
+) -> Result<(), GitError> {
+    validate_no_flag(agent_id, "agent_id")?;
+    let branch_name = format!("{}{}", AGENT_BRANCH_PREFIX, agent_id);
+
+    // Verify the agent branch exists
+    if !branch_exists_locally(repo_path, &branch_name)? {
+        return Err(GitError::CommandFailed(format!(
+            "Agent branch not found: {}",
+            branch_name
+        )));
+    }
+
+    match strategy {
+        MergeStrategy::FastForward => {
+            // Try fast-forward merge
+            run_git_command(repo_path, &["merge", "--ff-only", &branch_name])?;
+        }
+        MergeStrategy::Squash => {
+            // Squash merge — stages all changes but does not commit
+            run_git_command(repo_path, &["merge", "--squash", &branch_name])?;
+            // Commit the squashed changes
+            let msg = format!("feat: merge agent workspace {}", agent_id);
+            run_git_command(repo_path, &["commit", "-m", &msg])?;
+        }
+        MergeStrategy::CherryPick => {
+            // Find commits unique to the agent branch and cherry-pick them
+            let log_output = run_git_command(
+                repo_path,
+                &[
+                    "log",
+                    "--format=%H",
+                    "--reverse",
+                    &format!("HEAD..{}", branch_name),
+                ],
+            )?;
+            for sha in log_output.lines() {
+                let sha = sha.trim();
+                if !sha.is_empty() {
+                    run_git_command(repo_path, &["cherry-pick", sha])?;
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
+
+fn discard_agent_worktree_sync(repo_path: &str, agent_id: &str) -> Result<(), GitError> {
+    validate_no_flag(agent_id, "agent_id")?;
+    let branch_name = format!("{}{}", AGENT_BRANCH_PREFIX, agent_id);
+    let dir_name = format!("{}{}", AGENT_WORKTREE_PREFIX, agent_id);
+    let worktree_path = Path::new(repo_path).join(".worktrees").join(&dir_name);
+    let worktree_path_str = worktree_path.to_string_lossy().to_string();
+
+    // Remove the worktree (force in case of uncommitted changes)
+    if worktree_path.exists() {
+        run_git_command(
+            repo_path,
+            &["worktree", "remove", "--force", "--", &worktree_path_str],
+        )?;
+    }
+
+    // Delete the branch
+    if branch_exists_locally(repo_path, &branch_name)? {
+        run_git_command(repo_path, &["branch", "-D", &branch_name])?;
+    }
+
+    Ok(())
+}
+
+fn list_agent_worktrees_sync(repo_path: &str) -> Result<Vec<AgentWorktree>, GitError> {
+    let all_worktrees = list_worktrees_sync(repo_path)?;
+    let parent_branch = current_branch_name(repo_path).unwrap_or_else(|_| "unknown".to_string());
+
+    let mut agent_worktrees = Vec::new();
+    for wt in &all_worktrees {
+        if let Some(aid) = agent_id_from_branch(&wt.branch) {
+            agent_worktrees.push(AgentWorktree {
+                id: aid.to_string(),
+                path: wt.path.clone(),
+                branch: wt.branch.clone(),
+                parent_branch: parent_branch.clone(),
+                created_at: 0, // We don't persist creation time, 0 means unknown
+                status: "active".to_string(),
+            });
+        }
+    }
+
+    Ok(agent_worktrees)
+}
+
+fn get_agent_worktree_diff_sync(
+    repo_path: &str,
+    agent_id: &str,
+) -> Result<Vec<GitFileStatus>, GitError> {
+    validate_no_flag(agent_id, "agent_id")?;
+    let branch_name = format!("{}{}", AGENT_BRANCH_PREFIX, agent_id);
+
+    if !branch_exists_locally(repo_path, &branch_name)? {
+        return Err(GitError::CommandFailed(format!(
+            "Agent branch not found: {}",
+            branch_name
+        )));
+    }
+
+    // Find the merge-base between HEAD and the agent branch
+    let merge_base_output = run_git_command(repo_path, &["merge-base", "HEAD", &branch_name])?;
+    let merge_base = merge_base_output.trim();
+
+    // Get changed files between merge-base and agent branch tip
+    let name_status_output = run_git_command(
+        repo_path,
+        &["diff", "--name-status", merge_base, &branch_name],
+    )?;
+
+    let mut files = Vec::new();
+    for line in name_status_output.lines() {
+        if line.is_empty() {
+            continue;
+        }
+        let mut parts = line.splitn(2, '\t');
+        let status_code = parts.next().unwrap_or("").trim();
+        let path = parts.next().unwrap_or("").trim();
+        if path.is_empty() {
+            continue;
+        }
+
+        let status = match status_code.chars().next() {
+            Some('A') => "added",
+            Some('M') => "modified",
+            Some('D') => "deleted",
+            Some('R') => "renamed",
+            Some('C') => "copied",
+            _ => "modified",
+        };
+
+        files.push(GitFileStatus {
+            path: path.to_string(),
+            status: status.to_string(),
+        });
+    }
+
+    Ok(files)
+}
+
+#[tauri::command]
+pub async fn create_agent_worktree(
+    repo_path: String,
+    agent_id: String,
+) -> Result<AgentWorktree, GitError> {
+    spawn_blocking(move || create_agent_worktree_sync(&repo_path, &agent_id))
+        .await
+        .map_err(|e| GitError::TaskJoin(e.to_string()))?
+}
+
+#[tauri::command]
+pub async fn merge_agent_worktree(
+    repo_path: String,
+    agent_id: String,
+    strategy: MergeStrategy,
+) -> Result<(), GitError> {
+    spawn_blocking(move || merge_agent_worktree_sync(&repo_path, &agent_id, &strategy))
+        .await
+        .map_err(|e| GitError::TaskJoin(e.to_string()))?
+}
+
+#[tauri::command]
+pub async fn discard_agent_worktree(repo_path: String, agent_id: String) -> Result<(), GitError> {
+    spawn_blocking(move || discard_agent_worktree_sync(&repo_path, &agent_id))
+        .await
+        .map_err(|e| GitError::TaskJoin(e.to_string()))?
+}
+
+#[tauri::command]
+pub async fn list_agent_worktrees(repo_path: String) -> Result<Vec<AgentWorktree>, GitError> {
+    spawn_blocking(move || list_agent_worktrees_sync(&repo_path))
+        .await
+        .map_err(|e| GitError::TaskJoin(e.to_string()))?
+}
+
+#[tauri::command]
+pub async fn get_agent_worktree_diff(
+    repo_path: String,
+    agent_id: String,
+) -> Result<Vec<GitFileStatus>, GitError> {
+    spawn_blocking(move || get_agent_worktree_diff_sync(&repo_path, &agent_id))
+        .await
+        .map_err(|e| GitError::TaskJoin(e.to_string()))?
 }
 
 #[cfg(test)]

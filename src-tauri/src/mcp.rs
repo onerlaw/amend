@@ -262,6 +262,56 @@ fn handle_tools_list(id: Value) -> JsonRpcResponse {
                         },
                         "required": ["terminal_id", "input"]
                     }
+                },
+                {
+                    "name": "create_isolated_workspace",
+                    "description": "Create an isolated git worktree for agent work. Returns the workspace path and branch name.",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {
+                            "repo_path": {
+                                "type": "string",
+                                "description": "Path to the git repository."
+                            },
+                            "agent_id": {
+                                "type": "string",
+                                "description": "Optional agent identifier. Auto-generated if not provided."
+                            }
+                        },
+                        "required": ["repo_path"]
+                    }
+                },
+                {
+                    "name": "get_workspace_status",
+                    "description": "Get the status of all agent workspaces for a repository, including changed files.",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {
+                            "repo_path": {
+                                "type": "string",
+                                "description": "Path to the git repository."
+                            }
+                        },
+                        "required": ["repo_path"]
+                    }
+                },
+                {
+                    "name": "complete_workspace",
+                    "description": "Signal that agent work in an isolated workspace is complete. Does not merge — just marks the workspace as completed.",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {
+                            "repo_path": {
+                                "type": "string",
+                                "description": "Path to the git repository."
+                            },
+                            "agent_id": {
+                                "type": "string",
+                                "description": "The agent identifier for the workspace to complete."
+                            }
+                        },
+                        "required": ["repo_path", "agent_id"]
+                    }
                 }
             ]
         }),
@@ -289,6 +339,9 @@ async fn handle_tools_call(
         "read_terminal_output" => tool_read_terminal_output(id, &arguments, state).await,
         "is_terminal_busy" => tool_is_terminal_busy(id, &arguments, state).await,
         "write_to_terminal" => tool_write_to_terminal(id, &arguments, state).await,
+        "create_isolated_workspace" => tool_create_isolated_workspace(id, &arguments).await,
+        "get_workspace_status" => tool_get_workspace_status(id, &arguments).await,
+        "complete_workspace" => tool_complete_workspace(id, &arguments).await,
         _ => JsonRpcResponse::error(id, -32602, format!("Unknown tool: {}", tool_name)),
     }
 }
@@ -422,6 +475,102 @@ async fn tool_write_to_terminal(
             }),
         ),
         Err(e) => JsonRpcResponse::error(id, -32603, format!("Write failed: {}", e)),
+    }
+}
+
+// --- Agent Workspace Tool Implementations ---
+
+async fn tool_create_isolated_workspace(id: Value, args: &Value) -> JsonRpcResponse {
+    let repo_path = match args.get("repo_path").and_then(|v| v.as_str()) {
+        Some(p) => p.to_string(),
+        None => {
+            return JsonRpcResponse::error(id, -32602, "Missing repo_path".to_string());
+        }
+    };
+
+    let agent_id = args
+        .get("agent_id")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string())
+        .unwrap_or_else(|| uuid::Uuid::new_v4().to_string()[..8].to_string());
+
+    match crate::git::create_agent_worktree(repo_path, agent_id).await {
+        Ok(wt) => JsonRpcResponse::success(
+            id,
+            json!({
+                "content": [{
+                    "type": "text",
+                    "text": serde_json::to_string_pretty(&wt).unwrap_or_default()
+                }]
+            }),
+        ),
+        Err(e) => JsonRpcResponse::error(id, -32603, format!("Failed to create workspace: {}", e)),
+    }
+}
+
+async fn tool_get_workspace_status(id: Value, args: &Value) -> JsonRpcResponse {
+    let repo_path = match args.get("repo_path").and_then(|v| v.as_str()) {
+        Some(p) => p.to_string(),
+        None => {
+            return JsonRpcResponse::error(id, -32602, "Missing repo_path".to_string());
+        }
+    };
+
+    match crate::git::list_agent_worktrees(repo_path).await {
+        Ok(workspaces) => JsonRpcResponse::success(
+            id,
+            json!({
+                "content": [{
+                    "type": "text",
+                    "text": serde_json::to_string_pretty(&workspaces).unwrap_or_default()
+                }]
+            }),
+        ),
+        Err(e) => JsonRpcResponse::error(id, -32603, format!("Failed to list workspaces: {}", e)),
+    }
+}
+
+async fn tool_complete_workspace(id: Value, args: &Value) -> JsonRpcResponse {
+    let repo_path = match args.get("repo_path").and_then(|v| v.as_str()) {
+        Some(p) => p.to_string(),
+        None => {
+            return JsonRpcResponse::error(id, -32602, "Missing repo_path".to_string());
+        }
+    };
+
+    let agent_id = match args.get("agent_id").and_then(|v| v.as_str()) {
+        Some(a) => a.to_string(),
+        None => {
+            return JsonRpcResponse::error(id, -32602, "Missing agent_id".to_string());
+        }
+    };
+
+    // Verify the workspace exists
+    match crate::git::list_agent_worktrees(repo_path).await {
+        Ok(workspaces) => {
+            if workspaces.iter().any(|w| w.id == agent_id) {
+                JsonRpcResponse::success(
+                    id,
+                    json!({
+                        "content": [{
+                            "type": "text",
+                            "text": format!("Workspace {} marked as completed. Use the Amend UI to review and merge changes.", agent_id)
+                        }]
+                    }),
+                )
+            } else {
+                JsonRpcResponse::error(
+                    id,
+                    -32602,
+                    format!("Agent workspace not found: {}", agent_id),
+                )
+            }
+        }
+        Err(e) => JsonRpcResponse::error(
+            id,
+            -32603,
+            format!("Failed to check workspace status: {}", e),
+        ),
     }
 }
 
