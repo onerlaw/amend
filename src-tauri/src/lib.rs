@@ -57,7 +57,7 @@ pub fn run() {
         .setup(move |app| {
             // Initialize session capture data directory and load persisted sessions
             let session_state: tauri::State<'_, SessionCapture> = app.state();
-            if let Some(app_data_dir) = app.path().app_data_dir().ok() {
+            if let Ok(app_data_dir) = app.path().app_data_dir() {
                 session_state.set_data_dir(app_data_dir);
                 if let Err(e) = session_state.load_sessions() {
                     eprintln!("[session] Failed to load sessions: {}", e);

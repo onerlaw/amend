@@ -162,37 +162,6 @@ impl SessionCapture {
         }
     }
 
-    // ── Integration hooks ───────────────────────────────────────────────
-
-    pub fn record_command_start(
-        &self,
-        session_id: &str,
-        terminal_id: &str,
-        command: &str,
-        cwd: &str,
-    ) {
-        self.record_event(
-            session_id,
-            SessionEvent::CommandStart {
-                timestamp: now_millis(),
-                terminal_id: terminal_id.to_string(),
-                command: command.to_string(),
-                cwd: cwd.to_string(),
-            },
-        );
-    }
-
-    pub fn record_file_change(&self, session_id: &str, path: &str, change_type: &str) {
-        self.record_event(
-            session_id,
-            SessionEvent::FileChanged {
-                timestamp: now_millis(),
-                path: path.to_string(),
-                change_type: change_type.to_string(),
-            },
-        );
-    }
-
     // ── Persistence ─────────────────────────────────────────────────────
 
     pub fn save_session(&self, session_id: &str) -> Result<(), String> {
@@ -234,19 +203,11 @@ impl SessionCapture {
                             sessions.insert(session.id.clone(), session);
                         }
                         Err(e) => {
-                            eprintln!(
-                                "[session] Failed to parse {}: {}",
-                                path.display(),
-                                e
-                            );
+                            eprintln!("[session] Failed to parse {}: {}", path.display(), e);
                         }
                     },
                     Err(e) => {
-                        eprintln!(
-                            "[session] Failed to read {}: {}",
-                            path.display(),
-                            e
-                        );
+                        eprintln!("[session] Failed to read {}: {}", path.display(), e);
                     }
                 }
             }
@@ -258,10 +219,7 @@ impl SessionCapture {
 // ── Tauri commands ──────────────────────────────────────────────────────
 
 #[tauri::command]
-pub fn start_session_recording(
-    terminal_id: String,
-    capture: State<'_, SessionCapture>,
-) -> String {
+pub fn start_session_recording(terminal_id: String, capture: State<'_, SessionCapture>) -> String {
     capture.start_session(&terminal_id)
 }
 
