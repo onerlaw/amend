@@ -280,7 +280,13 @@ export function useTerminal(containerId: string | null) {
           bytes[i] = binaryStr.charCodeAt(i);
         }
         const text = entry.decoder.decode(bytes, { stream: true });
-        entry.terminal.write(text);
+        const buf = entry.terminal.buffer.active;
+        const wasAtBottom = buf.baseY + entry.terminal.rows >= buf.length;
+        entry.terminal.write(text, () => {
+          if (wasAtBottom) {
+            entry.terminal.scrollToBottom();
+          }
+        });
       });
 
       // Set up exit listener - close the tab when the process exits
