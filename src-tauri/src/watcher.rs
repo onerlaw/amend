@@ -25,12 +25,15 @@ impl FileWatcher {
     pub fn start_watching(&self, path: &str, app_handle: &AppHandle) {
         let mut state = self.state.lock().unwrap();
 
-        // Stop existing watcher if any
+        // Stop existing watcher if any — signal shutdown but don't block on join
         if let Some(old) = state.take() {
             drop(old._watcher);
             let _ = old.shutdown_tx.send(());
+            // Let the debounce thread exit on its own; don't block the caller
             if let Some(handle) = old.debounce_thread {
-                let _ = handle.join();
+                thread::spawn(move || {
+                    let _ = handle.join();
+                });
             }
         }
 
@@ -103,22 +106,26 @@ impl FileWatcher {
             drop(old._watcher);
             let _ = old.shutdown_tx.send(());
             if let Some(handle) = old.debounce_thread {
-                let _ = handle.join();
+                thread::spawn(move || {
+                    let _ = handle.join();
+                });
             }
         }
     }
 }
 
 #[tauri::command]
-pub fn start_watching_directory(
+pub async fn start_watching_directory(
     path: String,
     app_handle: AppHandle,
     state: State<'_, FileWatcher>,
-) {
+) -> Result<(), String> {
     state.start_watching(&path, &app_handle);
+    Ok(())
 }
 
 #[tauri::command]
-pub fn stop_watching_directory(state: State<'_, FileWatcher>) {
+pub async fn stop_watching_directory(state: State<'_, FileWatcher>) -> Result<(), String> {
     state.stop_watching();
+    Ok(())
 }

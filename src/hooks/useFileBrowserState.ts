@@ -248,11 +248,18 @@ export function useFileBrowserState() {
       if (!file || !file.isDirty) return;
 
       setSaveStatus(path, 'saving');
+      const saveInitiatedAt = Date.now();
       try {
-        recentSelfWrites.current.set(path, Date.now());
+        recentSelfWrites.current.set(path, saveInitiatedAt);
         await writeFile(path, file.content);
-        markBrowseFileSaved(path);
-        setSaveStatus(path, 'idle');
+        // Only mark clean if no edits happened during the async write
+        const current = useFileStore.getState().browseOpenFiles.find((f) => f.path === path);
+        if (current && (!current.lastLocalEditAt || current.lastLocalEditAt <= saveInitiatedAt)) {
+          markBrowseFileSaved(path);
+          setSaveStatus(path, 'idle');
+        } else {
+          setSaveStatus(path, 'pending');
+        }
       } catch (err) {
         recentSelfWrites.current.delete(path);
         console.error('Failed to save file:', err);

@@ -258,12 +258,16 @@ impl TerminalManager {
 
     /// Check if a terminal has a foreground child process running.
     pub fn is_busy(&self, id: &str) -> bool {
-        let sessions = self.sessions.lock();
-        let Some(session) = sessions.get(id) else {
-            return false;
-        };
-        let Some(pid) = session.shell_pid else {
-            return false;
+        // Extract PID under the lock, then release before spawning pgrep
+        let pid = {
+            let sessions = self.sessions.lock();
+            let Some(session) = sessions.get(id) else {
+                return false;
+            };
+            match session.shell_pid {
+                Some(pid) => pid,
+                None => return false,
+            }
         };
         std::process::Command::new("pgrep")
             .args(["-P", &pid.to_string()])
@@ -284,22 +288,28 @@ pub async fn create_terminal(
 }
 
 #[tauri::command]
-pub fn write_to_terminal(
+pub async fn write_to_terminal(
     state: tauri::State<'_, Arc<TerminalManager>>,
     id: String,
     data: String,
 ) -> Result<(), TerminalError> {
-    state.write_to_terminal(&id, &data)
+    let mgr = state.inner().clone();
+    tokio::task::spawn_blocking(move || mgr.write_to_terminal(&id, &data))
+        .await
+        .map_err(|e| TerminalError::Pty(e.to_string()))?
 }
 
 #[tauri::command]
-pub fn resize_terminal(
+pub async fn resize_terminal(
     state: tauri::State<'_, Arc<TerminalManager>>,
     id: String,
     cols: u16,
     rows: u16,
 ) -> Result<(), TerminalError> {
-    state.resize_terminal(&id, cols, rows)
+    let mgr = state.inner().clone();
+    tokio::task::spawn_blocking(move || mgr.resize_terminal(&id, cols, rows))
+        .await
+        .map_err(|e| TerminalError::Pty(e.to_string()))?
 }
 
 #[tauri::command]
@@ -313,6 +323,12 @@ pub async fn close_terminal(
 }
 
 #[tauri::command]
-pub fn is_terminal_busy(id: String, state: tauri::State<'_, Arc<TerminalManager>>) -> bool {
-    state.is_busy(&id)
+pub async fn is_terminal_busy(
+    id: String,
+    state: tauri::State<'_, Arc<TerminalManager>>,
+) -> Result<bool, TerminalError> {
+    let mgr = state.inner().clone();
+    tokio::task::spawn_blocking(move || mgr.is_busy(&id))
+        .await
+        .map_err(|e| TerminalError::Pty(e.to_string()))
 }

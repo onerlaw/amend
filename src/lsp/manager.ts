@@ -34,6 +34,7 @@ function serverKey(configName: string, rootPath: string): string {
 }
 
 const servers = new Map<string, ManagedServer>();
+const pendingStarts = new Map<string, Promise<ManagedServer | null>>();
 
 export interface LspServerStatus {
   configName: string;
@@ -78,7 +79,20 @@ export async function getOrStartLspClient(
     return { client: existing.client, languageId };
   }
 
-  const managed = await startServer(config, rootPath, key);
+  // Prevent duplicate concurrent starts for the same key
+  const pending = pendingStarts.get(key);
+  if (pending) {
+    const managed = await pending;
+    if (!managed) return null;
+    managed.refCount++;
+    return { client: managed.client, languageId };
+  }
+
+  const startPromise = startServer(config, rootPath, key);
+  pendingStarts.set(key, startPromise);
+  startPromise.finally(() => pendingStarts.delete(key));
+
+  const managed = await startPromise;
   if (!managed) return null;
 
   return { client: managed.client, languageId };

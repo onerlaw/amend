@@ -79,6 +79,8 @@ export function MainLayout() {
   const browseEditorTabsRef = useRef<BrowseEditorTabsHandle>(null);
   const restoredContextsRef = useRef<Set<string>>(new Set());
   const gitPolling = useGitPolling(contextPath);
+  const forceCheckRef = useRef(gitPolling.forceCheck);
+  forceCheckRef.current = gitPolling.forceCheck;
   const diffStats = gitPolling.diffStats;
   const gitStatus = gitPolling.status;
 
@@ -204,7 +206,7 @@ export function MainLayout() {
       if (gitTimer) clearTimeout(gitTimer);
       gitTimer = setTimeout(() => {
         gitTimer = null;
-        gitPolling.forceCheck();
+        forceCheckRef.current();
       }, 200);
     }).then((fn) => {
       if (cancelled) {
@@ -220,7 +222,7 @@ export function MainLayout() {
       if (indexTimer) clearTimeout(indexTimer);
       if (gitTimer) clearTimeout(gitTimer);
     };
-  }, [contextPath, gitPolling.forceCheck]);
+  }, [contextPath]);
 
   return (
     <div className="flex h-screen flex-col bg-surface-0">

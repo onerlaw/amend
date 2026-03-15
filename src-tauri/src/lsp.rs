@@ -27,6 +27,7 @@ struct LspSession {
     stdin: std::process::ChildStdin,
 }
 
+#[derive(Clone)]
 pub struct LspManager {
     sessions: Arc<Mutex<HashMap<String, LspSession>>>,
 }
@@ -157,10 +158,13 @@ impl LspManager {
     }
 
     pub fn stop_server(&self, server_id: &str) -> Result<(), LspError> {
-        let mut sessions = self.sessions.lock();
-        let mut session = sessions
-            .remove(server_id)
-            .ok_or_else(|| LspError::NotFound(server_id.to_string()))?;
+        // Remove from map and drop the lock before kill/wait
+        let mut session = {
+            self.sessions
+                .lock()
+                .remove(server_id)
+                .ok_or_else(|| LspError::NotFound(server_id.to_string()))?
+        };
 
         let _ = session.child.kill();
         let _ = session.child.wait();
@@ -259,7 +263,7 @@ pub struct StartServerArgs {
 }
 
 #[tauri::command]
-pub fn lsp_start_server(
+pub async fn lsp_start_server(
     app_handle: AppHandle,
     state: tauri::State<'_, LspManager>,
     params: StartServerArgs,
@@ -280,28 +284,41 @@ pub fn lsp_start_server(
         (cmd, params.args)
     };
 
-    state.start_server(
-        &app_handle,
-        &params.server_id,
-        &command,
-        &args,
-        params.root_path.as_deref(),
-    )
+    let mgr = state.inner().clone();
+    let app = app_handle.clone();
+    let server_id = params.server_id.clone();
+    tokio::task::spawn_blocking(move || {
+        mgr.start_server(
+            &app,
+            &server_id,
+            &command,
+            &args,
+            params.root_path.as_deref(),
+        )
+    })
+    .await
+    .map_err(|e| LspError::Spawn(e.to_string()))?
 }
 
 #[tauri::command]
-pub fn lsp_send_message(
+pub async fn lsp_send_message(
     state: tauri::State<'_, LspManager>,
     server_id: String,
     message: String,
 ) -> Result<(), LspError> {
-    state.send_message(&server_id, &message)
+    let mgr = state.inner().clone();
+    tokio::task::spawn_blocking(move || mgr.send_message(&server_id, &message))
+        .await
+        .map_err(|e| LspError::Spawn(e.to_string()))?
 }
 
 #[tauri::command]
-pub fn lsp_stop_server(
+pub async fn lsp_stop_server(
     state: tauri::State<'_, LspManager>,
     server_id: String,
 ) -> Result<(), LspError> {
-    state.stop_server(&server_id)
+    let mgr = state.inner().clone();
+    tokio::task::spawn_blocking(move || mgr.stop_server(&server_id))
+        .await
+        .map_err(|e| LspError::Spawn(e.to_string()))?
 }
