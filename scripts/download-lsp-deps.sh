@@ -12,7 +12,7 @@ TAURI_DIR="$ROOT_DIR/src-tauri"
 BIN_DIR="$TAURI_DIR/bin"
 LSP_DIR="$TAURI_DIR/resources/lsp-servers"
 
-NODE_VERSION="v22.14.0"
+NODE_VERSION="v24.14.0"
 
 # Determine host platform and Tauri target triple
 detect_target() {
