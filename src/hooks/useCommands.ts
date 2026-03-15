@@ -307,14 +307,19 @@ function handlePasteFiles(e: KeyboardEvent, contextPath: string | null, panelMod
         const baseName = dot > 0 ? fileName.slice(0, dot) : fileName;
         const ext = dot > 0 ? fileName.slice(dot) : '';
 
-        while (true) {
+        while (counter <= 100) {
           try {
             await copyEntry(srcPath, destPath);
             break;
-          } catch {
+          } catch (copyErr) {
+            const msg = String(copyErr);
+            // Only retry with incremented name on "already exists" collisions
+            if (!msg.includes('exists')) {
+              console.error('Failed to paste file:', copyErr);
+              break;
+            }
             destPath = join(contextPath, `${baseName} (${counter})${ext}`);
             counter++;
-            if (counter > 100) break;
           }
         }
       }

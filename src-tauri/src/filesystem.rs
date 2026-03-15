@@ -220,7 +220,11 @@ impl FileSystemManager {
                 continue;
             }
 
-            let metadata = entry_path.metadata()?;
+            // Skip entries whose metadata can't be read (e.g. race with deletion)
+            let metadata = match entry_path.metadata() {
+                Ok(m) => m,
+                Err(_) => continue,
+            };
             let name = entry_path
                 .file_name()
                 .map(|n| n.to_string_lossy().to_string())
@@ -501,10 +505,11 @@ pub async fn read_directories(
 ) -> Result<Vec<Vec<FileEntry>>, FileSystemError> {
     let mgr = state.inner().clone();
     spawn_blocking(move || {
-        paths
+        // Return results per-directory; failed reads (e.g. deleted dir) yield empty vec
+        Ok(paths
             .iter()
-            .map(|p| mgr.read_directory(p))
-            .collect::<Result<Vec<_>, _>>()
+            .map(|p| mgr.read_directory(p).unwrap_or_default())
+            .collect())
     })
     .await
     .map_err(|e| FileSystemError::TaskJoin(e.to_string()))?

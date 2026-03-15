@@ -24,6 +24,7 @@ function App() {
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
     let unlisten: (() => void) | undefined;
     onWindowCloseRequested(async () => {
       const tabs = useTerminalStore.getState().tabs;
@@ -36,9 +37,14 @@ function App() {
         forceQuitApp();
       }
     }).then((fn) => {
-      unlisten = fn;
+      if (cancelled) {
+        fn();
+      } else {
+        unlisten = fn;
+      }
     });
     return () => {
+      cancelled = true;
       unlisten?.();
     };
   }, []);

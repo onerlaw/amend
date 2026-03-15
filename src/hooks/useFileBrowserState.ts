@@ -40,15 +40,19 @@ export function useFileBrowserState() {
     }
     try {
       const contents = await readDirectory(contextPath);
-      // Discard results from stale generations
-      if (generation !== loadGenerationRef.current) return;
-      setEntries(contents);
-      initialLoadDone.current = true;
+      // Only apply results from the latest generation
+      if (generation === loadGenerationRef.current) {
+        setEntries(contents);
+        initialLoadDone.current = true;
+      }
     } catch (err) {
-      if (generation !== loadGenerationRef.current) return;
       console.error('Failed to read directory:', err);
+    } finally {
+      // Always clear loading state to prevent stuck spinner
+      if (generation === loadGenerationRef.current) {
+        setIsLoading(false);
+      }
     }
-    setIsLoading(false);
   }, [contextPath]);
 
   useEffect(() => {
@@ -69,6 +73,7 @@ export function useFileBrowserState() {
   useEffect(() => {
     if (!contextPath) return;
 
+    let cancelled = false;
     let unlisten: (() => void) | undefined;
     onFsChanged(() => {
       // Debounce the UI refresh on the frontend side to coalesce rapid events
@@ -124,10 +129,15 @@ export function useFileBrowserState() {
         }
       }, 1000);
     }).then((fn) => {
-      unlisten = fn;
+      if (cancelled) {
+        fn();
+      } else {
+        unlisten = fn;
+      }
     });
 
     return () => {
+      cancelled = true;
       unlisten?.();
       if (fsDebounceTimer.current) {
         clearTimeout(fsDebounceTimer.current);
@@ -197,13 +207,21 @@ export function useFileBrowserState() {
       const timer = setTimeout(async () => {
         autoSaveTimers.current.delete(path);
         setSaveStatus(path, 'saving');
+        const saveInitiatedAt = Date.now();
 
         try {
           // Record self-write so the watcher knows to ignore the resulting event
-          recentSelfWrites.current.set(path, Date.now());
+          recentSelfWrites.current.set(path, saveInitiatedAt);
           await writeFile(path, newContent);
-          markBrowseFileSaved(path);
-          setSaveStatus(path, 'idle');
+          // Only mark clean if no edits happened during the async write
+          const current = useFileStore.getState().browseOpenFiles.find((f) => f.path === path);
+          if (current && (!current.lastLocalEditAt || current.lastLocalEditAt <= saveInitiatedAt)) {
+            markBrowseFileSaved(path);
+            setSaveStatus(path, 'idle');
+          } else {
+            // Content changed during save — leave dirty, schedule next save
+            setSaveStatus(path, 'pending');
+          }
         } catch (err) {
           // If the write failed, remove from self-writes tracking
           recentSelfWrites.current.delete(path);

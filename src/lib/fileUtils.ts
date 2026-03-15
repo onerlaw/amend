@@ -185,6 +185,9 @@ export function toggleSetItem<T>(set: Set<T>, item: T): Set<T> {
  * Reorder an array by moving an item from one index to another.
  */
 export function reorderArray<T>(items: T[], fromIndex: number, toIndex: number): T[] {
+  if (fromIndex < 0 || fromIndex >= items.length || toIndex < 0 || toIndex >= items.length) {
+    return items;
+  }
   const result = [...items];
   const [moved] = result.splice(fromIndex, 1);
   result.splice(toIndex, 0, moved);

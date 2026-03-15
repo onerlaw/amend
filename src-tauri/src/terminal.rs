@@ -240,12 +240,16 @@ impl TerminalManager {
     }
 
     pub fn close_terminal(&self, id: &str) -> Result<(), TerminalError> {
-        let mut sessions = self.sessions.lock();
-        let mut session = sessions
-            .remove(id)
-            .ok_or_else(|| TerminalError::NotFound(id.to_string()))?;
+        // Remove session from the map and drop the lock before kill/wait,
+        // so write_to_terminal and resize_terminal aren't blocked.
+        let mut session = {
+            self.sessions
+                .lock()
+                .remove(id)
+                .ok_or_else(|| TerminalError::NotFound(id.to_string()))?
+        };
 
-        // Kill the child process and wait for it to exit
+        // Kill the child process and wait for it to exit (lock is not held)
         let _ = session.child.kill();
         let _ = session.child.wait();
 

@@ -75,7 +75,6 @@ export function useGitPolling(repoPath: string | null) {
         }
 
         setCurrentBranch(data.currentBranch);
-
       } catch (err) {
         // Repository::discover error means not a git repo
         const msg = err instanceof Error ? err.message : String(err);
@@ -193,7 +192,16 @@ export function useGitPolling(repoPath: string | null) {
     return fullPoll(false);
   }, [fullPoll, scheduleNext]);
 
-  return { status, diffStats, currentBranch, isLoading, error, refresh: manualRefresh, resetInterval, forceCheck };
+  return {
+    status,
+    diffStats,
+    currentBranch,
+    isLoading,
+    error,
+    refresh: manualRefresh,
+    resetInterval,
+    forceCheck,
+  };
 }
 
 export type GitPollingResult = ReturnType<typeof useGitPolling>;

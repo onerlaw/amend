@@ -139,6 +139,19 @@ export const useFileStore = create<FileState>()((set, get) => ({
       };
     }
 
+    // Evict oldest entries to prevent unbounded memory growth (file content is stored)
+    const MAX_SAVED_CONTEXTS = 10;
+    const keys = Object.keys(saved);
+    if (keys.length > MAX_SAVED_CONTEXTS) {
+      // Keep the new context and the most recent entries; drop the rest
+      const toRemove = keys
+        .filter((k) => k !== newContextPath)
+        .slice(0, keys.length - MAX_SAVED_CONTEXTS);
+      for (const k of toRemove) {
+        delete saved[k];
+      }
+    }
+
     // Restore browse state for the new context (or clear if null)
     const restored = newContextPath ? saved[newContextPath] : undefined;
 

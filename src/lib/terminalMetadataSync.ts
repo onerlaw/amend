@@ -6,6 +6,7 @@ import {
 } from '@/lib/tauri';
 
 let unsubscribe: (() => void) | null = null;
+let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
 function buildMetadata(tab: TerminalTab): TerminalMetadataPayload {
   return {
@@ -34,8 +35,6 @@ export function startTerminalMetadataSync() {
     prevTabIds.add(tab.id);
     syncTerminalMetadata(tab.id, meta).catch(() => {});
   }
-
-  let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
   unsubscribe = useTerminalStore.subscribe((state) => {
     if (debounceTimer) clearTimeout(debounceTimer);
@@ -68,6 +67,10 @@ export function startTerminalMetadataSync() {
 }
 
 export function stopTerminalMetadataSync() {
+  if (debounceTimer) {
+    clearTimeout(debounceTimer);
+    debounceTimer = null;
+  }
   if (unsubscribe) {
     unsubscribe();
     unsubscribe = null;
