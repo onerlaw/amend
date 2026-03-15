@@ -42,11 +42,14 @@ export function useTabGitRoots() {
   // Periodically re-check tabs where gitRoot is null (not a repo yet).
   // This detects `git init` in an existing terminal tab.
   useEffect(() => {
+    let cancelled = false;
+
     const interval = setInterval(() => {
       const currentTabs = tabsRef.current;
       const nonGitTabs = currentTabs.filter((t) => t.gitRoot === null);
       for (const tab of nonGitTabs) {
         getGitRepoInfo(tab.cwd).then((info) => {
+          if (cancelled) return;
           if (info) {
             setTabRepoInfo(tab.id, {
               gitRoot: info.gitRoot,
@@ -60,6 +63,9 @@ export function useTabGitRoots() {
       }
     }, 3000);
 
-    return () => clearInterval(interval);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
   }, [setTabRepoInfo]);
 }

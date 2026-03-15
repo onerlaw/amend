@@ -28,9 +28,12 @@ export function useCloseTerminal() {
 
   const close = useCallback(
     async (id: string) => {
-      await closeTerminal(id);
+      // Destroy frontend instance first to unregister the exit listener
+      // before killing the PTY (which would trigger the exit event and
+      // call removeTab a second time).
       destroyTerminalInstance(id);
       removeTab(id);
+      await closeTerminal(id).catch(console.error);
     },
     [removeTab]
   );

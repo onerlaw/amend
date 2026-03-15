@@ -108,6 +108,7 @@ export const TerminalTabs = forwardRef<TerminalTabsHandle>(function TerminalTabs
   const closeTerminal = useCloseTerminal();
   const [closingTabId, setClosingTabId] = useState<string | null>(null);
   const initializedRef = useRef(false);
+  const creatingRef = useRef(false);
 
   useTabGitRoots();
 
@@ -134,41 +135,46 @@ export const TerminalTabs = forwardRef<TerminalTabsHandle>(function TerminalTabs
 
   // Auto-create terminal(s) on startup, restoring saved session if available
   useEffect(() => {
-    if (tabs.length === 0 && !initializedRef.current) {
+    if (tabs.length === 0 && !initializedRef.current && !creatingRef.current) {
       initializedRef.current = true;
+      creatingRef.current = true;
       const { terminalCwds, activeTerminalIndex, terminalLayout } = useSessionStore.getState();
       if (terminalCwds.length > 0) {
         (async () => {
-          const ids: string[] = [];
-          for (const cwd of terminalCwds) {
-            try {
-              const id = await createTerminal(cwd);
-              ids.push(id);
-            } catch (err) {
-              console.error('Failed to restore terminal:', cwd, err);
-            }
-          }
-          const targetIndex = Math.min(activeTerminalIndex, ids.length - 1);
-          if (ids[targetIndex]) {
-            setActiveTab(ids[targetIndex]);
-          }
-          // Restore layout from session
-          if (terminalLayout && ids.length > 0) {
-            const restored = deserializeLayout(terminalLayout, ids);
-            if (restored) {
-              setLayout(restored);
-              // Set focus to the active terminal's pane
-              const activeId = ids[targetIndex] ?? ids[0];
-              const leaf = findLeafByTerminalId(restored, activeId);
-              if (leaf) {
-                setFocusedPane(leaf.id);
+          try {
+            const ids: string[] = [];
+            for (const cwd of terminalCwds) {
+              try {
+                const id = await createTerminal(cwd);
+                ids.push(id);
+              } catch (err) {
+                console.error('Failed to restore terminal:', cwd, err);
               }
-              return;
             }
-          }
-          // Fallback: single leaf for first terminal
-          if (ids.length > 0) {
-            initLayout(ids[targetIndex] ?? ids[0]);
+            const targetIndex = Math.min(activeTerminalIndex, ids.length - 1);
+            if (ids[targetIndex]) {
+              setActiveTab(ids[targetIndex]);
+            }
+            // Restore layout from session
+            if (terminalLayout && ids.length > 0) {
+              const restored = deserializeLayout(terminalLayout, ids);
+              if (restored) {
+                setLayout(restored);
+                // Set focus to the active terminal's pane
+                const activeId = ids[targetIndex] ?? ids[0];
+                const leaf = findLeafByTerminalId(restored, activeId);
+                if (leaf) {
+                  setFocusedPane(leaf.id);
+                }
+                return;
+              }
+            }
+            // Fallback: single leaf for first terminal
+            if (ids.length > 0) {
+              initLayout(ids[targetIndex] ?? ids[0]);
+            }
+          } finally {
+            creatingRef.current = false;
           }
         })();
       } else {
@@ -177,6 +183,9 @@ export const TerminalTabs = forwardRef<TerminalTabsHandle>(function TerminalTabs
           .catch((err) => {
             console.error('Failed to create terminal:', err);
             initializedRef.current = false;
+          })
+          .finally(() => {
+            creatingRef.current = false;
           });
       }
     }
@@ -283,7 +292,9 @@ export const TerminalTabs = forwardRef<TerminalTabsHandle>(function TerminalTabs
           <div ref={containerRef} className="flex flex-1 overflow-x-auto gap-0.5 items-center">
             {backgroundedGroups.map((group, groupIdx) => (
               <Fragment key={group.projectKey}>
-                {groupIdx > 0 && <div className="w-0.5 h-6 bg-accent/30 rounded-full mx-1 shrink-0" />}
+                {groupIdx > 0 && (
+                  <div className="w-0.5 h-6 bg-accent/30 rounded-full mx-1 shrink-0" />
+                )}
                 <div className="flex items-center gap-0.5 shrink-0 bg-surface-1/50 rounded-md px-1 py-0.5">
                   <ProjectLabel name={group.projectName} />
                   {group.tabs.map((tab, tabIdx) => {

@@ -18,6 +18,7 @@ export function GlobalSearch() {
   const resultsRef = useRef<HTMLDivElement>(null);
 
   const results = [...filenameResults, ...contentResults];
+  const safeSelectedIndex = Math.min(selectedIndex, Math.max(0, results.length - 1));
 
   const { contextPath: searchRoot } = useFileStore();
   const { setPanelMode } = useUIStore();
@@ -151,12 +152,12 @@ export function GlobalSearch() {
   // Scroll selected item into view
   useEffect(() => {
     if (resultsRef.current && results.length > 0) {
-      const selectedElement = resultsRef.current.children[selectedIndex] as HTMLElement;
+      const selectedElement = resultsRef.current.children[safeSelectedIndex] as HTMLElement;
       if (selectedElement) {
         selectedElement.scrollIntoView({ block: 'nearest' });
       }
     }
-  }, [selectedIndex, results.length]);
+  }, [safeSelectedIndex, results.length]);
 
   // Handle keyboard navigation in dropdown
   const handleInputKeyDown = (e: React.KeyboardEvent) => {
@@ -171,7 +172,7 @@ export function GlobalSearch() {
       setSelectedIndex((i) => Math.max(i - 1, 0));
     } else if (e.key === 'Enter' && results.length > 0) {
       e.preventDefault();
-      handleSelectResult(results[selectedIndex]);
+      handleSelectResult(results[safeSelectedIndex]);
     }
   };
 
@@ -238,7 +239,7 @@ export function GlobalSearch() {
                     key={`${result.path}-${result.lineNumber ?? 0}`}
                     onClick={() => handleSelectResult(result)}
                     className={`flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-surface-3/50 ${
-                      index === selectedIndex ? 'bg-surface-3' : ''
+                      index === safeSelectedIndex ? 'bg-surface-3' : ''
                     }`}
                   >
                     <FileIcon

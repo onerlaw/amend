@@ -1,11 +1,7 @@
 import { Fragment, useCallback, useRef, useEffect, useState, useMemo } from 'react';
 import { TerminalPane } from './TerminalPane';
 import { DropZoneOverlay } from './DropZoneOverlay';
-import {
-  TerminalTabLabel,
-  groupTabsByProject,
-  ProjectLabel,
-} from './TerminalTabs';
+import { TerminalTabLabel, groupTabsByProject, ProjectLabel } from './TerminalTabs';
 import { useTerminalLayoutStore } from '@/stores/terminalLayoutStore';
 import { useTerminalDragStore } from '@/stores/terminalDragStore';
 import { useTerminalStore } from '@/stores/terminalStore';
@@ -137,7 +133,9 @@ export function TerminalLeafPane({ leafId, terminalIds, activeTerminalId }: Term
         <div className="flex items-center bg-surface-1 px-1 gap-0.5 shrink-0 overflow-x-auto">
           {paneGroups.map((group, groupIdx) => (
             <Fragment key={group.projectKey}>
-              {groupIdx > 0 && <div className="w-0.5 h-6 bg-accent/30 rounded-full mx-1 shrink-0" />}
+              {groupIdx > 0 && (
+                <div className="w-0.5 h-6 bg-accent/30 rounded-full mx-1 shrink-0" />
+              )}
               <div className="flex items-center gap-0.5 shrink-0 bg-surface-2/50 rounded-md px-1 py-0.5">
                 <ProjectLabel name={group.projectName} />
                 {group.tabs.map((tab) => {

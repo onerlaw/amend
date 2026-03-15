@@ -180,6 +180,7 @@ export function MainLayout() {
   // Re-index symbols and refresh git polling on file system changes
   useEffect(() => {
     if (!contextPath) return;
+    let cancelled = false;
     let indexTimer: ReturnType<typeof setTimeout> | null = null;
     let gitTimer: ReturnType<typeof setTimeout> | null = null;
     let unlisten: (() => void) | undefined;
@@ -206,10 +207,15 @@ export function MainLayout() {
         gitPolling.forceCheck();
       }, 200);
     }).then((fn) => {
-      unlisten = fn;
+      if (cancelled) {
+        fn();
+      } else {
+        unlisten = fn;
+      }
     });
 
     return () => {
+      cancelled = true;
       unlisten?.();
       if (indexTimer) clearTimeout(indexTimer);
       if (gitTimer) clearTimeout(gitTimer);
@@ -319,11 +325,19 @@ export function MainLayout() {
         </div>
         <div className="flex min-w-[40px] items-center justify-end gap-2">
           {gitPolling.currentBranch && (
-            <div className="flex items-center gap-1 text-xs text-secondary" title={gitPolling.currentBranch + (activeTab?.worktreeName ? ` (${activeTab.worktreeName})` : '')}>
+            <div
+              className="flex items-center gap-1 text-xs text-secondary"
+              title={
+                gitPolling.currentBranch +
+                (activeTab?.worktreeName ? ` (${activeTab.worktreeName})` : '')
+              }
+            >
               <BranchIcon className="h-3 w-3 shrink-0" />
               <span className="max-w-[120px] truncate">{gitPolling.currentBranch}</span>
               {activeTab?.worktreeName && (
-                <span className="max-w-[80px] truncate text-tertiary">({activeTab.worktreeName})</span>
+                <span className="max-w-[80px] truncate text-tertiary">
+                  ({activeTab.worktreeName})
+                </span>
               )}
             </div>
           )}
