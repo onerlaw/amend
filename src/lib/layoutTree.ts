@@ -9,7 +9,7 @@ export type LayoutNode =
       ratio: number;
     };
 
-let _nextId = 0;
+let _nextId = Date.now();
 export function genNodeId(): string {
   return `pane-${++_nextId}`;
 }
