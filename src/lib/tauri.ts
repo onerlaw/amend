@@ -33,6 +33,15 @@ export async function onTerminalExit(id: string, callback: () => void): Promise<
   });
 }
 
+export async function onTerminalCwdChange(
+  id: string,
+  callback: (cwd: string) => void
+): Promise<UnlistenFn> {
+  return listen(`terminal-cwd-${id}`, (event) => {
+    callback(event.payload as string);
+  });
+}
+
 export async function isTerminalBusy(id: string): Promise<boolean> {
   return invoke<boolean>('is_terminal_busy', { id });
 }

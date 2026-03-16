@@ -61,6 +61,55 @@ add-zsh-hook chpwd _amend_report_cwd
     Some(integration_dir)
 }
 
+/// Get the newest child PID of a given parent process.
+fn get_child_pid(parent_pid: u32) -> Option<u32> {
+    let output = std::process::Command::new("pgrep")
+        .args(["-nP", &parent_pid.to_string()])
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    stdout.trim().lines().next()?.parse::<u32>().ok()
+}
+
+/// Get the current working directory of a process.
+fn get_process_cwd(pid: u32) -> Option<String> {
+    if cfg!(target_os = "linux") {
+        std::fs::read_link(format!("/proc/{}/cwd", pid))
+            .ok()
+            .and_then(|p| p.to_str().map(String::from))
+    } else {
+        // macOS: use lsof
+        let output = std::process::Command::new("lsof")
+            .args(["-a", "-d", "cwd", "-p", &pid.to_string(), "-Fn"])
+            .output()
+            .ok()?;
+        if !output.status.success() {
+            return None;
+        }
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        for line in stdout.lines() {
+            if let Some(path) = line.strip_prefix('n') {
+                return Some(path.to_string());
+            }
+        }
+        None
+    }
+}
+
+/// Check if a process is still alive.
+fn is_process_alive(pid: u32) -> bool {
+    std::process::Command::new("ps")
+        .args(["-p", &pid.to_string()])
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false)
+}
+
 impl Default for TerminalManager {
     fn default() -> Self {
         Self::new()
@@ -205,6 +254,37 @@ impl TerminalManager {
             }
             let _ = app_handle_clone.emit(&format!("terminal-exit-{}", id_clone), ());
         });
+
+        // Spawn CWD polling thread for child process detection
+        if let Some(shell_pid) = shell_pid {
+            let id_for_cwd = id.clone();
+            let app_handle_for_cwd = app_handle.clone();
+            thread::spawn(move || {
+                let event_name = format!("terminal-cwd-{}", id_for_cwd);
+                let mut last_cwd: Option<String> = None;
+
+                loop {
+                    thread::sleep(std::time::Duration::from_secs(2));
+
+                    // Exit if shell is dead
+                    if !is_process_alive(shell_pid) {
+                        break;
+                    }
+
+                    if let Some(child_pid) = get_child_pid(shell_pid) {
+                        if let Some(cwd) = get_process_cwd(child_pid) {
+                            if last_cwd.as_ref() != Some(&cwd) {
+                                last_cwd = Some(cwd.clone());
+                                let _ = app_handle_for_cwd.emit(&event_name, cwd);
+                            }
+                        }
+                    } else {
+                        // No child process — reset so next child is detected
+                        last_cwd = None;
+                    }
+                }
+            });
+        }
 
         Ok(id)
     }
