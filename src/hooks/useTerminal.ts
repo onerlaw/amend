@@ -11,6 +11,7 @@ import {
   closeTerminal,
   onTerminalOutput,
   onTerminalExit,
+  onTerminalCwdChange,
 } from '@/lib/tauri';
 import { useTerminalStore } from '@/stores/terminalStore';
 import { useFileStore } from '@/stores/fileStore';
@@ -312,6 +313,13 @@ export function useTerminal(containerId: string | null) {
         return true;
       });
 
+      // Set up CWD polling listener for child process CWD changes
+      const unlistenCwd = await onTerminalCwdChange(containerId, (cwd) => {
+        if (import.meta.env.DEV)
+          console.log('[CWD] Poll detected child CWD change:', { cwd, tabId: containerId });
+        useTerminalStore.getState().updateTabCwd(containerId, cwd);
+      });
+
       // Set up title change listener
       const titleDisposable = terminal.onTitleChange((title) => {
         useTerminalStore.getState().setTabTitle(containerId, title);
@@ -326,6 +334,7 @@ export function useTerminal(containerId: string | null) {
         unlisteners: [
           unlistenOutput,
           unlistenExit,
+          unlistenCwd,
           () => oscDisposable.dispose(),
           () => titleDisposable.dispose(),
         ],
