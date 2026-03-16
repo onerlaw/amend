@@ -92,6 +92,7 @@ export function ProjectLabel({ name }: { name: string }) {
 export interface TerminalTabsHandle {
   openNewTerminal: () => void;
   openFolder: () => void;
+  requestClose: (tabId: string) => void;
 }
 
 export const TerminalTabs = forwardRef<TerminalTabsHandle>(function TerminalTabs(_, ref) {
@@ -249,8 +250,16 @@ export const TerminalTabs = forwardRef<TerminalTabsHandle>(function TerminalTabs
     () => ({
       openNewTerminal: handleNewTerminal,
       openFolder: handleOpenFolder,
+      requestClose: async (tabId: string) => {
+        const busy = await isTerminalBusy(tabId);
+        if (busy) {
+          setClosingTabId(tabId);
+        } else {
+          closeTerminal(tabId);
+        }
+      },
     }),
-    [handleNewTerminal, handleOpenFolder]
+    [handleNewTerminal, handleOpenFolder, closeTerminal]
   );
 
   const handleCloseTerminal = async (e: React.MouseEvent, id: string) => {

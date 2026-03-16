@@ -2,7 +2,7 @@ import { useEffect, useCallback, RefObject } from 'react';
 import { useUIStore } from '@/stores/uiStore';
 import { useTerminalStore } from '@/stores/terminalStore';
 import { useFileStore } from '@/stores/fileStore';
-import { useCloseTerminal, useCreateTerminal } from '@/hooks/useTerminalLifecycle';
+import { useCreateTerminal } from '@/hooks/useTerminalLifecycle';
 import { useContextMenuStore } from '@/stores/contextMenuStore';
 import { useNotesStore } from '@/stores/notesStore';
 import { useTerminalLayoutStore } from '@/stores/terminalLayoutStore';
@@ -26,7 +26,6 @@ export function useCommands({ terminalTabsRef, browseEditorTabsRef }: CommandRef
   const { panelMode } = useUIStore();
   const { tabs, activeTabId, setActiveTab } = useTerminalStore();
   const { browseActiveFilePath, closeBrowseFile, contextPath } = useFileStore();
-  const closeTerminal = useCloseTerminal();
   const createTerminal = useCreateTerminal();
 
   const handleKeyDown = useCallback(
@@ -208,7 +207,7 @@ export function useCommands({ terminalTabsRef, browseEditorTabsRef }: CommandRef
 
           if (focusedPanel === 'terminal') {
             if (tabs.length > 1 && activeTabId) {
-              closeTerminal(activeTabId);
+              terminalTabsRef.current?.requestClose(activeTabId);
             }
           } else if (focusedPanel === 'editor') {
             if (panelMode === 'browse' && browseActiveFilePath) {
@@ -223,7 +222,6 @@ export function useCommands({ terminalTabsRef, browseEditorTabsRef }: CommandRef
       tabs,
       activeTabId,
       setActiveTab,
-      closeTerminal,
       createTerminal,
       panelMode,
       browseActiveFilePath,
