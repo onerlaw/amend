@@ -20,33 +20,13 @@ import { useTabGitRoots } from '@/hooks/useTabGitRoots';
 import { TerminalPane } from './TerminalPane';
 import { TerminalSplitLayout } from './TerminalSplitLayout';
 import { RootDropZone } from './RootDropZone';
-import { CloseIcon, FolderIcon, SpinnerIcon } from '@/components/Icons';
+import { TerminalTabLabel } from './TerminalTabLabel';
+import { CloseIcon, FolderIcon } from '@/components/Icons';
 import { getFileName, formatShortcut } from '@/lib/fileUtils';
 import { useDraggableTabs } from '@/hooks/useDraggableTabs';
 import { isTerminalBusy, onMcpTerminalCreated, onMcpTerminalClosed } from '@/lib/tauri';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { collectTerminalIds, findLeafByTerminalId, deserializeLayout } from '@/lib/layoutTree';
-
-function TabBranchBadge({ tab }: { tab: TerminalTab }) {
-  const label = tab.branchName ?? tab.worktreeName ?? '~';
-  return (
-    <span className="inline-flex items-center text-[9px] text-tertiary/70 bg-surface-2 rounded px-1 font-mono select-none shrink-0">
-      {label}
-    </span>
-  );
-}
-
-export function TerminalTabLabel({ tab }: { tab: TerminalTab }) {
-  const isBusy = useTerminalStore((s) => s.busyMap[tab.id]);
-  const dirName = getFileName(tab.cwd);
-  return (
-    <span className="flex items-center gap-1 max-w-[200px]">
-      {isBusy && <SpinnerIcon className="h-3 w-3 animate-spin shrink-0" />}
-      <span className="truncate">{tab.title || dirName}</span>
-      <TabBranchBadge tab={tab} />
-    </span>
-  );
-}
 
 interface TabGroup {
   projectName: string;
@@ -142,18 +122,26 @@ export const TerminalTabs = forwardRef<TerminalTabsHandle>(function TerminalTabs
     if (tabs.length === 0 && !initializedRef.current && !creatingRef.current) {
       initializedRef.current = true;
       creatingRef.current = true;
-      const { terminalCwds, activeTerminalIndex, terminalLayout } = useSessionStore.getState();
+      const { terminalCwds, terminalCustomNames, activeTerminalIndex, terminalLayout } = useSessionStore.getState();
       if (terminalCwds.length > 0) {
         (async () => {
           try {
             const ids: string[] = [];
-            for (const cwd of terminalCwds) {
+            const originalIndices: number[] = [];
+            for (let idx = 0; idx < terminalCwds.length; idx++) {
               try {
-                const id = await createTerminal(cwd);
+                const id = await createTerminal(terminalCwds[idx]);
                 ids.push(id);
+                originalIndices.push(idx);
               } catch (err) {
-                console.error('Failed to restore terminal:', cwd, err);
+                console.error('Failed to restore terminal:', terminalCwds[idx], err);
               }
+            }
+            // Restore custom names using original indices to handle gaps from failed restores
+            const { setTabCustomName } = useTerminalStore.getState();
+            for (let i = 0; i < ids.length; i++) {
+              const name = terminalCustomNames[originalIndices[i]];
+              if (name) setTabCustomName(ids[i], name);
             }
             const targetIndex = Math.min(activeTerminalIndex, ids.length - 1);
             if (ids[targetIndex]) {
@@ -240,9 +228,10 @@ export const TerminalTabs = forwardRef<TerminalTabsHandle>(function TerminalTabs
     const cwds = tabs.map((t) => t.cwd);
     const activeIndex = tabs.findIndex((t) => t.id === activeTabId);
     const terminalIds = tabs.map((t) => t.id);
+    const customNames = tabs.map((t) => t.customName ?? '');
     useSessionStore
       .getState()
-      .saveTerminals(cwds, activeIndex >= 0 ? activeIndex : 0, layout, terminalIds);
+      .saveTerminals(cwds, activeIndex >= 0 ? activeIndex : 0, layout, terminalIds, customNames);
   }, [tabs, activeTabId, layout]);
 
   const handleNewTerminal = useCallback(async () => {
