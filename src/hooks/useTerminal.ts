@@ -12,6 +12,7 @@ import {
   onTerminalOutput,
   onTerminalExit,
   onTerminalCwdChange,
+  onTerminalBusyChange,
 } from '@/lib/tauri';
 import { useTerminalStore } from '@/stores/terminalStore';
 import { useFileStore } from '@/stores/fileStore';
@@ -320,6 +321,11 @@ export function useTerminal(containerId: string | null) {
         useTerminalStore.getState().updateTabCwd(containerId, cwd);
       });
 
+      // Set up busy state listener
+      const unlistenBusy = await onTerminalBusyChange(containerId, (isBusy) => {
+        useTerminalStore.getState().setTerminalBusy(containerId, isBusy);
+      });
+
       // Set up title change listener
       const titleDisposable = terminal.onTitleChange((title) => {
         useTerminalStore.getState().setTabTitle(containerId, title);
@@ -335,6 +341,7 @@ export function useTerminal(containerId: string | null) {
           unlistenOutput,
           unlistenExit,
           unlistenCwd,
+          unlistenBusy,
           () => oscDisposable.dispose(),
           () => titleDisposable.dispose(),
         ],

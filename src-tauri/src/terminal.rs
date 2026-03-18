@@ -261,7 +261,9 @@ impl TerminalManager {
             let app_handle_for_cwd = app_handle.clone();
             thread::spawn(move || {
                 let event_name = format!("terminal-cwd-{}", id_for_cwd);
+                let busy_event_name = format!("terminal-busy-{}", id_for_cwd);
                 let mut last_cwd: Option<String> = None;
+                let mut last_busy: Option<bool> = None;
 
                 loop {
                     thread::sleep(std::time::Duration::from_secs(2));
@@ -271,7 +273,14 @@ impl TerminalManager {
                         break;
                     }
 
-                    if let Some(child_pid) = get_child_pid(shell_pid) {
+                    let child_pid = get_child_pid(shell_pid);
+                    let is_busy = child_pid.is_some();
+                    if last_busy != Some(is_busy) {
+                        last_busy = Some(is_busy);
+                        let _ = app_handle_for_cwd.emit(&busy_event_name, is_busy);
+                    }
+
+                    if let Some(child_pid) = child_pid {
                         if let Some(cwd) = get_process_cwd(child_pid) {
                             if last_cwd.as_ref() != Some(&cwd) {
                                 last_cwd = Some(cwd.clone());
