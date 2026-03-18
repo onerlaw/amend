@@ -15,6 +15,7 @@ import { useUIStore } from '@/stores/uiStore';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useTerminalLayoutStore } from '@/stores/terminalLayoutStore';
 import { useCreateTerminal, useCloseTerminal } from '@/hooks/useTerminalLifecycle';
+import { destroyTerminalInstance } from '@/hooks/useTerminal';
 import { useTabGitRoots } from '@/hooks/useTabGitRoots';
 import { TerminalPane } from './TerminalPane';
 import { TerminalSplitLayout } from './TerminalSplitLayout';
@@ -22,7 +23,7 @@ import { RootDropZone } from './RootDropZone';
 import { CloseIcon, FolderIcon } from '@/components/Icons';
 import { getFileName, formatShortcut } from '@/lib/fileUtils';
 import { useDraggableTabs } from '@/hooks/useDraggableTabs';
-import { isTerminalBusy } from '@/lib/tauri';
+import { isTerminalBusy, onMcpTerminalCreated, onMcpTerminalClosed } from '@/lib/tauri';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { collectTerminalIds, findLeafByTerminalId, deserializeLayout } from '@/lib/layoutTree';
 
@@ -202,6 +203,34 @@ export const TerminalTabs = forwardRef<TerminalTabsHandle>(function TerminalTabs
       initLayout(tabs[0].id);
     }
   }, [tabs.length, layout, initLayout, tabs]);
+
+  // Listen for MCP-created and MCP-closed terminal events
+  useEffect(() => {
+    const unlisteners: (() => void)[] = [];
+
+    onMcpTerminalCreated(({ id, cwd }) => {
+      // Backend already created the PTY — just add the tab and split the layout
+      useTerminalStore.getState().addTab(id, cwd);
+
+      const layoutState = useTerminalLayoutStore.getState();
+      if (layoutState.focusedPaneId) {
+        layoutState.splitPane(layoutState.focusedPaneId, 'vertical', 'second', id);
+      } else if (layoutState.layout) {
+        layoutState.splitAtRoot('vertical', 'second', id);
+      } else {
+        layoutState.initLayout(id);
+      }
+    }).then((fn) => unlisteners.push(fn));
+
+    onMcpTerminalClosed((terminalId) => {
+      destroyTerminalInstance(terminalId);
+      useTerminalStore.getState().removeTab(terminalId);
+    }).then((fn) => unlisteners.push(fn));
+
+    return () => {
+      for (const unlisten of unlisteners) unlisten();
+    };
+  }, []);
 
   // Save terminal state to session whenever tabs, active tab, or layout changes
   useEffect(() => {

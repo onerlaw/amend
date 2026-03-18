@@ -50,10 +50,12 @@ pub fn run() {
         .setup(move |app| {
             let mcp_handle: tauri::State<'_, McpServerHandle> = app.state();
             let mcp_handle_inner = mcp_handle.inner().clone();
+            let app_handle_for_mcp = app.handle().clone();
 
             // Spawn MCP server on the async runtime
             tauri::async_runtime::spawn(async move {
-                match McpServer::start(ob_for_mcp, ms_for_mcp, tm_for_mcp).await {
+                match McpServer::start(app_handle_for_mcp, ob_for_mcp, ms_for_mcp, tm_for_mcp).await
+                {
                     Ok(port) => {
                         mcp_handle_inner.set_port(port).await;
                     }

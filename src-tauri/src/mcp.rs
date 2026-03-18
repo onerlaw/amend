@@ -12,6 +12,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::convert::Infallible;
 use std::sync::Arc;
+use tauri::{AppHandle, Emitter};
 use tokio::sync::{broadcast, RwLock};
 use tower_http::cors::CorsLayer;
 
@@ -69,6 +70,7 @@ impl JsonRpcResponse {
 
 #[derive(Clone)]
 pub struct McpServerState {
+    pub app_handle: AppHandle,
     pub output_buffers: Arc<OutputBufferRegistry>,
     pub metadata_store: Arc<TerminalMetadataStore>,
     pub terminal_manager: Arc<TerminalManager>,
@@ -81,6 +83,7 @@ pub struct McpServer;
 
 impl McpServer {
     pub async fn start(
+        app_handle: AppHandle,
         output_buffers: Arc<OutputBufferRegistry>,
         metadata_store: Arc<TerminalMetadataStore>,
         terminal_manager: Arc<TerminalManager>,
@@ -88,6 +91,7 @@ impl McpServer {
         let (response_tx, _) = broadcast::channel::<String>(256);
 
         let state = McpServerState {
+            app_handle,
             output_buffers,
             metadata_store,
             terminal_manager,
@@ -247,7 +251,7 @@ fn handle_tools_list(id: Value) -> JsonRpcResponse {
                 },
                 {
                     "name": "write_to_terminal",
-                    "description": "Send raw input to a terminal's PTY. Include \\n to execute a command.",
+                    "description": "Send raw input to a terminal's PTY. Include \\n to execute a command. For isolated command output, use create_terminal first to get a dedicated terminal.",
                     "inputSchema": {
                         "type": "object",
                         "properties": {
@@ -261,6 +265,34 @@ fn handle_tools_list(id: Value) -> JsonRpcResponse {
                             }
                         },
                         "required": ["terminal_id", "input"]
+                    }
+                },
+                {
+                    "name": "create_terminal",
+                    "description": "Create a new terminal split pane. Returns the terminal ID. The terminal opens in the given cwd (or the home directory if omitted).",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {
+                            "cwd": {
+                                "type": "string",
+                                "description": "Working directory for the new terminal. Defaults to the home directory."
+                            }
+                        },
+                        "required": []
+                    }
+                },
+                {
+                    "name": "close_terminal",
+                    "description": "Close a terminal and remove its split pane.",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {
+                            "terminal_id": {
+                                "type": "string",
+                                "description": "The terminal ID to close."
+                            }
+                        },
+                        "required": ["terminal_id"]
                     }
                 }
             ]
@@ -289,6 +321,8 @@ async fn handle_tools_call(
         "read_terminal_output" => tool_read_terminal_output(id, &arguments, state).await,
         "is_terminal_busy" => tool_is_terminal_busy(id, &arguments, state).await,
         "write_to_terminal" => tool_write_to_terminal(id, &arguments, state).await,
+        "create_terminal" => tool_create_terminal(id, &arguments, state).await,
+        "close_terminal" => tool_close_terminal(id, &arguments, state).await,
         _ => JsonRpcResponse::error(id, -32602, format!("Unknown tool: {}", tool_name)),
     }
 }
@@ -422,6 +456,70 @@ async fn tool_write_to_terminal(
             }),
         ),
         Err(e) => JsonRpcResponse::error(id, -32603, format!("Write failed: {}", e)),
+    }
+}
+
+async fn tool_create_terminal(id: Value, args: &Value, state: &McpServerState) -> JsonRpcResponse {
+    let cwd = args.get("cwd").and_then(|v| v.as_str()).map(String::from);
+
+    let app_handle = state.app_handle.clone();
+    let terminal_manager = state.terminal_manager.clone();
+
+    let result =
+        tokio::task::spawn_blocking(move || terminal_manager.create_terminal(&app_handle, cwd))
+            .await;
+
+    match result {
+        Ok(Ok(terminal_id)) => {
+            let effective_cwd = args
+                .get("cwd")
+                .and_then(|v| v.as_str())
+                .unwrap_or("~")
+                .to_string();
+            let _ = state.app_handle.emit(
+                "mcp-terminal-created",
+                json!({ "id": terminal_id, "cwd": effective_cwd }),
+            );
+            JsonRpcResponse::success(
+                id,
+                json!({
+                    "content": [{
+                        "type": "text",
+                        "text": terminal_id
+                    }]
+                }),
+            )
+        }
+        Ok(Err(e)) => JsonRpcResponse::error(id, -32603, format!("Create failed: {}", e)),
+        Err(e) => JsonRpcResponse::error(id, -32603, format!("Task failed: {}", e)),
+    }
+}
+
+async fn tool_close_terminal(id: Value, args: &Value, state: &McpServerState) -> JsonRpcResponse {
+    let terminal_id = match args.get("terminal_id").and_then(|v| v.as_str()) {
+        Some(tid) => tid,
+        None => {
+            return JsonRpcResponse::error(id, -32602, "Missing terminal_id".to_string());
+        }
+    };
+
+    state.output_buffers.remove(terminal_id).await;
+
+    let tid = terminal_id.to_string();
+    match state.terminal_manager.close_terminal(&tid) {
+        Ok(()) => {
+            let _ = state.app_handle.emit("mcp-terminal-closed", &tid);
+            JsonRpcResponse::success(
+                id,
+                json!({
+                    "content": [{
+                        "type": "text",
+                        "text": "ok"
+                    }]
+                }),
+            )
+        }
+        Err(e) => JsonRpcResponse::error(id, -32603, format!("Close failed: {}", e)),
     }
 }
 
