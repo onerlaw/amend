@@ -16,6 +16,7 @@ export interface TerminalTab {
 interface TerminalState {
   tabs: TerminalTab[];
   activeTabId: string | null;
+  busyMap: Record<string, boolean>;
   addTab: (id: string, cwd: string, afterTabId?: string) => void;
   removeTab: (id: string) => void;
   setActiveTab: (id: string) => void;
@@ -31,12 +32,14 @@ interface TerminalState {
       branchName?: string | null;
     }
   ) => void;
+  setTerminalBusy: (id: string, busy: boolean) => void;
   reorderTabs: (fromIndex: number, toIndex: number) => void;
 }
 
 export const useTerminalStore = create<TerminalState>((set, get) => ({
   tabs: [],
   activeTabId: null,
+  busyMap: {},
 
   addTab: (id: string, cwd: string, afterTabId?: string) => {
     const tabs = get().tabs;
@@ -70,7 +73,9 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
       }
     }
 
-    set({ tabs: newTabs, activeTabId: newActiveId });
+    const busyMap = { ...get().busyMap };
+    delete busyMap[id];
+    set({ tabs: newTabs, activeTabId: newActiveId, busyMap });
   },
 
   setActiveTab: (id: string) => {
@@ -125,6 +130,11 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
           : t
       ),
     });
+  },
+
+  setTerminalBusy: (id: string, busy: boolean) => {
+    if (get().busyMap[id] === busy) return;
+    set({ busyMap: { ...get().busyMap, [id]: busy } });
   },
 
   reorderTabs: (fromIndex: number, toIndex: number) => {

@@ -20,7 +20,7 @@ import { useTabGitRoots } from '@/hooks/useTabGitRoots';
 import { TerminalPane } from './TerminalPane';
 import { TerminalSplitLayout } from './TerminalSplitLayout';
 import { RootDropZone } from './RootDropZone';
-import { CloseIcon, FolderIcon } from '@/components/Icons';
+import { CloseIcon, FolderIcon, SpinnerIcon } from '@/components/Icons';
 import { getFileName, formatShortcut } from '@/lib/fileUtils';
 import { useDraggableTabs } from '@/hooks/useDraggableTabs';
 import { isTerminalBusy, onMcpTerminalCreated, onMcpTerminalClosed } from '@/lib/tauri';
@@ -37,9 +37,11 @@ function TabBranchBadge({ tab }: { tab: TerminalTab }) {
 }
 
 export function TerminalTabLabel({ tab }: { tab: TerminalTab }) {
+  const isBusy = useTerminalStore((s) => s.busyMap[tab.id]);
   const dirName = getFileName(tab.cwd);
   return (
     <span className="flex items-center gap-1 max-w-[200px]">
+      {isBusy && <SpinnerIcon className="h-3 w-3 animate-spin shrink-0" />}
       <span className="truncate">{tab.title || dirName}</span>
       <TabBranchBadge tab={tab} />
     </span>

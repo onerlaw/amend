@@ -46,6 +46,15 @@ export async function isTerminalBusy(id: string): Promise<boolean> {
   return invoke<boolean>('is_terminal_busy', { id });
 }
 
+export async function onTerminalBusyChange(
+  id: string,
+  callback: (isBusy: boolean) => void
+): Promise<UnlistenFn> {
+  return listen(`terminal-busy-${id}`, (event) => {
+    callback(event.payload as boolean);
+  });
+}
+
 export async function forceQuitApp(): Promise<void> {
   return invoke('force_quit');
 }
