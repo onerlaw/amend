@@ -96,6 +96,23 @@ export async function onWindowCloseRequested(callback: () => void): Promise<Unli
   });
 }
 
+// MCP terminal events
+export async function onMcpTerminalCreated(
+  callback: (payload: { id: string; cwd: string }) => void
+): Promise<UnlistenFn> {
+  return listen('mcp-terminal-created', (event) => {
+    callback(event.payload as { id: string; cwd: string });
+  });
+}
+
+export async function onMcpTerminalClosed(
+  callback: (terminalId: string) => void
+): Promise<UnlistenFn> {
+  return listen('mcp-terminal-closed', (event) => {
+    callback(event.payload as string);
+  });
+}
+
 // File system types
 export interface FileEntry {
   name: string;
