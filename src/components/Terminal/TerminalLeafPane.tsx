@@ -1,7 +1,8 @@
 import { Fragment, useCallback, useRef, useEffect, useState, useMemo } from 'react';
 import { TerminalPane } from './TerminalPane';
 import { DropZoneOverlay } from './DropZoneOverlay';
-import { TerminalTabLabel, groupTabsByProject, ProjectLabel } from './TerminalTabs';
+import { TerminalTabLabel } from './TerminalTabLabel';
+import { groupTabsByProject, ProjectLabel } from './TerminalTabs';
 import { useTerminalLayoutStore } from '@/stores/terminalLayoutStore';
 import { useTerminalDragStore } from '@/stores/terminalDragStore';
 import { useTerminalStore } from '@/stores/terminalStore';

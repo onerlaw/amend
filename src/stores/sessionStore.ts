@@ -9,14 +9,16 @@ interface BrowseContextState {
 
 interface SessionState {
   terminalCwds: string[];
+  terminalCustomNames: string[];
   activeTerminalIndex: number;
   terminalLayout: SerializedLayoutNode | null;
   browseFilePaths: Record<string, BrowseContextState>;
   saveTerminals: (
     cwds: string[],
     activeIndex: number,
-    layout?: LayoutNode | null,
-    terminalIds?: string[]
+    layout: LayoutNode | null,
+    terminalIds: string[],
+    customNames: string[]
   ) => void;
   saveBrowseState: (state: Record<string, BrowseContextState>) => void;
 }
@@ -25,10 +27,11 @@ export const useSessionStore = create<SessionState>()(
   persist(
     (set) => ({
       terminalCwds: [],
+      terminalCustomNames: [],
       activeTerminalIndex: 0,
       terminalLayout: null,
       browseFilePaths: {},
-      saveTerminals: (cwds, activeIndex, layout, terminalIds) => {
+      saveTerminals: (cwds, activeIndex, layout, terminalIds, customNames) => {
         let serializedLayout: SerializedLayoutNode | null = null;
         if (layout && terminalIds && terminalIds.length > 0) {
           try {
@@ -39,6 +42,7 @@ export const useSessionStore = create<SessionState>()(
         }
         set({
           terminalCwds: cwds,
+          terminalCustomNames: customNames,
           activeTerminalIndex: activeIndex,
           terminalLayout: serializedLayout,
         });
@@ -49,6 +53,7 @@ export const useSessionStore = create<SessionState>()(
       name: 'amend-session',
       partialize: (state) => ({
         terminalCwds: state.terminalCwds,
+        terminalCustomNames: state.terminalCustomNames,
         activeTerminalIndex: state.activeTerminalIndex,
         terminalLayout: state.terminalLayout,
         browseFilePaths: state.browseFilePaths,

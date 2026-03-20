@@ -6,6 +6,7 @@ export interface TerminalTab {
   id: string;
   cwd: string;
   title?: string;
+  customName?: string;
   gitRoot?: string | null; // undefined = not resolved, null = not in a repo, string = git root
   repoName?: string | null;
   mainRepoRoot?: string | null;
@@ -21,6 +22,7 @@ interface TerminalState {
   removeTab: (id: string) => void;
   setActiveTab: (id: string) => void;
   setTabTitle: (id: string, title: string) => void;
+  setTabCustomName: (id: string, customName: string | undefined) => void;
   updateTabCwd: (id: string, cwd: string) => void;
   setTabRepoInfo: (
     id: string,
@@ -85,6 +87,12 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
   setTabTitle: (id: string, title: string) => {
     set({
       tabs: get().tabs.map((tab) => (tab.id === id ? { ...tab, title } : tab)),
+    });
+  },
+
+  setTabCustomName: (id: string, customName: string | undefined) => {
+    set({
+      tabs: get().tabs.map((tab) => (tab.id === id ? { ...tab, customName } : tab)),
     });
   },
 
