@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, lazy, Suspense } from 'react';
+import { useEffect, useState, useRef, useCallback, lazy, Suspense } from 'react';
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 import { useUIStore } from '@/stores/uiStore';
 import { useTerminalStore } from '@/stores/terminalStore';
@@ -74,6 +74,7 @@ export function MainLayout() {
   const { tabs, activeTabId } = useTerminalStore();
   const [showSettings, setShowSettings] = useState(false);
   const [showWorktrees, setShowWorktrees] = useState(false);
+  const [worktreeAutoAdd, setWorktreeAutoAdd] = useState(false);
   const createTerminal = useCreateTerminal();
   const terminalTabsRef = useRef<TerminalTabsHandle>(null);
   const browseEditorTabsRef = useRef<BrowseEditorTabsHandle>(null);
@@ -85,7 +86,13 @@ export function MainLayout() {
   const gitStatus = gitPolling.status;
 
   // Centralized keyboard shortcuts
-  useCommands({ terminalTabsRef, browseEditorTabsRef });
+  const openWorktreesWithAdd = useCallback(() => {
+    if (contextPath) {
+      setWorktreeAutoAdd(true);
+      setShowWorktrees(true);
+    }
+  }, [contextPath]);
+  useCommands({ terminalTabsRef, browseEditorTabsRef, onOpenWorktrees: openWorktreesWithAdd });
 
   // One-time cleanup of legacy localStorage data
   useEffect(() => {
@@ -248,7 +255,7 @@ export function MainLayout() {
             <NotesIcon />
           </button>
           <button
-            onClick={() => contextPath && setShowWorktrees(true)}
+            onClick={() => contextPath && (setWorktreeAutoAdd(false), setShowWorktrees(true))}
             disabled={!contextPath}
             className={`rounded-md p-1.5 ${
               showWorktrees
@@ -426,8 +433,12 @@ export function MainLayout() {
       {showWorktrees && contextPath && (
         <WorktreeManager
           repoPath={contextPath}
-          onClose={() => setShowWorktrees(false)}
+          onClose={() => {
+            setShowWorktrees(false);
+            setWorktreeAutoAdd(false);
+          }}
           createTerminal={createTerminal}
+          autoShowAddForm={worktreeAutoAdd}
         />
       )}
 

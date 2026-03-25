@@ -122,7 +122,8 @@ export const TerminalTabs = forwardRef<TerminalTabsHandle>(function TerminalTabs
     if (tabs.length === 0 && !initializedRef.current && !creatingRef.current) {
       initializedRef.current = true;
       creatingRef.current = true;
-      const { terminalCwds, terminalCustomNames, activeTerminalIndex, terminalLayout } = useSessionStore.getState();
+      const { terminalCwds, terminalCustomNames, activeTerminalIndex, terminalLayout } =
+        useSessionStore.getState();
       if (terminalCwds.length > 0) {
         (async () => {
           try {

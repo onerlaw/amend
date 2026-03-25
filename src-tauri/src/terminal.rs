@@ -274,7 +274,9 @@ impl TerminalManager {
                     }
 
                     let child_pid = get_child_pid(shell_pid);
-                    let is_busy = child_pid.is_some();
+                    let is_busy = child_pid
+                        .map(|pid| get_child_pid(pid).is_some())
+                        .unwrap_or(false);
                     if last_busy != Some(is_busy) {
                         last_busy = Some(is_busy);
                         let _ = app_handle_for_cwd.emit(&busy_event_name, is_busy);
@@ -345,7 +347,10 @@ impl TerminalManager {
         Ok(())
     }
 
-    /// Check if a terminal has a foreground child process running.
+    /// Check if a terminal has an actively working child process.
+    /// Returns true only when the shell's child has its own children
+    /// (grandchildren of the shell), so idle interactive programs like
+    /// `claude` at a prompt won't show as busy.
     pub fn is_busy(&self, id: &str) -> bool {
         // Extract PID under the lock, then release before spawning pgrep
         let pid = {
@@ -358,11 +363,12 @@ impl TerminalManager {
                 None => return false,
             }
         };
-        std::process::Command::new("pgrep")
-            .args(["-P", &pid.to_string()])
-            .status()
-            .map(|s| s.success())
-            .unwrap_or(false)
+        // Get the shell's direct child, then check if it has its own children
+        let child_pid = match get_child_pid(pid) {
+            Some(pid) => pid,
+            None => return false,
+        };
+        get_child_pid(child_pid).is_some()
     }
 }
 
