@@ -12,6 +12,7 @@ import {
 } from '@/lib/tauri';
 import { BranchIcon, CloseIcon, PlusIcon, TrashIcon, SpinnerIcon } from '@/components/Icons';
 import { getFileName } from '@/lib/fileUtils';
+import { useTerminalLayoutStore } from '@/stores/terminalLayoutStore';
 
 interface WorktreeManagerProps {
   repoPath: string;
@@ -46,17 +47,30 @@ export function WorktreeManager({
     refresh();
   }, [refresh]);
 
+  const openTerminalWithPaneAssignment = async (path: string) => {
+    try {
+      const newId = await createTerminal(path);
+      const { focusedPaneId, assignTerminalToPane } = useTerminalLayoutStore.getState();
+      if (focusedPaneId) {
+        assignTerminalToPane(focusedPaneId, newId);
+      }
+    } catch (err) {
+      console.error('Failed to create terminal:', err);
+    }
+  };
+
   const handleRowClick = async (wt: GitWorktree) => {
-    await createTerminal(wt.path);
+    await openTerminalWithPaneAssignment(wt.path);
     onClose();
   };
 
   const handleWorktreeOpenedOrCreated = useCallback(
     async (wt: GitWorktree) => {
       setShowAddForm(false);
-      await createTerminal(wt.path);
+      await openTerminalWithPaneAssignment(wt.path);
       onClose();
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- openTerminalWithPaneAssignment only captures stable callbacks
     [createTerminal, onClose]
   );
 
