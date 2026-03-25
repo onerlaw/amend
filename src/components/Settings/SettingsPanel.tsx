@@ -158,6 +158,7 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
             <div className="space-y-2 text-xs">
               {[
                 ['New Terminal', formatShortcut('Mod+T')],
+                ['New Worktree', formatShortcut('Mod+Shift+T')],
                 ['Open Folder', formatShortcut('Mod+O')],
                 ['Cycle Panes', formatShortcut('Mod+`')],
                 ['Split Right', formatShortcut('Mod+D')],

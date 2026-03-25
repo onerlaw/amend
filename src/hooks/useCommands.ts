@@ -16,13 +16,18 @@ import type { TerminalTab } from '@/stores/terminalStore';
 interface CommandRefs {
   terminalTabsRef: RefObject<TerminalTabsHandle | null>;
   browseEditorTabsRef: RefObject<BrowseEditorTabsHandle | null>;
+  onOpenWorktrees?: () => void;
 }
 
 /**
  * Centralized keyboard shortcut handler. Registers all global shortcuts
  * and wires them to the appropriate store actions or ref methods.
  */
-export function useCommands({ terminalTabsRef, browseEditorTabsRef }: CommandRefs) {
+export function useCommands({
+  terminalTabsRef,
+  browseEditorTabsRef,
+  onOpenWorktrees,
+}: CommandRefs) {
   const { panelMode } = useUIStore();
   const { tabs, activeTabId, setActiveTab } = useTerminalStore();
   const { browseActiveFilePath, closeBrowseFile, contextPath } = useFileStore();
@@ -75,8 +80,13 @@ export function useCommands({ terminalTabsRef, browseEditorTabsRef }: CommandRef
       if (!mod) return;
 
       switch (e.key) {
-        // Cmd/Ctrl + T: New terminal (home dir)
+        // Cmd/Ctrl + T: New terminal (home dir) or new worktree
         case 't': {
+          if (e.shiftKey) {
+            e.preventDefault();
+            onOpenWorktrees?.();
+            return;
+          }
           e.preventDefault();
           terminalTabsRef.current?.openNewTerminal();
           return;
@@ -229,6 +239,7 @@ export function useCommands({ terminalTabsRef, browseEditorTabsRef }: CommandRef
       terminalTabsRef,
       browseEditorTabsRef,
       contextPath,
+      onOpenWorktrees,
     ]
   );
 

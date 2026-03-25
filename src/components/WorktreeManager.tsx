@@ -17,12 +17,18 @@ interface WorktreeManagerProps {
   repoPath: string;
   onClose: () => void;
   createTerminal: (cwd: string) => Promise<string>;
+  autoShowAddForm?: boolean;
 }
 
-export function WorktreeManager({ repoPath, onClose, createTerminal }: WorktreeManagerProps) {
+export function WorktreeManager({
+  repoPath,
+  onClose,
+  createTerminal,
+  autoShowAddForm,
+}: WorktreeManagerProps) {
   const [worktrees, setWorktrees] = useState<GitWorktree[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showAddForm, setShowAddForm] = useState(false);
+  const [showAddForm, setShowAddForm] = useState(autoShowAddForm ?? false);
   const [removing, setRemoving] = useState<GitWorktree | null>(null);
 
   const refresh = useCallback(async () => {
