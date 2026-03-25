@@ -80,13 +80,22 @@ export function useCommands({
       if (!mod) return;
 
       switch (e.key) {
-        // Cmd/Ctrl + T: New terminal (home dir) or new worktree
+        // Cmd/Ctrl + T: New terminal (home dir) or new worktree or new note
         case 't': {
           if (e.shiftKey) {
             e.preventDefault();
             onOpenWorktrees?.();
             return;
           }
+
+          // New note if notes panel is focused
+          const notesPanel = document.querySelector('[data-notes-panel]');
+          if (notesPanel && notesPanel.contains(document.activeElement)) {
+            e.preventDefault();
+            useNotesStore.getState().addNote();
+            return;
+          }
+
           e.preventDefault();
           terminalTabsRef.current?.openNewTerminal();
           return;
@@ -206,10 +215,11 @@ export function useCommands({
         case 'w': {
           e.preventDefault();
 
-          // Close notes panel if it's focused
+          // Close active note tab if notes panel is focused
           const notesPanel = document.querySelector('[data-notes-panel]');
           if (notesPanel && notesPanel.contains(document.activeElement)) {
-            useNotesStore.getState().toggleNotes();
+            const { activeNoteId, removeNote } = useNotesStore.getState();
+            if (activeNoteId) removeNote(activeNoteId);
             return;
           }
 

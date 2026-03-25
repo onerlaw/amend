@@ -4,18 +4,124 @@ import { EditorState } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
 import { useNotesStore } from '@/stores/notesStore';
 import { createBaseExtensions } from '@/lib/codemirror';
-import { CloseIcon } from '@/components/Icons';
+import { CloseIcon, PlusIcon } from '@/components/Icons';
+import { useDraggableTabs } from '@/hooks/useDraggableTabs';
+
+function NoteTabLabel({
+  title,
+  isActive,
+  isDragging,
+  onSelect,
+  onClose,
+  onRename,
+  dragProps,
+}: {
+  title: string;
+  isActive: boolean;
+  isDragging: boolean;
+  onSelect: () => void;
+  onClose: (e: React.MouseEvent) => void;
+  onRename: (title: string) => void;
+  dragProps: { ref: (el: HTMLElement | null) => void; onMouseDown: (e: React.MouseEvent) => void };
+}) {
+  const [renaming, setRenaming] = useState(false);
+  const [renameValue, setRenameValue] = useState(title);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+
+  const commitRename = useCallback(() => {
+    const trimmed = renameValue.trim();
+    onRename(trimmed || title);
+    setRenaming(false);
+  }, [renameValue, title, onRename]);
+
+  const handleDoubleClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setRenameValue(title);
+    setRenaming(true);
+  };
+
+  useEffect(() => {
+    if (renaming && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, [renaming]);
+
+  if (renaming) {
+    return (
+      <div
+        {...dragProps}
+        className={`group flex items-center gap-1 px-2 py-1 text-xs ${
+          isActive ? 'bg-surface-0 text-primary' : 'text-secondary'
+        } ${isDragging ? 'opacity-50' : ''}`}
+      >
+        <input
+          ref={inputRef}
+          value={renameValue}
+          onChange={(e) => setRenameValue(e.target.value)}
+          onKeyDown={(e) => {
+            e.stopPropagation();
+            if (e.key === 'Enter') commitRename();
+            if (e.key === 'Escape') setRenaming(false);
+          }}
+          onBlur={commitRename}
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+          className="bg-surface-3 text-primary text-xs rounded px-1 py-0 outline-none border border-accent w-24 min-w-[40px]"
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className={`group flex items-center ${isDragging ? 'opacity-50' : ''}`}>
+      <button
+        {...dragProps}
+        onClick={onSelect}
+        onDoubleClick={handleDoubleClick}
+        className={`flex items-center gap-1 px-2 py-1 text-xs ${
+          isActive
+            ? 'bg-surface-0 text-primary'
+            : 'text-secondary hover:bg-surface-1 opacity-50 hover:opacity-75'
+        }`}
+      >
+        <span className="truncate max-w-[120px]">{title || 'Untitled'}</span>
+        <span
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={onClose}
+          className="rounded-full p-0.5 opacity-0 hover:bg-surface-3 group-hover:opacity-100"
+        >
+          <CloseIcon className="h-3 w-3" />
+        </span>
+      </button>
+    </div>
+  );
+}
 
 export function NotesPanel() {
-  const { isOpen, content, position, size, toggleNotes, setContent, setPosition, setSize } =
-    useNotesStore();
+  const {
+    isOpen,
+    notes,
+    activeNoteId,
+    position,
+    size,
+    toggleNotes,
+    setActiveNote,
+    addNote,
+    removeNote,
+    renameNote,
+    reorderNotes,
+    updateNoteContent,
+    setPosition,
+    setSize,
+  } = useNotesStore();
 
-  const containerRef = useRef<HTMLDivElement>(null);
+  const editorContainerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
-  const contentRef = useRef(content);
+  const activeNoteIdRef = useRef(activeNoteId);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const previousNoteIdRef = useRef<string | null>(null);
 
-  // Drag state
   const [dragPos, setDragPos] = useState<{ x: number; y: number } | null>(null);
   const dragStartRef = useRef<{
     mouseX: number;
@@ -24,32 +130,63 @@ export function NotesPanel() {
     posY: number;
   } | null>(null);
 
-  // Resize state
   const [resizeSize, setResizeSize] = useState<{ width: number; height: number } | null>(null);
   const resizeStartRef = useRef<{ mouseX: number; mouseY: number; w: number; h: number } | null>(
     null
   );
 
-  // Keep contentRef in sync
   useEffect(() => {
-    contentRef.current = content;
-  }, [content]);
+    previousNoteIdRef.current = activeNoteIdRef.current;
+    activeNoteIdRef.current = activeNoteId;
+  }, [activeNoteId]);
 
-  // Clamp position to viewport on open
-  const clampedPosition = useCallback(() => {
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
-    const x = Math.max(0, Math.min(position.x, vw - size.width));
-    const y = Math.max(0, Math.min(position.y, vh - size.height));
-    return { x, y };
-  }, [position, size]);
+  const flushPendingSave = useCallback(() => {
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+      debounceRef.current = null;
+    }
+    const view = viewRef.current;
+    if (!view) return;
+    const currentId = activeNoteIdRef.current;
+    if (!currentId) return;
+    const content = view.state.doc.toString();
+    const note = useNotesStore.getState().notes.find((n) => n.id === currentId);
+    if (note && content !== note.content) {
+      updateNoteContent(currentId, content);
+    }
+  }, [updateNoteContent]);
 
-  // Create / destroy CodeMirror when panel opens/closes
   useEffect(() => {
-    if (!isOpen || !containerRef.current) return;
+    const view = viewRef.current;
+    if (!view) return;
 
-    // Clamp stored position on open
-    const clamped = clampedPosition();
+    const prevId = previousNoteIdRef.current;
+    if (prevId && prevId !== activeNoteId) {
+      flushPendingSave();
+    }
+
+    const note = notes.find((n) => n.id === activeNoteId);
+    if (!note) return;
+
+    const currentDoc = view.state.doc.toString();
+    if (currentDoc !== note.content) {
+      view.dispatch({
+        changes: { from: 0, to: currentDoc.length, insert: note.content },
+      });
+    }
+  }, [activeNoteId, notes, flushPendingSave]);
+
+  useEffect(() => {
+    if (!isOpen || !editorContainerRef.current) return;
+
+    const clamped = (() => {
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      return {
+        x: Math.max(0, Math.min(position.x, vw - size.width)),
+        y: Math.max(0, Math.min(position.y, vh - size.height)),
+      };
+    })();
     if (clamped.x !== position.x || clamped.y !== position.y) {
       setPosition(clamped);
     }
@@ -57,45 +194,52 @@ export function NotesPanel() {
     const updateListener = EditorView.updateListener.of((update) => {
       if (update.docChanged) {
         const newContent = update.state.doc.toString();
-        contentRef.current = newContent;
+        const currentId = activeNoteIdRef.current;
         if (debounceRef.current) clearTimeout(debounceRef.current);
         debounceRef.current = setTimeout(() => {
-          setContent(newContent);
+          const note = useNotesStore.getState().notes.find((n) => n.id === currentId);
+          if (note && newContent !== note.content) {
+            updateNoteContent(currentId, newContent);
+          }
         }, 300);
       }
     });
 
+    const note = notes.find((n) => n.id === activeNoteId);
+    const initialContent = note?.content ?? '';
+
     const state = EditorState.create({
-      doc: content,
+      doc: initialContent,
       extensions: [...createBaseExtensions('markdown'), updateListener],
     });
 
     const view = new EditorView({
       state,
-      parent: containerRef.current,
+      parent: editorContainerRef.current,
     });
 
     viewRef.current = view;
     view.focus();
 
     return () => {
-      // Flush pending content on unmount
       if (debounceRef.current) {
         clearTimeout(debounceRef.current);
         debounceRef.current = null;
       }
       const finalContent = view.state.doc.toString();
-      if (finalContent !== useNotesStore.getState().content) {
-        setContent(finalContent);
+      const currentId = activeNoteIdRef.current;
+      if (currentId) {
+        const note = useNotesStore.getState().notes.find((n) => n.id === currentId);
+        if (note && finalContent !== note.content) {
+          updateNoteContent(currentId, finalContent);
+        }
       }
       view.destroy();
       viewRef.current = null;
     };
-    // Only recreate editor when isOpen changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
-  // Drag handlers
   const handleDragMouseDown = useCallback(
     (e: React.MouseEvent) => {
       e.preventDefault();
@@ -136,7 +280,6 @@ export function NotesPanel() {
     [position, dragPos, size, resizeSize, setPosition]
   );
 
-  // Resize handlers
   const handleResizeMouseDown = useCallback(
     (e: React.MouseEvent) => {
       e.preventDefault();
@@ -176,6 +319,24 @@ export function NotesPanel() {
     [size, resizeSize, setSize]
   );
 
+  const {
+    getTabDragProps,
+    containerRef: tabsContainerRef,
+    dropIndicatorIndex,
+    dragFromIndex,
+  } = useDraggableTabs({
+    itemCount: notes.length,
+    onReorder: reorderNotes,
+  });
+
+  const handleCloseTab = useCallback(
+    (e: React.MouseEvent, noteId: string) => {
+      e.stopPropagation();
+      removeNote(noteId);
+    },
+    [removeNote]
+  );
+
   if (!isOpen) return null;
 
   const currentPos = dragPos ?? position;
@@ -194,10 +355,10 @@ export function NotesPanel() {
     >
       {/* Title bar — drag handle */}
       <div
-        className="flex h-8 shrink-0 cursor-move items-center justify-between bg-surface-1 px-3"
+        className="flex h-8 shrink-0 cursor-move items-center justify-between bg-surface-1 px-3 select-none"
         onMouseDown={handleDragMouseDown}
       >
-        <span className="select-none text-xs font-medium text-primary">Notes</span>
+        <span className="text-xs font-medium text-primary">Notes</span>
         <button
           onClick={toggleNotes}
           onMouseDown={(e) => e.stopPropagation()}
@@ -207,8 +368,42 @@ export function NotesPanel() {
         </button>
       </div>
 
+      {/* Tab bar */}
+      <div
+        ref={tabsContainerRef}
+        className="flex bg-surface-2 overflow-x-auto px-1 pt-0.5 gap-0.5 items-end shrink-0"
+      >
+        {notes.map((note, index) => (
+          <div key={note.id} className="relative flex">
+            {dropIndicatorIndex === index && (
+              <div className="absolute left-0 top-1 bottom-1 w-0.5 bg-accent rounded-full z-10 pointer-events-none" />
+            )}
+            <NoteTabLabel
+              title={note.title}
+              isActive={note.id === activeNoteId}
+              isDragging={dragFromIndex === index}
+              onSelect={() => setActiveNote(note.id)}
+              onClose={(e) => handleCloseTab(e, note.id)}
+              onRename={(title) => renameNote(note.id, title)}
+              dragProps={getTabDragProps(index)}
+            />
+          </div>
+        ))}
+        {dropIndicatorIndex === notes.length && (
+          <div className="relative flex">
+            <div className="absolute left-0 top-1 bottom-1 w-0.5 bg-accent rounded-full z-10 pointer-events-none" />
+          </div>
+        )}
+        <button
+          onClick={addNote}
+          className="flex items-center justify-center rounded p-0.5 text-secondary hover:bg-surface-1 hover:text-primary mb-0.5"
+        >
+          <PlusIcon className="h-3 w-3" />
+        </button>
+      </div>
+
       {/* CodeMirror container */}
-      <div ref={containerRef} className="min-h-0 flex-1 overflow-hidden" />
+      <div ref={editorContainerRef} className="min-h-0 flex-1 overflow-hidden" />
 
       {/* Resize handle */}
       <div
